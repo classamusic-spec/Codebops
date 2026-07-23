@@ -42,7 +42,7 @@ export class SparkleMeadow {
     // Puzzle island tiles
     for (let row = 0; row < level.rows; row++) {
       for (let col = 0; col < level.cols; col++) {
-        const tint = (row + col) % 2 === 0 ? '#8ee06a' : '#7ed95e';
+        const tint = (row + col) % 2 === 0 ? '#79d455' : '#6cc94a';
         const tile = createGroundTile(TILE, tint);
         const p = this.cellToWorld(col, row);
         tile.position.set(p.x, TILE_TOP / 2, p.z);

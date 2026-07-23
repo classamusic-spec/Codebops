@@ -57,12 +57,10 @@ npm run typecheck  # strict TypeScript check
   for the family (persists separately from progress), replay or delete
   from the island shelf.
 
-### Canon-locked traced SVG mascots
-
-### Canon-locked traced SVG mascots
-- Zip & Mixy were **machine-traced from the reference art** into layered,
-  resolution-independent SVGs (color-quantized contour tracing) — pixel-
-  faithful silhouettes and palette, semantically grouped parts
+### Canon smooth-vector mascots
+- Zip & Mixy are **hand-authored smooth bézier SVGs matched to the
+  reference art** — clean anti-aliased curves at any resolution, on-model
+  palette and proportions, semantically grouped parts
   (body / ears / crest / eyes / mouth / arms / antenna / fragments).
 - **Multiple animated states, zero redesign**: blinking eyelids, glancing
   pupils, smile / open / surprised "o" mouths, excited star-eyes, wave,

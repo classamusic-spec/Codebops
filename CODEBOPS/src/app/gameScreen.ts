@@ -21,7 +21,7 @@ import {
   showPrediction, showCelebration, showGlitchReplay, showSettings,
   showToast, showBrief, showFredDialog,
 } from '../ui/dialogs';
-import { Sfx } from '../audio/sfx';
+import { sharedSfx } from '../audio/sfx';
 import { SaveStore } from '../storage/saveStore';
 import { assertLevelValid } from '../data/schemas/level';
 import type { LevelDef } from '../data/schemas/level';
@@ -54,8 +54,8 @@ export class GameScreen {
   private deck!: ProgramDeck;
   private topBar!: TopBar;
   private charLayer!: HTMLElement;
-  private readonly sfx = new Sfx();
-  private readonly store = new SaveStore();
+  private readonly sfx = sharedSfx;
+  private readonly store: SaveStore;
   private program: ProgramStep[] = [];
   private running = false;
   private predictedSuccess: boolean | null = null;
@@ -77,8 +77,11 @@ export class GameScreen {
       hasNext: boolean;
       /** Fired once when the level is completed (Daily Bop hooks in here). */
       onSuccess?: () => void;
+      /** Shared save store — one instance app-wide so writes never clobber. */
+      store?: SaveStore;
     },
   ) {
+    this.store = events.store ?? new SaveStore();
     assertLevelValid(level);
   }
 
@@ -278,17 +281,26 @@ export class GameScreen {
 
   /** BopLens: sparkle rings over every tile the current rule can see. */
   private refreshLens(): void {
-    this.lensGroup?.removeFromParent();
-    this.lensGroup = null;
+    if (this.lensGroup) {
+      this.lensGroup.removeFromParent();
+      this.lensGroup.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          o.geometry.dispose();
+          (o.material as THREE.Material).dispose();
+        }
+      });
+      this.lensGroup = null;
+    }
     if (!this.lensOn || !this.selectedRule) return;
     const group = new THREE.Group();
     const mat = new THREE.MeshToonMaterial({
       color: '#7ff3ff', emissive: '#54e6ff', emissiveIntensity: 1.3,
       transparent: true, opacity: 0.9,
     });
+    const ringGeo = new THREE.TorusGeometry(0.62, 0.05, 8, 28);
     for (const item of this.level.items) {
       if (item.kind !== this.selectedRule.trigger) continue;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 8, 28), mat);
+      const ring = new THREE.Mesh(ringGeo, mat);
       ring.rotation.x = -Math.PI / 2;
       const p = this.world.cellToWorld(item.col, item.row);
       ring.position.set(p.x, TILE_TOP + 0.04, p.z);

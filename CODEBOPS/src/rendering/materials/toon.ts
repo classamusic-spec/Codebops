@@ -11,6 +11,7 @@ export function toonGradient(): THREE.DataTexture {
   gradientMap.minFilter = THREE.NearestFilter;
   gradientMap.magFilter = THREE.NearestFilter;
   gradientMap.needsUpdate = true;
+  gradientMap.userData.shared = true;
   return gradientMap;
 }
 
@@ -21,13 +22,18 @@ export function toonMat(color: string | number): THREE.MeshToonMaterial {
   let m = cache.get(key);
   if (!m) {
     m = new THREE.MeshToonMaterial({ color, gradientMap: toonGradient() });
+    // Cached + reused across levels — Stage.dispose must not destroy it.
+    m.userData.shared = true;
     cache.set(key, m);
   }
   return m;
 }
 
+let contactShadow: THREE.Texture | null = null;
+
 /** Radial soft contact-shadow texture (shared). */
 export function contactShadowTexture(): THREE.Texture {
+  if (contactShadow) return contactShadow;
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -40,6 +46,8 @@ export function contactShadowTexture(): THREE.Texture {
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.userData.shared = true;
+  contactShadow = tex;
   return tex;
 }
 

@@ -6,22 +6,30 @@ import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { loadCustomLevels, deleteCustomLevel } from '../storage/customLevels';
 import { inlineSvgInto, startMascotLife } from '../rendering/spriteCharacter';
+import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { createCampfireGate, showCampfire } from './campfire';
 
-const WORLD_META: Record<string, { emoji: string; name: string }> = {
-  'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow' },
-  'bubble-bay': { emoji: '🫧', name: 'Bubble Bay' },
-  'pattern-forest': { emoji: '🌸', name: 'Pattern Forest' },
-  'robot-town': { emoji: '🤖', name: 'Robot Town' },
-  'agent-academy': { emoji: '🎓', name: 'Agent Academy' },
+const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
+  'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
+  'bubble-bay': { emoji: '🐚', name: 'Bubble Bay', theme: 'bay' },
+  'pattern-forest': { emoji: '🌸', name: 'Pattern Forest', theme: 'forest' },
+  'robot-town': { emoji: '🤖', name: 'Robot Town', theme: 'town' },
+  'agent-academy': { emoji: '🎓', name: 'Agent Academy', theme: 'academy' },
 };
 const WORLD_ORDER = ['sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town', 'agent-academy'];
 
-/** Today's featured level for the Daily Bop (stable per calendar day). */
+/**
+ * Today's featured level for the Daily Bop (stable per LOCAL calendar day,
+ * so it flips at the same midnight the streak logic uses).
+ */
 function dailyLevelIndex(): number {
-  return Math.floor(Date.now() / 86_400_000) % ALL_LEVELS.length;
+  const now = new Date();
+  const localDays = Math.floor(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 86_400_000,
+  );
+  return ((localDays % ALL_LEVELS.length) + ALL_LEVELS.length) % ALL_LEVELS.length;
 }
 
 export class App {
@@ -56,21 +64,25 @@ export class App {
 
   private showTitle(): void {
     this.clearHost();
-    const screen = el('section', 'screen', this.host);
+    const screen = el('section', 'screen title-screen', this.host);
     screen.id = 'screen-title';
-    screen.style.background =
-      'radial-gradient(130% 100% at 50% -10%, #7dd7ff 0%, #4ea9f0 38%, #2e7ce6 72%, #16225c 100%)';
 
-    const hill1 = el('div', undefined, screen);
-    Object.assign(hill1.style, {
-      position: 'absolute', left: '-12%', bottom: '-22%', width: '70%', height: '46%',
-      background: '#6fcb52', borderRadius: '50%',
+    // Sky decor: sun rays, clouds, floating sparkles
+    el('div', 'title-rays', screen);
+    for (const cls of ['c1', 'c2', 'c3']) el('div', `title-cloud ${cls}`, screen);
+    const deco = ['⭐', '✨', '⬡', '✦', '💧', '⭐', '✨'];
+    deco.forEach((d, i) => {
+      const s = el('span', `title-spark s${i}`, screen, d);
+      s.setAttribute('aria-hidden', 'true');
     });
-    const hill2 = el('div', undefined, screen);
-    Object.assign(hill2.style, {
-      position: 'absolute', right: '-14%', bottom: '-26%', width: '76%', height: '52%',
-      background: '#5dbd49', borderRadius: '50%',
-    });
+
+    // Rolling hills with bushes + flowers
+    const ground = el('div', 'title-ground', screen);
+    el('div', 'title-hill h1', ground);
+    el('div', 'title-hill h2', ground);
+    for (const cls of ['b1', 'b2', 'b3', 'b4']) el('div', `title-bush ${cls}`, ground);
+    const flowers = ['🌸', '🌼', '🌺', '🌻'];
+    flowers.forEach((f, i) => el('span', `title-flower f${i}`, ground, f));
 
     // Live traced mascots (blinking + glancing)
     const zipBox = el('div', 'title-mascot zip', screen);
@@ -84,17 +96,26 @@ export class App {
 
     const card = el('div', 'title-card', screen);
     buildLogo(card, 'title-logo');
-    el('div', 'title-tag', card, 'Teach tiny helpers. Build big ideas.');
+    const tag = el('div', 'title-tag', card);
+    el('span', 'tag-star', tag, '⭐');
+    el('span', undefined, tag, 'Teach tiny helpers. Build big ideas.');
+    el('span', 'tag-star', tag, '⭐');
     const play = el('button', 'btn-play', card);
     play.type = 'button';
     play.setAttribute('aria-label', 'Play CodeBops');
+    el('span', 'gloss', play);
     play.append('PLAY');
     el('span', 'tri', play);
-    play.addEventListener('click', () => this.showSelect());
+    play.addEventListener('click', () => {
+      sharedSfx.play('bop');
+      this.showSelect();
+    });
 
     // Bop Garden entry
-    const garden = el('button', 'garden-btn', card, '🌻 My Garden');
+    const garden = el('button', 'garden-btn', card);
     garden.type = 'button';
+    el('span', undefined, garden, '🌻');
+    el('span', undefined, garden, 'My Garden');
     garden.addEventListener('click', () => this.showGarden());
 
     // Grown-Up Campfire (hold-to-open gate, bottom corner)
@@ -103,7 +124,6 @@ export class App {
       showCampfire(screen, this.store, () => { /* progress reset */ });
     });
 
-    play.focus();
   }
 
   // ---------- level select ----------
@@ -113,6 +133,7 @@ export class App {
     this.store = new SaveStore(); // re-read stars earned in the last session
     const screen = el('section', 'screen', this.host);
     const wrap = el('div', 'select-wrap', screen);
+    for (const cls of ['c1', 'c2']) el('div', `title-cloud select-cloud ${cls}`, wrap);
 
     const header = el('div', 'select-header', wrap);
     const back = el('button', 'circle-btn', header, '←');
@@ -125,10 +146,12 @@ export class App {
     pill.style.marginLeft = 'auto';
     el('span', 'star earned', pill, '★');
     el('span', undefined, pill, ` ${totalStars}`);
-    const gardenBtn = el('button', 'circle-btn garden-shortcut', header, '🌻');
-    gardenBtn.type = 'button';
-    gardenBtn.setAttribute('aria-label', 'Visit the Bop Garden');
-    gardenBtn.addEventListener('click', () => this.showGarden());
+    const gardenPill = el('button', 'stars-pill garden-pill', header) as HTMLButtonElement;
+    gardenPill.type = 'button';
+    gardenPill.setAttribute('aria-label', 'Visit the Bop Garden');
+    el('span', undefined, gardenPill, '🌻');
+    el('span', undefined, gardenPill, ` ${this.store.daily.totalCompleted}`);
+    gardenPill.addEventListener('click', () => this.showGarden());
 
     // --- Daily Bop card ---
     const dailyIdx = dailyLevelIndex();
@@ -147,9 +170,8 @@ export class App {
       daily.addEventListener('click', () => this.showGame(dailyIdx, {
         onSuccess: () => {
           const streak = this.store.completeDaily();
-          this.store = new SaveStore();
-          setTimeout(() => { /* streak toast lands after celebration mounts */ }, 0);
-          void streak;
+          // Land the streak toast after the celebration dialog mounts.
+          window.setTimeout(() => this.streakToast(streak), 900);
         },
       }));
     }
@@ -160,28 +182,43 @@ export class App {
       const levels = ALL_LEVELS.filter((l) => l.worldId === worldId);
       if (levels.length === 0) continue;
       const meta = WORLD_META[worldId];
-      const section = el('div', 'world-section', wrap);
+      const firstIdx = globalIndex;
+      const worldUnlocked =
+        firstIdx === 0 || (this.store.stars[ALL_LEVELS[firstIdx - 1].id] ?? 0) >= 1;
+      const section = el('div', `world-panel wp-${meta.theme}${worldUnlocked ? '' : ' locked'}`, wrap);
       const title = el('div', 'world-title', section);
       el('span', 'wemoji', title, meta.emoji);
       el('span', undefined, title, meta.name);
-      const row = el('div', 'level-row', section);
+      if (!worldUnlocked) el('span', 'world-lock', title, '🔒');
+      const list = el('div', 'level-list', section);
 
       for (const level of levels) {
         const idx = globalIndex;
         const unlocked = idx === 0 || (this.store.stars[ALL_LEVELS[idx - 1].id] ?? 0) >= 1;
         const stars = this.store.stars[level.id] ?? 0;
-        const card = el('button', `level-card${unlocked ? '' : ' locked'}${level.prefill ? ' debug' : ''}`, row) as HTMLButtonElement;
-        card.type = 'button';
-        card.setAttribute('aria-label', unlocked ? `Play ${level.shortTitle}` : `${level.shortTitle} — locked`);
-        el('span', 'lv-num', card, String(idx + 1));
-        el('span', 'lv-emoji', card, level.brief.emoji);
-        el('span', 'lv-name', card, level.shortTitle);
-        const starRow = el('span', 'lv-stars', card);
-        for (let s = 0; s < 3; s++) {
-          el('span', s < stars ? 'on' : '', starRow, '★');
-        }
+        const row = el('button', `level-item${unlocked ? '' : ' locked'}${level.prefill ? ' debug' : ''}`, list) as HTMLButtonElement;
+        row.type = 'button';
+        row.setAttribute('aria-label', unlocked ? `Play ${level.shortTitle}` : `${level.shortTitle} — locked`);
+        const num = el('span', 'li-num', row);
+        el('span', 'li-num-text', num, String(idx + 1));
+        el('span', 'li-leaf', num, '🍃');
+        el('span', 'li-emoji', row, level.brief.emoji);
+        el('span', 'li-name', row, level.shortTitle);
+        const right = el('span', 'li-right', row);
+        if (!unlocked) el('span', 'li-lock', right, '🔒');
+        const starRow = el('span', 'li-stars', right);
+        for (let s = 0; s < 3; s++) el('span', s < stars ? 'on' : '', starRow, '★');
         if (unlocked) {
-          card.addEventListener('click', () => this.showGame(idx));
+          row.addEventListener('click', () => this.showGame(idx));
+        } else {
+          // Locked rows still respond — wiggle + a friendly hint.
+          row.addEventListener('click', () => {
+            sharedSfx.play('bump');
+            row.classList.remove('shake');
+            void row.offsetWidth;
+            row.classList.add('shake');
+            this.hintToast('⭐ Win the level before this one to unlock it!');
+          });
         }
         globalIndex++;
       }
@@ -189,23 +226,23 @@ export class App {
 
     // --- Imagination Island ---
     const customs = loadCustomLevels();
-    const section = el('div', 'world-section island', wrap);
+    const section = el('div', 'world-panel wp-island', wrap);
     const title = el('div', 'world-title', section);
     el('span', 'wemoji', title, '🏝️');
     el('span', undefined, title, 'Imagination Island');
-    const row = el('div', 'level-row', section);
-    const create = el('button', 'level-card create-card', row) as HTMLButtonElement;
+    const list = el('div', 'level-list', section);
+    const create = el('button', 'level-item create-item', list) as HTMLButtonElement;
     create.type = 'button';
-    el('span', 'lv-emoji', create, '＋');
-    el('span', 'lv-name', create, 'Build a Level');
+    el('span', 'li-emoji', create, '＋');
+    el('span', 'li-name', create, 'Build a Level');
     create.addEventListener('click', () => this.showEditor());
     for (const custom of customs) {
-      const card = el('button', 'level-card custom-card', row) as HTMLButtonElement;
-      card.type = 'button';
-      el('span', 'lv-emoji', card, '🛠️');
-      el('span', 'lv-name', card, custom.shortTitle);
-      card.addEventListener('click', () => this.showCustomGame(custom));
-      const del = el('span', 'lv-del', card, '✕');
+      const row = el('button', 'level-item custom-item', list) as HTMLButtonElement;
+      row.type = 'button';
+      el('span', 'li-emoji', row, '🛠️');
+      el('span', 'li-name', row, custom.shortTitle);
+      row.addEventListener('click', () => this.showCustomGame(custom));
+      const del = el('span', 'lv-del', row, '✕');
       del.setAttribute('aria-label', `Delete ${custom.shortTitle}`);
       del.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -214,7 +251,20 @@ export class App {
       });
     }
 
-    back.focus();
+  }
+
+  /** Floating toast over whatever screen is active. */
+  private hintToast(text: string): void {
+    document.querySelector('.app-toast')?.remove();
+    const t = el('div', 'toast app-toast', this.host, text);
+    window.setTimeout(() => t.remove(), 2200);
+  }
+
+  private streakToast(streak: number): void {
+    document.querySelector('.app-toast')?.remove();
+    const t = el('div', 'toast app-toast streak-toast', this.host,
+      `🔥 Daily Bop streak: ${streak} day${streak === 1 ? '' : 's'}! A golden flower joins your garden 🌻`);
+    window.setTimeout(() => t.remove(), 3400);
   }
 
   // ---------- game ----------
@@ -229,6 +279,7 @@ export class App {
       onNextLevel: () => this.showGame(Math.min(index + 1, ALL_LEVELS.length - 1)),
       hasNext: index < ALL_LEVELS.length - 1,
       onSuccess: opts.onSuccess,
+      store: this.store,
     });
     this.gameScreen.enter();
   }
@@ -241,6 +292,7 @@ export class App {
       onExit: () => this.showSelect(),
       onNextLevel: () => this.showSelect(),
       hasNext: false,
+      store: this.store,
     });
     this.gameScreen.enter();
   }
@@ -274,6 +326,7 @@ export class App {
           onExit: () => this.showEditor(),
           onNextLevel: () => this.showEditor(),
           hasNext: false,
+          store: this.store,
         });
         this.gameScreen.enter();
       },

@@ -5,7 +5,7 @@
 import { el } from '../ui/dom';
 import { SaveStore } from '../storage/saveStore';
 import { inlineSvgInto, startMascotLife } from '../rendering/spriteCharacter';
-import { Sfx } from '../audio/sfx';
+import { sharedSfx } from '../audio/sfx';
 
 const FLOWERS = ['🌸', '🌼', '🌷', '🌻', '🌹', '💐', '🪻', '🌺'];
 
@@ -22,7 +22,7 @@ function rng(seed: number): () => number {
 
 export class GardenScreen {
   private stops: Array<() => void> = [];
-  private readonly sfx = new Sfx();
+  private readonly sfx = sharedSfx;
 
   constructor(
     private readonly root: HTMLElement,

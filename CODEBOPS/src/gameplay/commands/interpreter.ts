@@ -337,6 +337,8 @@ export function runProgram(
       for (let k = 1; k <= count && steps < MAX_STEPS; k++) {
         events.push({ type: 'loopIter', index: i, iter: k, count });
         for (const b of body) execTile(b.cmd, b.source, { k, n: count });
+        // An IF only guards a tile inside its own iteration.
+        skipNext = false;
       }
       events.push({ type: 'loopEnd', index: i });
       continue;
@@ -359,6 +361,8 @@ export function runProgram(
         }
         events.push({ type: 'loopIter', index: i, iter: k });
         const actions = body.map((b) => execTile(b.cmd, b.source, { k, n: '∞' }));
+        // An IF only guards a tile inside its own iteration.
+        skipNext = false;
         if (shouldStop(actions)) break;
       }
       events.push({ type: 'loopEnd', index: i });

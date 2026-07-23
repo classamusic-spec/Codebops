@@ -43,7 +43,6 @@ export class Stage {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#6fc7ff');
-    this.scene.fog = new THREE.Fog('#6fc7ff', 26, 60);
     this.scene.fog = new THREE.Fog('#a8dcff', 50, 130);
 
     // Fixed three-quarter camera, restrained perspective.
@@ -164,6 +163,8 @@ export class Stage {
   resize(): void {
     const w = Math.max(1, this.wrap.clientWidth);
     const h = Math.max(1, this.wrap.clientHeight);
+    // Re-apply DPR: browser zoom or monitor moves change devicePixelRatio.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     // Widen the lens a touch as screens narrow; distance fitting handles
@@ -189,8 +190,11 @@ export class Stage {
         obj.geometry.dispose();
         const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         for (const m of mats) {
+          // Cached toon materials + gradient/shadow textures outlive the
+          // stage — disposing them would poison every later level.
+          if (m.userData?.shared) continue;
           for (const v of Object.values(m)) {
-            if (v instanceof THREE.Texture) v.dispose();
+            if (v instanceof THREE.Texture && !v.userData?.shared) v.dispose();
           }
           m.dispose();
         }

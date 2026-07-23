@@ -64,3 +64,9 @@ export class Sfx {
     }
   }
 }
+
+/**
+ * One app-wide Sfx (and one AudioContext). Browsers cap live contexts at
+ * ~6; a per-screen instance leaks one per navigation until audio dies.
+ */
+export const sharedSfx = new Sfx();

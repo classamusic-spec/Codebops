@@ -27,10 +27,18 @@ export function createGroundSlab(): THREE.Mesh {
   return m;
 }
 
-/** One grass tile of the puzzle island. */
-export function createGroundTile(size: number, tint: string): THREE.Mesh {
+/**
+ * One tile of the puzzle island: rounded base + a lighter inset cap so the
+ * board reads as chunky toy blocks with a soft top highlight.
+ */
+export function createGroundTile(size: number, tint: string): THREE.Group {
+  const g = new THREE.Group();
   const geo = new RoundedBoxGeometry(size, 0.42, size, 3, 0.12);
-  return mesh(geo, toonMat(tint), 0, 0.21, 0);
+  g.add(mesh(geo, toonMat(tint), 0, 0.21, 0));
+  const cap = new THREE.Color(tint).lerp(new THREE.Color('#ffffff'), 0.10);
+  const capGeo = new RoundedBoxGeometry(size * 0.88, 0.05, size * 0.88, 2, 0.025);
+  g.add(mesh(capGeo, toonMat(`#${cap.getHexString()}`), 0, 0.425, 0, false, true));
+  return g;
 }
 
 /** Puffy rounded storybook tree. */

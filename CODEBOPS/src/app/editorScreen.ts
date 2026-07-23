@@ -7,7 +7,7 @@ import { el } from '../ui/dom';
 import { editorLevel, saveCustomLevel } from '../storage/customLevels';
 import type { LevelDef } from '../data/schemas/level';
 import { showToast } from '../ui/dialogs';
-import { Sfx } from '../audio/sfx';
+import { sharedSfx } from '../audio/sfx';
 
 type CellKind = 'empty' | 'item' | 'goal' | 'blocked' | 'start';
 
@@ -28,7 +28,7 @@ const HINT: Record<CellKind, string> = {
 export class EditorScreen {
   private cells: CellKind[][] = [];
   private cellEls: HTMLButtonElement[][] = [];
-  private readonly sfx = new Sfx();
+  private readonly sfx = sharedSfx;
 
   constructor(
     private readonly root: HTMLElement,

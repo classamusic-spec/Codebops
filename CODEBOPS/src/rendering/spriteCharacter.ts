@@ -73,6 +73,9 @@ export function startMascotLife(svg: SVGSVGElement): () => void {
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
+// Scratch vectors reused every frame (avoids per-frame GC churn).
+const SCRATCH_A = new THREE.Vector3();
+const SCRATCH_B = new THREE.Vector3();
 
 export class SpriteCharacter {
   readonly root = new THREE.Group();
@@ -247,8 +250,8 @@ export class SpriteCharacter {
     const h = this.viewport.clientHeight;
     if (w === 0 || h === 0) return;
 
-    const p = this.root.position.clone().project(this.camera);
-    const p2 = this.root.position.clone().add(UP).project(this.camera);
+    const p = SCRATCH_A.copy(this.root.position).project(this.camera);
+    const p2 = SCRATCH_B.copy(this.root.position).add(UP).project(this.camera);
     if (p.z > 1) {
       this.el.style.visibility = 'hidden';
       return;

@@ -9,6 +9,8 @@ import { toonMat } from './materials/toon';
 
 export class PathPreview {
   private readonly group = new THREE.Group();
+  // One geometry for every dot, for the preview's whole life.
+  private readonly geo = new THREE.SphereGeometry(0.11, 10, 8);
 
   constructor(
     parent: THREE.Object3D,
@@ -23,7 +25,7 @@ export class PathPreview {
     this.group.clear();
     if (program.length === 0) return;
     const steps = previewPath(this.level, program);
-    const geo = new THREE.SphereGeometry(0.11, 10, 8);
+    const geo = this.geo;
     for (const step of steps) {
       const color = step.kind === 'goal' ? '#ffd23e' : step.kind === 'bump' ? '#ff8a8a' : '#ffffff';
       const dot = new THREE.Mesh(geo, toonMat(color));

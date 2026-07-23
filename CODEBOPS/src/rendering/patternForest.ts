@@ -135,8 +135,13 @@ export class PatternForest {
       for (let col = 0; col < level.cols; col++) {
         const even = (row + col) % 2 === 0;
         const tile = createGroundTile(TILE, even ? '#3f7d5c' : '#37714f');
-        (tile.material as THREE.MeshToonMaterial).emissive = new THREE.Color(even ? '#123b2a' : '#0e3222');
-        (tile.material as THREE.MeshToonMaterial).emissiveIntensity = 0.5;
+        tile.traverse((o) => {
+          if (o instanceof THREE.Mesh) {
+            const m = o.material as THREE.MeshToonMaterial;
+            m.emissive = new THREE.Color(even ? '#123b2a' : '#0e3222');
+            m.emissiveIntensity = 0.5;
+          }
+        });
         const p = this.cellToWorld(col, row);
         tile.position.set(p.x, TILE_TOP / 2, p.z);
         this.group.add(tile);
