@@ -82,14 +82,4 @@
     <ellipse cx="302" cy="373" rx="8" ry="9" fill="#EE2838"/>
   </g>
 </g>
-<g id="arm-left">
-  <path d="M 192,420 C 128,426 74,440 40,448 C 16,453 12,478 34,481 C 22,493 36,505 56,502 C 104,496 152,486 194,480 C 220,476 224,416 192,420 Z" fill="#2e93f5" stroke="#063FA0" stroke-width="12" stroke-linejoin="round"/>
-  <ellipse cx="44" cy="470" rx="26" ry="23" fill="#2e93f5" stroke="#063FA0" stroke-width="12"/>
-  <ellipse cx="150" cy="452" rx="30" ry="9" fill="#7fc4ff" opacity=".5"/>
-</g>
-<g id="arm-right">
-  <path d="M 408,420 C 472,426 526,440 560,448 C 584,453 588,478 566,481 C 578,493 564,505 544,502 C 496,496 448,486 406,480 C 380,476 376,416 408,420 Z" fill="#2e93f5" stroke="#063FA0" stroke-width="12" stroke-linejoin="round"/>
-  <ellipse cx="556" cy="470" rx="26" ry="23" fill="#2e93f5" stroke="#063FA0" stroke-width="12"/>
-  <ellipse cx="450" cy="452" rx="30" ry="9" fill="#7fc4ff" opacity=".5"/>
-</g>
 </svg>

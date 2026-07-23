@@ -67,17 +67,8 @@ export function startMascotLife(svg: SVGSVGElement): () => void {
     if (pick) svg.classList.add(pick);
     window.setTimeout(glance, 3200 + Math.random() * 3600);
   };
-  const wave = (): void => {
-    if (!alive) return;
-    svg.classList.remove('waving');
-    void svg.getBoundingClientRect();
-    svg.classList.add('waving');
-    window.setTimeout(() => svg.classList.remove('waving'), 1600);
-    window.setTimeout(wave, 6000 + Math.random() * 6000);
-  };
   window.setTimeout(blink, 900 + Math.random() * 1200);
   window.setTimeout(glance, 2200);
-  window.setTimeout(wave, 2600 + Math.random() * 3000);
   return () => { alive = false; };
 }
 

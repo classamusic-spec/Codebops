@@ -128,12 +128,4 @@
   </g>
 </g>
 <g id="antenna-left"></g><g id="antenna-right"></g><g id="crest"></g><g id="belly"></g>
-<g id="arm-left">
-  <path d="M 160,384 C 120,388 82,402 56,412 C 32,420 30,444 54,444 C 42,456 60,468 78,460 C 106,449 134,438 160,428 C 186,419 190,380 160,384 Z" fill="#9b3cfa" stroke="#330281" stroke-width="12" stroke-linejoin="round"/>
-  <ellipse cx="56" cy="430" rx="25" ry="22" fill="#9b3cfa" stroke="#330281" stroke-width="12"/>
-</g>
-<g id="arm-right">
-  <path d="M 438,384 C 478,388 516,402 542,412 C 566,420 568,444 544,444 C 556,456 538,468 520,460 C 492,449 464,438 438,428 C 412,419 408,380 438,384 Z" fill="#9b3cfa" stroke="#330281" stroke-width="12" stroke-linejoin="round"/>
-  <ellipse cx="542" cy="430" rx="25" ry="22" fill="#9b3cfa" stroke="#330281" stroke-width="12"/>
-</g>
 </svg>

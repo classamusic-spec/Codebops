@@ -1478,49 +1478,6 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 @media (max-width: 760px) { .logo-chip-img { display: none; } }
 
 /* ============================================================
-   Posable overlay arms — the canon art bakes the arms into the
-   body silhouette, so each character carries oversized overlay
-   arms that mask the baked ones and pivot at the shoulder.
-   ============================================================ */
-.char-svg.zip #arm-left  { transform-box: view-box; transform-origin: 190px 448px; }
-.char-svg.zip #arm-right { transform-box: view-box; transform-origin: 410px 448px; }
-.char-svg.mixy #arm-left  { transform-box: view-box; transform-origin: 155px 400px; }
-.char-svg.mixy #arm-right { transform-box: view-box; transform-origin: 445px 400px; }
-
-/* gentle idle sway so the arms always feel alive */
-.char-svg #arm-left  { animation: arm-idle-l 3.8s ease-in-out infinite; }
-.char-svg #arm-right { animation: arm-idle-r 3.8s ease-in-out infinite; }
-@keyframes arm-idle-l { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(4.5deg); } }
-@keyframes arm-idle-r { 0%, 100% { transform: rotate(2deg); } 50% { transform: rotate(-4.5deg); } }
-
-/* wave — the right arm flaps up (kept modest so nothing peeks) */
-.char-sprite.waving .char-svg #arm-right,
-.title-mascot.waving .char-svg #arm-right { animation: arm-wave .5s ease-in-out var(--wave-count, 3); }
-.char-sprite.waving .char-svg #arm-left,
-.title-mascot.waving .char-svg #arm-left { animation: arm-wave-l .5s ease-in-out var(--wave-count, 3); }
-.char-svg.waving #arm-right { animation: arm-wave .5s ease-in-out 3; }
-.char-svg.waving #arm-left { animation: arm-wave-l .5s ease-in-out 3; }
-@keyframes arm-wave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(-16deg); } }
-@keyframes arm-wave-l { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(8deg); } }
-
-/* hop + celebrate — both arms pump */
-.char-sprite.hop .char-svg #arm-left { animation: arm-flap-l .34s ease-in-out; }
-.char-sprite.hop .char-svg #arm-right { animation: arm-flap-r .34s ease-in-out; }
-.char-sprite.celebrate .char-svg #arm-left { animation: arm-flap-l .5s ease-in-out 3; }
-.char-sprite.celebrate .char-svg #arm-right { animation: arm-flap-r .5s ease-in-out 3; }
-@keyframes arm-flap-l { 0%, 100% { transform: rotate(2deg); } 50% { transform: rotate(16deg); } }
-@keyframes arm-flap-r { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(-16deg); } }
-
-/* bump — arms jitter */
-.char-sprite.bump .char-svg #arm-left { animation: arm-jit-l .32s linear; }
-.char-sprite.bump .char-svg #arm-right { animation: arm-jit-r .32s linear; }
-@keyframes arm-jit-l { 0%,100%{transform:rotate(0)} 25%{transform:rotate(9deg)} 60%{transform:rotate(-5deg)} }
-@keyframes arm-jit-r { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-9deg)} 60%{transform:rotate(5deg)} }
-
-body.calm-mode .char-svg #arm-left, body.calm-mode .char-svg #arm-right,
-.char-sprite.calm .char-svg #arm-left, .char-sprite.calm .char-svg #arm-right { animation: none !important; }
-
-/* ============================================================
    💎 ULTRA-PREMIUM COMMAND TILES — molded-toy keycaps
    ============================================================ */
 .tile {
