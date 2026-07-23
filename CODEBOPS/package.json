@@ -1,0 +1,25 @@
+{
+  "name": "codebops",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "description": "CodeBops — Teach tiny helpers. Build big ideas. A playful coding adventure for ages 3–7.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test:logic": "esbuild test/logic.test.ts --bundle --platform=node --outfile=/tmp/logic-test.cjs && node /tmp/logic-test.cjs"
+  },
+  "dependencies": {
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.171.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}

@@ -1,0 +1,284 @@
+/** App bootstrap + screen router (title → select/garden/editor → game). */
+import { el, buildLogo } from '../ui/dom';
+import { GameScreen } from './gameScreen';
+import { ALL_LEVELS } from '../data/levels';
+import type { LevelDef } from '../data/schemas/level';
+import { SaveStore, dayStamp } from '../storage/saveStore';
+import { loadCustomLevels, deleteCustomLevel } from '../storage/customLevels';
+import { inlineSvgInto, startMascotLife } from '../rendering/spriteCharacter';
+import { GardenScreen } from './gardenScreen';
+import { EditorScreen } from './editorScreen';
+import { createCampfireGate, showCampfire } from './campfire';
+
+const WORLD_META: Record<string, { emoji: string; name: string }> = {
+  'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow' },
+  'bubble-bay': { emoji: '🫧', name: 'Bubble Bay' },
+  'pattern-forest': { emoji: '🌸', name: 'Pattern Forest' },
+  'robot-town': { emoji: '🤖', name: 'Robot Town' },
+  'agent-academy': { emoji: '🎓', name: 'Agent Academy' },
+};
+const WORLD_ORDER = ['sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town', 'agent-academy'];
+
+/** Today's featured level for the Daily Bop (stable per calendar day). */
+function dailyLevelIndex(): number {
+  return Math.floor(Date.now() / 86_400_000) % ALL_LEVELS.length;
+}
+
+export class App {
+  private readonly host: HTMLElement;
+  private gameScreen: GameScreen | null = null;
+  private garden: GardenScreen | null = null;
+  private editor: EditorScreen | null = null;
+  private store = new SaveStore();
+  private mascotStops: Array<() => void> = [];
+
+  constructor(host: HTMLElement) {
+    this.host = host;
+  }
+
+  start(): void {
+    this.showTitle();
+  }
+
+  private clearHost(): void {
+    this.mascotStops.forEach((s) => s());
+    this.mascotStops = [];
+    this.gameScreen?.dispose();
+    this.gameScreen = null;
+    this.garden?.dispose();
+    this.garden = null;
+    this.editor?.dispose();
+    this.editor = null;
+    this.host.innerHTML = '';
+  }
+
+  // ---------- title ----------
+
+  private showTitle(): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-title';
+    screen.style.background =
+      'radial-gradient(130% 100% at 50% -10%, #7dd7ff 0%, #4ea9f0 38%, #2e7ce6 72%, #16225c 100%)';
+
+    const hill1 = el('div', undefined, screen);
+    Object.assign(hill1.style, {
+      position: 'absolute', left: '-12%', bottom: '-22%', width: '70%', height: '46%',
+      background: '#6fcb52', borderRadius: '50%',
+    });
+    const hill2 = el('div', undefined, screen);
+    Object.assign(hill2.style, {
+      position: 'absolute', right: '-14%', bottom: '-26%', width: '76%', height: '52%',
+      background: '#5dbd49', borderRadius: '50%',
+    });
+
+    // Live traced mascots (blinking + glancing)
+    const zipBox = el('div', 'title-mascot zip', screen);
+    void inlineSvgInto(zipBox, './art/characters/zip/zip.svg').then((svg) => {
+      if (svg) this.mascotStops.push(startMascotLife(svg));
+    });
+    const mixyBox = el('div', 'title-mascot mixy', screen);
+    void inlineSvgInto(mixyBox, './art/characters/mixy/mixy.svg').then((svg) => {
+      if (svg) this.mascotStops.push(startMascotLife(svg));
+    });
+
+    const card = el('div', 'title-card', screen);
+    buildLogo(card, 'title-logo');
+    el('div', 'title-tag', card, 'Teach tiny helpers. Build big ideas.');
+    const play = el('button', 'btn-play', card);
+    play.type = 'button';
+    play.setAttribute('aria-label', 'Play CodeBops');
+    play.append('PLAY');
+    el('span', 'tri', play);
+    play.addEventListener('click', () => this.showSelect());
+
+    // Bop Garden entry
+    const garden = el('button', 'garden-btn', card, '🌻 My Garden');
+    garden.type = 'button';
+    garden.addEventListener('click', () => this.showGarden());
+
+    // Grown-Up Campfire (hold-to-open gate, bottom corner)
+    createCampfireGate(screen, () => {
+      this.store = new SaveStore();
+      showCampfire(screen, this.store, () => { /* progress reset */ });
+    });
+
+    play.focus();
+  }
+
+  // ---------- level select ----------
+
+  private showSelect(): void {
+    this.clearHost();
+    this.store = new SaveStore(); // re-read stars earned in the last session
+    const screen = el('section', 'screen', this.host);
+    const wrap = el('div', 'select-wrap', screen);
+
+    const header = el('div', 'select-header', wrap);
+    const back = el('button', 'circle-btn', header, '←');
+    back.type = 'button';
+    back.setAttribute('aria-label', 'Back to title');
+    back.addEventListener('click', () => this.showTitle());
+    el('h1', undefined, header, 'Pick a Level!');
+    const totalStars = Object.values(this.store.stars).reduce((a, b) => a + b, 0);
+    const pill = el('div', 'stars-pill', header);
+    pill.style.marginLeft = 'auto';
+    el('span', 'star earned', pill, '★');
+    el('span', undefined, pill, ` ${totalStars}`);
+    const gardenBtn = el('button', 'circle-btn garden-shortcut', header, '🌻');
+    gardenBtn.type = 'button';
+    gardenBtn.setAttribute('aria-label', 'Visit the Bop Garden');
+    gardenBtn.addEventListener('click', () => this.showGarden());
+
+    // --- Daily Bop card ---
+    const dailyIdx = dailyLevelIndex();
+    const dailyLevel = ALL_LEVELS[dailyIdx];
+    const doneToday = this.store.daily.lastCompleted === dayStamp();
+    const daily = el('button', `daily-card${doneToday ? ' done' : ''}`, wrap) as HTMLButtonElement;
+    daily.type = 'button';
+    el('span', 'dc-emoji', daily, doneToday ? '✅' : '📅');
+    const dcMid = el('span', 'dc-mid', daily);
+    el('span', 'dc-title', dcMid, doneToday ? 'Daily Bop — done!' : 'Daily Bop');
+    el('span', 'dc-sub', dcMid, doneToday
+      ? `Come back tomorrow — 🔥 ${this.store.daily.streak} day streak!`
+      : `Today's puzzle: ${dailyLevel.shortTitle} ${dailyLevel.brief.emoji}`);
+    el('span', 'dc-streak', daily, `🔥 ${this.store.daily.streak}`);
+    if (!doneToday) {
+      daily.addEventListener('click', () => this.showGame(dailyIdx, {
+        onSuccess: () => {
+          const streak = this.store.completeDaily();
+          this.store = new SaveStore();
+          setTimeout(() => { /* streak toast lands after celebration mounts */ }, 0);
+          void streak;
+        },
+      }));
+    }
+
+    // --- world sections ---
+    let globalIndex = 0;
+    for (const worldId of WORLD_ORDER) {
+      const levels = ALL_LEVELS.filter((l) => l.worldId === worldId);
+      if (levels.length === 0) continue;
+      const meta = WORLD_META[worldId];
+      const section = el('div', 'world-section', wrap);
+      const title = el('div', 'world-title', section);
+      el('span', 'wemoji', title, meta.emoji);
+      el('span', undefined, title, meta.name);
+      const row = el('div', 'level-row', section);
+
+      for (const level of levels) {
+        const idx = globalIndex;
+        const unlocked = idx === 0 || (this.store.stars[ALL_LEVELS[idx - 1].id] ?? 0) >= 1;
+        const stars = this.store.stars[level.id] ?? 0;
+        const card = el('button', `level-card${unlocked ? '' : ' locked'}${level.prefill ? ' debug' : ''}`, row) as HTMLButtonElement;
+        card.type = 'button';
+        card.setAttribute('aria-label', unlocked ? `Play ${level.shortTitle}` : `${level.shortTitle} — locked`);
+        el('span', 'lv-num', card, String(idx + 1));
+        el('span', 'lv-emoji', card, level.brief.emoji);
+        el('span', 'lv-name', card, level.shortTitle);
+        const starRow = el('span', 'lv-stars', card);
+        for (let s = 0; s < 3; s++) {
+          el('span', s < stars ? 'on' : '', starRow, '★');
+        }
+        if (unlocked) {
+          card.addEventListener('click', () => this.showGame(idx));
+        }
+        globalIndex++;
+      }
+    }
+
+    // --- Imagination Island ---
+    const customs = loadCustomLevels();
+    const section = el('div', 'world-section island', wrap);
+    const title = el('div', 'world-title', section);
+    el('span', 'wemoji', title, '🏝️');
+    el('span', undefined, title, 'Imagination Island');
+    const row = el('div', 'level-row', section);
+    const create = el('button', 'level-card create-card', row) as HTMLButtonElement;
+    create.type = 'button';
+    el('span', 'lv-emoji', create, '＋');
+    el('span', 'lv-name', create, 'Build a Level');
+    create.addEventListener('click', () => this.showEditor());
+    for (const custom of customs) {
+      const card = el('button', 'level-card custom-card', row) as HTMLButtonElement;
+      card.type = 'button';
+      el('span', 'lv-emoji', card, '🛠️');
+      el('span', 'lv-name', card, custom.shortTitle);
+      card.addEventListener('click', () => this.showCustomGame(custom));
+      const del = el('span', 'lv-del', card, '✕');
+      del.setAttribute('aria-label', `Delete ${custom.shortTitle}`);
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteCustomLevel(custom.id);
+        this.showSelect();
+      });
+    }
+
+    back.focus();
+  }
+
+  // ---------- game ----------
+
+  private showGame(index: number, opts: { onSuccess?: () => void } = {}): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-game';
+    const level = ALL_LEVELS[index];
+    this.gameScreen = new GameScreen(screen, level, {
+      onExit: () => this.showSelect(),
+      onNextLevel: () => this.showGame(Math.min(index + 1, ALL_LEVELS.length - 1)),
+      hasNext: index < ALL_LEVELS.length - 1,
+      onSuccess: opts.onSuccess,
+    });
+    this.gameScreen.enter();
+  }
+
+  private showCustomGame(level: LevelDef): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-game';
+    this.gameScreen = new GameScreen(screen, level, {
+      onExit: () => this.showSelect(),
+      onNextLevel: () => this.showSelect(),
+      hasNext: false,
+    });
+    this.gameScreen.enter();
+  }
+
+  // ---------- garden ----------
+
+  private showGarden(): void {
+    this.clearHost();
+    this.store = new SaveStore();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-garden';
+    this.garden = new GardenScreen(screen, this.store, {
+      onBack: () => this.showTitle(),
+    });
+    this.garden.enter();
+  }
+
+  // ---------- editor ----------
+
+  private showEditor(): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-editor';
+    this.editor = new EditorScreen(screen, {
+      onBack: () => this.showSelect(),
+      onPlay: (level) => {
+        this.clearHost();
+        const gameHost = el('section', 'screen', this.host);
+        gameHost.id = 'screen-game';
+        this.gameScreen = new GameScreen(gameHost, level, {
+          onExit: () => this.showEditor(),
+          onNextLevel: () => this.showEditor(),
+          hasNext: false,
+        });
+        this.gameScreen.enter();
+      },
+      onSaved: () => { /* stay in the editor; toast already shown */ },
+    });
+    this.editor.enter();
+  }
+}
