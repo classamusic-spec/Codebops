@@ -143,7 +143,7 @@ export class PatternForest {
           }
         });
         const p = this.cellToWorld(col, row);
-        tile.position.set(p.x, TILE_TOP / 2, p.z);
+        tile.position.set(p.x, TILE_TOP, p.z);
         this.group.add(tile);
       }
     }

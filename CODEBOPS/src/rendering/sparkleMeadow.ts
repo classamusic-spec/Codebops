@@ -45,7 +45,7 @@ export class SparkleMeadow {
         const tint = (row + col) % 2 === 0 ? '#79d455' : '#6cc94a';
         const tile = createGroundTile(TILE, tint);
         const p = this.cellToWorld(col, row);
-        tile.position.set(p.x, TILE_TOP / 2, p.z);
+        tile.position.set(p.x, TILE_TOP, p.z);
         this.group.add(tile);
       }
     }

@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import type { LevelDef } from '../data/schemas/level';
-import { createDrone } from './worldFactories';
+import { createDrone, TILE_THICK } from './worldFactories';
 
 export const TILE = 1.6;
 export const STEP = 1.72;
@@ -61,8 +61,8 @@ function createChargePad(): THREE.Group {
 /** Riveted metal floor tile. */
 function createMetalTile(tint: string): THREE.Group {
   const g = new THREE.Group();
-  const top = mesh(new THREE.BoxGeometry(TILE, TILE_TOP, TILE), toon(tint));
-  top.position.y = -TILE_TOP / 2;
+  const top = mesh(new THREE.BoxGeometry(TILE, TILE_THICK, TILE), toon(tint));
+  top.position.y = -TILE_THICK / 2;
   g.add(top);
   for (const [dx, dz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]] as const) {
     const rivet = mesh(new THREE.SphereGeometry(0.05, 6, 4), toon('#5b6b8c'), false, false);

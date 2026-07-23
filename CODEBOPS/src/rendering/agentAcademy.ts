@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import type { LevelDef } from '../data/schemas/level';
 import { createMushroom } from './patternForest';
+import { TILE_THICK } from './worldFactories';
 
 export const TILE = 1.6;
 export const STEP = 1.72;
@@ -172,8 +173,8 @@ export class AgentAcademy {
       for (let col = 0; col < level.cols; col++) {
         const even = (row + col) % 2 === 0;
         const tile = new THREE.Group();
-        const top = mesh(new THREE.BoxGeometry(TILE, TILE_TOP, TILE), toon(even ? '#f2e3c6' : '#ecd9b6'));
-        top.position.y = -TILE_TOP / 2;
+        const top = mesh(new THREE.BoxGeometry(TILE, TILE_THICK, TILE), toon(even ? '#f2e3c6' : '#ecd9b6'));
+        top.position.y = -TILE_THICK / 2;
         tile.add(top);
         const chalk = mesh(new THREE.RingGeometry(0.42, 0.5, 24), toon('#ffffff', '#ffffff', 0.15), false, false);
         chalk.rotation.x = -Math.PI / 2;

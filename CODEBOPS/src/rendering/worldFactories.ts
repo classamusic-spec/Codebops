@@ -27,17 +27,20 @@ export function createGroundSlab(): THREE.Mesh {
   return m;
 }
 
+/** Thickness of a puzzle tile — kept slim so the star pad, bushes, berries
+ * and path dots always sit clearly proud of the board. */
+export const TILE_THICK = 0.28;
+
 /**
- * One tile of the puzzle island: rounded base + a lighter inset cap so the
- * board reads as chunky toy blocks with a soft top highlight.
+ * One tile of the puzzle island: a slim rounded slab whose TOP FACE sits at
+ * the group's origin (y = 0). Callers place the group at TILE_TOP so the
+ * board surface lands exactly where items, goals and characters rest — the
+ * slab extrudes downward only, never burying anything on top.
  */
 export function createGroundTile(size: number, tint: string): THREE.Group {
   const g = new THREE.Group();
-  const geo = new RoundedBoxGeometry(size, 0.42, size, 3, 0.12);
-  g.add(mesh(geo, toonMat(tint), 0, 0.21, 0));
-  const cap = new THREE.Color(tint).lerp(new THREE.Color('#ffffff'), 0.10);
-  const capGeo = new RoundedBoxGeometry(size * 0.88, 0.05, size * 0.88, 2, 0.025);
-  g.add(mesh(capGeo, toonMat(`#${cap.getHexString()}`), 0, 0.425, 0, false, true));
+  const geo = new RoundedBoxGeometry(size, TILE_THICK, size, 3, 0.1);
+  g.add(mesh(geo, toonMat(tint), 0, -TILE_THICK / 2, 0));
   return g;
 }
 

@@ -138,7 +138,7 @@ export class BubbleBay {
         const tint = (row + col) % 2 === 0 ? '#f7e3a1' : '#f2d98c';
         const tile = createGroundTile(TILE, tint);
         const p = this.cellToWorld(col, row);
-        tile.position.set(p.x, TILE_TOP / 2, p.z);
+        tile.position.set(p.x, TILE_TOP, p.z);
         this.group.add(tile);
       }
     }
