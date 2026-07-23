@@ -7,6 +7,7 @@
  */
 import { el } from './dom';
 import { COMMAND_DEFS } from '../data/commands/commandDefs';
+import { renderCommandIcon } from '../data/commands/commandIcons';
 import type { CommandId, ProgramStep } from '../gameplay/commands/interpreter';
 import type { Sfx } from '../audio/sfx';
 
@@ -190,7 +191,8 @@ export class ProgramDeck {
     tile.type = 'button';
     tile.dataset.cmd = cmd;
     tile.setAttribute('aria-label', kind === 'tray' ? `Add command: ${def.spoken}` : `Step ${slotIndex + 1}: ${def.spoken}. Tap to remove.`);
-    el('span', 'ico', tile, def.icon);
+    el('span', 'sheen', tile);
+    tile.appendChild(renderCommandIcon(cmd));
     el('span', 'lbl', tile, def.label);
 
     // Repeat count badge (slot tiles only): tap to cycle ×2 → ×3 → ×4

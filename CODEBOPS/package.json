@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:logic": "esbuild test/logic.test.ts --bundle --platform=node --outfile=/tmp/logic-test.cjs && node /tmp/logic-test.cjs"
+    "test:logic": "esbuild test/logic.test.ts --bundle --platform=node --outfile=/tmp/logic-test.cjs && node /tmp/logic-test.cjs",
+    "build:standalone": "vite build && node scripts/build-standalone.mjs"
   },
   "dependencies": {
     "three": "^0.171.0"

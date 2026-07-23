@@ -485,11 +485,6 @@ body.high-contrast .slot { border-color: rgba(255,255,255,.8); }
   40% { transform: translateY(-13%) scale(1.05, 1.08) }
   65% { transform: translateY(0) scale(1.06, .92) }
 }
-.char-sprite.waving #arm-right {
-  transform-box: fill-box; transform-origin: 25% 85%;
-  animation: sprite-wave .55s ease-in-out var(--wave-count, 3);
-}
-@keyframes sprite-wave { 0%, 100% { transform: rotate(0) } 50% { transform: rotate(-34deg) } }
 .char-sprite.mood-thinking svg { animation: sprite-think 2.6s ease-in-out infinite; }
 @keyframes sprite-think {
   0%, 100% { transform: rotate(0) translateY(0) }
@@ -691,9 +686,10 @@ body.left-handed .deck-tools { right: auto; left: 6px; }
     -webkit-overflow-scrolling: touch; touch-action: pan-x;
   }
   .deck-sequence::-webkit-scrollbar { display: none; }
-  .tile, .slot, .drag-ghost { width: 48px; height: 48px; flex: 0 0 auto; border-radius: 12px; }
+  .tile, .slot, .drag-ghost { width: 54px; height: 54px; flex: 0 0 auto; border-radius: 14px; }
   .tile .ico { font-size: 21px; }
-  .tile .lbl { font-size: 7.5px; }
+  .tile .cmd-ico { width: 30px; height: 30px; }
+  .tile .lbl { font-size: 8px; }
   .slot .num { width: 19px; height: 19px; font-size: 10.5px; top: -8px; left: -5px; box-shadow: 0 2px 0 #1c55ab; }
   .slot .count-badge { width: 24px; height: 24px; font-size: 11px; top: -9px; right: -7px; }
   .bop-wrap { gap: 6px; justify-content: flex-end; }
@@ -737,7 +733,7 @@ body.left-handed .deck-tools { right: auto; left: 6px; }
 
 /* Very small phones: tray tiles a touch smaller so 4 fit per row */
 @media (max-width: 380px) {
-  .tile, .slot, .drag-ghost { width: 44px; height: 44px; }
+  .tile, .slot, .drag-ghost { width: 48px; height: 48px; }
   .level-card { width: 100%; min-height: 84px; flex-direction: row; padding: 8px 12px; gap: 10px; text-align: left; justify-content: flex-start; }
   .level-card .lv-stars { margin-left: auto; }
 }
@@ -1481,14 +1477,129 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .logo-chip-img { height: clamp(28px, 3.4vw, 40px); width: auto; display: block; filter: drop-shadow(0 3px 6px rgba(13,20,55,.45)); }
 @media (max-width: 760px) { .logo-chip-img { display: none; } }
 
-/* Wave fallback for the flat official art: the whole Bop does a happy
-   rock (no separate arm part to rotate in the canon SVGs). */
-.char-sprite.waving svg, .title-mascot.waving svg {
-  animation: sprite-wave-all .55s ease-in-out var(--wave-count, 3);
-  transform-origin: 50% 88%;
+/* ============================================================
+   Posable overlay arms — the canon art bakes the arms into the
+   body silhouette, so each character carries oversized overlay
+   arms that mask the baked ones and pivot at the shoulder.
+   ============================================================ */
+.char-svg.zip #arm-left  { transform-box: view-box; transform-origin: 190px 448px; }
+.char-svg.zip #arm-right { transform-box: view-box; transform-origin: 410px 448px; }
+.char-svg.mixy #arm-left  { transform-box: view-box; transform-origin: 155px 400px; }
+.char-svg.mixy #arm-right { transform-box: view-box; transform-origin: 445px 400px; }
+
+/* gentle idle sway so the arms always feel alive */
+.char-svg #arm-left  { animation: arm-idle-l 3.8s ease-in-out infinite; }
+.char-svg #arm-right { animation: arm-idle-r 3.8s ease-in-out infinite; }
+@keyframes arm-idle-l { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(4.5deg); } }
+@keyframes arm-idle-r { 0%, 100% { transform: rotate(2deg); } 50% { transform: rotate(-4.5deg); } }
+
+/* wave — the right arm flaps up (kept modest so nothing peeks) */
+.char-sprite.waving .char-svg #arm-right,
+.title-mascot.waving .char-svg #arm-right { animation: arm-wave .5s ease-in-out var(--wave-count, 3); }
+.char-sprite.waving .char-svg #arm-left,
+.title-mascot.waving .char-svg #arm-left { animation: arm-wave-l .5s ease-in-out var(--wave-count, 3); }
+.char-svg.waving #arm-right { animation: arm-wave .5s ease-in-out 3; }
+.char-svg.waving #arm-left { animation: arm-wave-l .5s ease-in-out 3; }
+@keyframes arm-wave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(-16deg); } }
+@keyframes arm-wave-l { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(8deg); } }
+
+/* hop + celebrate — both arms pump */
+.char-sprite.hop .char-svg #arm-left { animation: arm-flap-l .34s ease-in-out; }
+.char-sprite.hop .char-svg #arm-right { animation: arm-flap-r .34s ease-in-out; }
+.char-sprite.celebrate .char-svg #arm-left { animation: arm-flap-l .5s ease-in-out 3; }
+.char-sprite.celebrate .char-svg #arm-right { animation: arm-flap-r .5s ease-in-out 3; }
+@keyframes arm-flap-l { 0%, 100% { transform: rotate(2deg); } 50% { transform: rotate(16deg); } }
+@keyframes arm-flap-r { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(-16deg); } }
+
+/* bump — arms jitter */
+.char-sprite.bump .char-svg #arm-left { animation: arm-jit-l .32s linear; }
+.char-sprite.bump .char-svg #arm-right { animation: arm-jit-r .32s linear; }
+@keyframes arm-jit-l { 0%,100%{transform:rotate(0)} 25%{transform:rotate(9deg)} 60%{transform:rotate(-5deg)} }
+@keyframes arm-jit-r { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-9deg)} 60%{transform:rotate(5deg)} }
+
+body.calm-mode .char-svg #arm-left, body.calm-mode .char-svg #arm-right,
+.char-sprite.calm .char-svg #arm-left, .char-sprite.calm .char-svg #arm-right { animation: none !important; }
+
+/* ============================================================
+   💎 ULTRA-PREMIUM COMMAND TILES — molded-toy keycaps
+   ============================================================ */
+.tile {
+  border: 3px solid rgba(255,255,255,.72);
+  box-shadow:
+    0 6px 0 var(--tile-deep),
+    0 12px 20px rgba(13,20,55,.4),
+    inset 0 3px 0 rgba(255,255,255,.55),
+    inset 0 -6px 10px rgba(13,20,55,.22);
+  overflow: hidden;
+  isolation: isolate;
 }
-@keyframes sprite-wave-all {
-  0%, 100% { transform: rotate(0); }
-  30% { transform: rotate(-7deg) translateY(-2%); }
-  70% { transform: rotate(5deg); }
+/* top gloss cap */
+.tile::before {
+  content: ''; position: absolute; left: 8%; right: 8%; top: 5%; height: 40%;
+  border-radius: 999px; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.04));
+}
+/* diagonal sheen that sweeps on hover/press */
+.tile .sheen {
+  position: absolute; top: -60%; bottom: -60%; width: 45%; left: -70%;
+  z-index: 2; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: skewX(-16deg);
+  transition: left .5s ease;
+}
+.tile:active .sheen { left: 130%; transition: left .35s ease; }
+@media (hover: hover) { .tile:hover .sheen { left: 130%; } }
+
+.tile .ico { position: relative; z-index: 3; display: grid; place-items: center; }
+.cmd-ico {
+  width: clamp(30px, 3.2vw, 46px); height: clamp(30px, 3.2vw, 46px);
+  color: #fff;
+  filter: drop-shadow(0 2px 0 rgba(13,20,55,.34)) drop-shadow(0 1px 3px rgba(13,20,55,.3));
+}
+.tile .lbl { position: relative; z-index: 3; }
+
+/* richer candy gradients per command (radial toy sheen) */
+.tile[data-cmd="moveUp"], .tile[data-cmd="moveDown"], .tile[data-cmd="move"] {
+  --tile-deep: #1257a8; background: radial-gradient(120% 120% at 50% 12%, #74d0ff 0%, #37a2f2 46%, #1f79df 100%);
+}
+.tile[data-cmd="moveLeft"], .tile[data-cmd="moveRight"] {
+  --tile-deep: #0c7a63; background: radial-gradient(120% 120% at 50% 12%, #74f0d2 0%, #2fd2ab 46%, #12ab88 100%);
+}
+.tile[data-cmd="grab"] {
+  --tile-deep: #a4560a; background: radial-gradient(120% 120% at 50% 12%, #ffd07a 0%, #ffa42f 44%, #f0810f 100%);
+}
+.tile[data-cmd="drop"] {
+  --tile-deep: #5a2fb0; background: radial-gradient(120% 120% at 50% 12%, #d4b0ff 0%, #a877f5 46%, #8a4fff 100%);
+}
+.tile[data-cmd="repeat"], .tile[data-cmd="repeatUntil"] {
+  --tile-deep: #5a2fb0; background: radial-gradient(120% 120% at 50% 12%, #cbaaff 0%, #a06bf5 46%, #7c46d8 100%);
+  outline: none;
+}
+.tile[data-cmd="turnLeft"], .tile[data-cmd="turnRight"] {
+  --tile-deep: #a4560a; background: radial-gradient(120% 120% at 50% 12%, #ffd07a 0%, #ffa42f 44%, #f0810f 100%);
+}
+.tile[data-cmd="swap"] {
+  --tile-deep: #a4560a; background: radial-gradient(120% 120% at 50% 12%, #ffdf8a 0%, #ffbf3f 44%, #f59a13 100%);
+}
+.tile[data-cmd="ifFlower"] {
+  --tile-deep: #b21f6f; background: radial-gradient(120% 120% at 50% 12%, #ffc0e0 0%, #ff7fb8 44%, #f24f9a 100%);
+  outline: none;
+}
+.tile[data-cmd="ifMushroom"] {
+  --tile-deep: #6a2fb8; background: radial-gradient(120% 120% at 50% 12%, #d8b0ff 0%, #b075f2 44%, #9354e0 100%);
+  outline: none;
+}
+.tile:active {
+  transform: translateY(5px) scale(.97);
+  box-shadow: 0 1px 0 var(--tile-deep), 0 4px 10px rgba(13,20,55,.4),
+    inset 0 3px 0 rgba(255,255,255,.5), inset 0 -5px 10px rgba(13,20,55,.25);
+}
+/* slot-filled tiles keep the shadow tidy inside the slot */
+.slot .tile { box-shadow: 0 5px 0 var(--tile-deep), inset 0 3px 0 rgba(255,255,255,.5), inset 0 -5px 10px rgba(13,20,55,.22); }
+
+/* number badge on filled slots: candy bubble */
+.slot .num {
+  border: 2px solid #fff;
+  background: radial-gradient(120% 120% at 50% 15%, #8fd6ff, #2f8ef0 70%);
+  box-shadow: 0 3px 0 #1257a8, inset 0 1px 0 rgba(255,255,255,.6);
 }

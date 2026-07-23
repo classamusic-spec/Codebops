@@ -5,7 +5,7 @@ import { ALL_LEVELS } from '../data/levels';
 import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { loadCustomLevels, deleteCustomLevel } from '../storage/customLevels';
-import { inlineSvgInto, startMascotLife } from '../rendering/spriteCharacter';
+import { inlineSvgInto, startMascotLife, loadSvg } from '../rendering/spriteCharacter';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
@@ -100,10 +100,15 @@ export class App {
     const logoBox = el('div', 'title-logo-art', card);
     logoBox.setAttribute('role', 'img');
     logoBox.setAttribute('aria-label', 'CodeBops');
-    void inlineSvgInto(logoBox, './art/logo.svg');
     const shine = el('div', 'logo-shine', logoBox);
-    shine.style.webkitMaskImage = "url('./art/logo.svg')";
-    shine.style.maskImage = "url('./art/logo.svg')";
+    // Inline the logo, and mask the glint with the SAME (inlined) art via a
+    // data-URI so it works from a single-file build too — no external URL.
+    void loadSvg('./art/logo.svg').then((text) => {
+      logoBox.insertAdjacentHTML('afterbegin', text);
+      const uri = `url("data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(text)))}")`;
+      shine.style.webkitMaskImage = uri;
+      shine.style.maskImage = uri;
+    });
     logoBox.addEventListener('pointerdown', () => {
       sharedSfx.play('star');
       logoBox.classList.remove('replay');
