@@ -1,129 +1,131 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 657 950" class="char-svg mixy"><style>.lid,.star-eye,.mouth-smile,.mouth-o{display:none}</style>
-<g stroke-linejoin="round" stroke-linecap="round">
-  <!-- left antenna: teardrop with cyan glossy cap -->
-  <g id="antenna-left">
-    <path d="M 208,300 C 176,262 140,196 126,140 C 116,102 126,64 158,48 C 190,32 226,48 240,88 C 260,144 264,222 258,272 L 232,296 Z"
-          fill="#8b3ff0" stroke="#4a1a8c" stroke-width="13"/>
-    <path d="M 127,144 C 116,104 126,64 158,48 C 190,32 226,48 240,88 C 247,108 252,130 255,152 L 210,148 L 206,172 L 156,166 L 152,146 Z"
-          fill="#3fd8f5" stroke="#0e7fa8" stroke-width="12"/>
-    <ellipse cx="162" cy="84" rx="26" ry="15" fill="#f7effc" transform="rotate(-24 162 84)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 598.5 604.8" class="char-svg mixy"><style>.lid,.star-eye,.mouth-smile,.mouth-o{display:none}</style>
+<!-- Canon base art: official GLITCH_.svg, geometry untouched (scaled 6.3x) -->
+<g id="body"><g transform="scale(6.3) translate(-74 -88.1)">
+<style type="text/css">.mxc-0 {fill:#330281;}
+.mxc-1 {fill:#8F31FB;}
+.mxc-2 {fill:#9B3CFA;}
+.mxc-3 {fill:#A0DE4E;}
+.mxc-4 {opacity:0.3;fill:#BF80FC;enable-background:new    ;}
+.mxc-5 {fill:#AF32FF;}
+.mxc-6 {fill:#F6F0FD;}
+.mxc-7 {fill:#FFFFFF;}
+.mxc-8 {fill:#280445;}
+.mxc-9 {fill:#38EBF8;}
+.mxc-10 {fill:#FC31BB;}
+.mxc-11 {fill:#DB2D65;}
+.mxc-12 {fill:#FF4270;}
+.mxc-13 {fill:none;stroke:#38EBF8;stroke-width:1.4933;stroke-linecap:round;stroke-miterlimit:10;}
+.mxc-14 {fill:#5FF3FE;}
+.mxc-15 {fill:#107EA0;}
+.mxc-16 {fill:#56EEFE;}
+.mxc-17 {fill:#FFFFFF;}
+.mxc-18 {fill:#C68CF9;}
+.mxc-19 {fill:#9B157A;}
+.mxc-20 {fill:#FD31CB;}
+.mxc-21 {fill:#4510AA;}
+.mxc-22 {fill:url(#SVGID_1_);}
+.mxc-23 {fill:#7DC541;}
+.mxc-24 {fill:#A0CE4A;}
+.mxc-25 {fill:#FF33BD;}
+.mxc-26 {fill:url(#SVGID_2_);}</style>
+  <path class="mxc-0" d="m150 156.6c-1-0.5-3.9-2-6.7-3.8 7.4-3.1 9.6-8.9 9.6-17.6 0-8.1-3.3-15-8.8-20.3 2.1-1.6 7.8-6.4 9.5-8.9l0.2-0.4c0.4-0.4 0.3-1.1-0.1-1.5l-7-4.6 1.8-2.5c0.4-0.5 0.3-1.4-0.2-1.6l-3.3-2.2c-0.6-0.4-1.2-0.5-2.1-0.1-3.7 2-6.1 5.6-7.4 16.6-3-1-6.2-1.8-10-2-5.4-0.3-10.9-0.3-16 1.9-1.3-10.6-2.6-19.5-10.3-20.3-3.7-0.3-7.3 1.1-9.1 4.7-2 4.1-0.5 9 3.3 13 1.6 1.9 4.7 5 7.9 7.7-4.7 4.5-8.4 11.8-8.4 19.6 0.3 7.6 3.9 12.7 12.4 15.8-2.8 1.8-8.3 4.5-9.8 5.2-1.1 0.4-4.3 0.4-4.5 3.2 0 2 1.7 2.7 1.9 2.7-0.8 1.4 0 3.7 2.3 3.7 1.2 0 2.3-0.6 2.5-0.8 1.3 1.7 3.4 0.8 8.1-1.9-0.6 3.6-1 8-1 13.7-0.8 0.7-2.3 2.3-2.3 4 0 1.8 0.9 3.2 6.1 3.3 2.3 0 5.8-0.4 6.8-1.3s1.2-1.5 2.6-6.3c1.4 0.2 4.5 0.4 7.7 0 1.4 5.2 1.5 5.8 2.9 6.6 2 1 9.9 1.7 11.8-0.3 1.5-1.7 0.5-4-1.3-5.6 0.4-7.3-0.4-13.9-0.6-14.2 1.1 0.6 4.6 2.7 6.8 3 1.6 0.1 2.2-0.6 2.3-0.8 2.6 2 5.4 0.6 4.8-2.3 1-0.3 1.8-1.3 1.6-2.6-0.3-1.8-2.1-2.5-4-2.8z"/>
+  <path class="mxc-1" d="m107.1 150.5c-1.6 1.1-8 4.8-11.5 6.5-1.2 0.6-3.2 0.4-3.4 2.1-0.1 1.2 1.2 2.3 3.9 0.8l0.3 0.9c-0.4 0.7-2.8 1-2.5 2.5 0.1 1.1 1.3 1.6 3 0.6 1.5-1 1.7-1.2 3.1-2v0.2c-0.4 0.9-1.5 1.4-1.5 1.8 0 0.6 0.7 1 2.6 0.2 1.5-0.6 4.4-2.2 5-2.9 0.6-2.3 2.3-6.9 3-9.3l-2-1.4z"/>
+  <path class="mxc-1" d="m137.9 153.6c1.3 2.4 2.3 4.4 2.5 6.3 0.7 1 5.1 3.3 5.5 3.5 1.7 0.9 1.1 0.7 1.7 0.7 2.2 0-1.2-2.2-2.6-2.7-5.8-1.8 2.1 2.3 2.9 0.3 0.2-0.6-1-0.3-2.9-2.1v-0.6c1.1 0.7 2.9 2.1 4.4 2.2 1.2 0.2 2.2-0.1 2.1-1.5-0.3-1.7-2.7-1.7-4.3-2.6-2.6-1.4-6-3.2-9.2-5.7l-0.1 2.2z"/>
+  <path class="mxc-2" d="m108.9 153.5 1.2-2.6c-0.2-0.2-5.5 1.7-6.1 1.7 0.6 0.3 4.9 0.9 4.9 0.9z"/>
+  <path class="mxc-2" d="m138 153.6-3.3-1.8 3.3-0.6 3.1 1.4c-2 0.3-2.4 0.9-3.1 1z"/>
+  <path class="mxc-1" d="m135.6 153.9-1.1-3.2c-1.4 0.2-13-0.8-24.1 0.9l-0.8 2.4c-2.4 7.1-3.6 14.9-3.5 22.2 0 0.8-2.5 2-2.3 3.8 0.2 1.1 1 1.7 5.3 1.9 1.8 0 4.5-0.3 5.4-0.8 1-0.5 1-1.1 2.5-6.2-5.1-1.8-3.4-2.8-3-2.3 1.9 0.9 4.9 1.5 8.1 1.5 2.9 0 5.5-0.4 8.1-1.5 1.7-0.4-2 2-3.2 2.1 1.4 5.2 1.5 5.6 2.4 6.1 1.7 0.9 9 1.4 10.2 0.1 1.1-1.3-1.5-3.9-1.6-4.5 0.5-9-1.1-17.3-2.4-22.5z"/>
+  <path class="mxc-2" d="m137 110.3c0.9-6.2 2.4-13.3 6.5-15.6 0.4-0.2 0.5-0.2 1 0.2l2.4 1.6-1.9 2.9c-0.3 0.3-0.1 1.1 0.5 1.3l2.1 1.7-1.2 1.5c-0.3 0.5-0.2 1 0.2 1.3l3.4 2.5c-1.2 1.7-6.8 6.2-6.9 6.2-1.7-1.5-4-2.8-6.1-3.6z"/>
+  <path class="mxc-1" d="m100.9 104.7-1.9-1.8-3.3 1.3 0.7 0.9 2.5-1 1.8 1.8c0.4 0.5 3.2-1.3 3.2-1.5l-1.2-4 3.2-3.2c1.5 3.5 2.3 9.7 2.7 13.1-2 0.8-4 2.1-6 3.4-2.4-1.8-7.5-6.7-8.7-8.3l5.1-2.5"/>
+  <path class="mxc-5" d="m124.4 109.1c-12.3-0.6-23.9 4.5-28.5 16-1.4 3.5-4.5 13.8 2.1 19.5 4.6 4.1 13.2 5.8 17 6v0.4c-1.1 0.2-5.4 0.2-7.8-0.5 2.4 1.1 9.2 0.7 21.8 0.5 2.2-0.1 4.6-0.1 8.7-0.6 12.7-2.7 13.8-9.7 13.3-16.5-0.4-8.9-6.5-23.8-26.6-24.8z"/>
+  <path class="mxc-6" d="m122.4 124.1c-4.9-4.2-9.5-6.2-14.7-4.9-5.3 1.5-9.1 6.9-8.8 14.4 0.6 10.5 10.1 15.1 23.5 15.4 13 0 23-2.6 23.5-14.1 0.2-6.8-5-16.3-14-15.7-3.3 0.3-5.5 1.4-9 4.4 0 0.1-0.3 0.5-0.5 0.5z"/>
+  <path class="mxc-6" d="m122.2 152.5c-5.2 0-11 3.5-11 9.9 0.3 5.5 4.9 9.6 11 9.5s11-3 11-9c0-5.2-4.7-10-11-10.4z"/>
+  <path class="mxc-7" d="m112.5 126.6c-7.4-2.6-10.5 4.4-9.4 8.8 0.8 3.3 4.1 5.5 7.4 4.5l2-13.3z"/>
+  <path class="mxc-8" d="m116.6 132.7c-0.1-4.1-3-7.5-6.6-7.5-3.8 0-7.1 3.4-7.3 7.4-0.1 2.5 0.9 5 2.8 6-2.4-2.6-2.9-8.7 1.6-11.1 1.9-1.1 4.5-1.1 6.1 0.4-3.3-1.5-7 1.5-7.1 5.7 0 3.3 2 6 5.3 6 3.1 0 5.3-3 5.2-6.9z"/>
+  <path class="mxc-7" d="m131.5 129.6c1.6-2.2 6.6-2.6 9 0.8 2.6 4 1 8.7-0.9 10-1.6 0.7-3.4 1.2-5.2 0.5l-2.9-11.3z"/>
+  <path class="mxc-8" d="m134.6 127c-3.5 0-6.7 3.1-6.7 7.4 0 3.3 1.7 6.5 5.1 6.3 3.1-0.1 5-2.8 5-6.1-0.1-3.6-2.9-6.2-6.3-5.4 1.8-1.3 4.9-1.7 7.3 0.5 2.5 2.3 2.7 7.3-0.1 10.3 2-0.6 3-3.1 3-5.6 0-4-2.9-7.4-7.3-7.4z"/>
+  <path class="mxc-7" d="m111.5 128.9c-1 0-1.9 0.8-1.9 1.8s0.9 1.9 1.9 1.9 2-0.9 2-1.9-0.9-1.8-2-1.8z"/>
+  <path class="mxc-7" d="m131.7 130.4c-1 0-1.8 0.7-1.8 1.7s0.7 1.8 1.7 1.8 1.9-0.8 1.9-1.8c0-0.9-0.8-1.7-1.8-1.7z"/>
+  <path class="mxc-8" d="m125.5 138.2c-0.1-0.6-0.6-0.5-0.8-0.3-1.6 0.7-4.6 0.8-6.3-0.2-0.5-0.3-0.8-0.3-0.9 0.7-0.5 2.3 1 6 4.2 6 3-0.2 4.2-3.4 3.8-6.2z"/>
+  <path class="mxc-11" d="m118.6 141.6c0.5 1 1.4 2.1 3 2.3 1.3 0 2.8-0.4 3.4-2.2-1.9-2.1-5.1-2-6.4-0.1z"/>
+  <path class="mxc-12" d="m122 141.6c-1.5 0-2.3 0.4-2.4 1.1 0.4 0.7 1 1.2 2 1.2 1.1 0 2.3-0.3 2.8-1.2-0.3-0.6-1-1.1-2.4-1.1z"/>
+  <path class="mxc-13" d="m113.1 137.7c-1.5 1-4.1 0.3-4.6-2"/>
+  <path class="mxc-13" d="m135.9 136.9c-0.4 1.7-2.5 3-4.7 1.7"/>
+  <path class="mxc-14" d="m93 105.9 4.9-2.4 2.8 1 2-1-1-2.9 5.3-5c-1.9-5.5-7.5-7-11.4-5.5-5.5 2.1-7.5 9.1-2.6 15.3v0.5z"/>
+  <path class="mxc-15" d="m92.4 105.9 1.6-0.5c-7.4-8.8-2.4-14.4 2.1-14.4 3.1 0 7.5 1.1 9.5 6l1.3-1.3c-2.9-7.3-9.5-7.8-12.9-6.1-3.4 1.5-8.3 7.5-1.6 16.3z"/>
+  <path class="frag f0 mxc-16" d="m97.2 137.2h-2.6l0.6 2.8h2v-2.8z"/>
+  <path class="frag f1 mxc-10" d="m101.4 140.1v-2.3h-2.4v4.2h2.4"/>
+  <path class="mxc-17" d="m95.7 93c-1.8 0-3.6 2.9-1.2 2.9 2.2-0.3 3.6-2.9 1.2-2.9z"/>
+  <path class="mxc-18" d="m112 112.5c-3 0-6.9 3.9-4.5 4 2.1 0.2 7-2.6 5.1-4h-0.6z"/>
+  <path class="mxc-0" d="m134.5 125c0 0.5 1.1 1 2.4 0.5 1.7-0.5 1.8-1.8 0.8-2.1-0.8 0.1-0.7 1.1-2.8 1.6-0.3-0.1-0.4 0-0.4 0z"/>
+  <path class="mxc-19" d="m126.1 97.9c-0.7-0.2-0.9 0.1-8.1 3.8-1 0.5-1 1.4-0.5 2.2l2.6 3.7-2.4 3c-0.5 0.9-0.2 1.6 1.8 3 0.7 0.4 1.7 0.5 2.4-0.2l4.5-4.4c0.3-0.5 0.5-1.3 0.1-1.6l-2-2.5 2-0.9 0.2-0.1c0.3-0.3 0.4-0.5 0.5-1l0.4-3.9c0-0.6-0.5-1.3-1.5-1.1z"/>
+  <path class="mxc-20" d="m126.4 99-7.8 4c-0.4 0.1-0.4 0.4-0.1 0.6l3 4.3c0.2 0.2 0 0.2-0.1 0.5l-2.8 3c-0.4 0.3 0.4 1 1.3 1.5 0.6 0.5 1 0.3 1.2 0.1l4-4.4c0.3-0.2 0.3-0.6 0.1-0.6l-2.3-3.3c-0.2-0.2-0.2-0.6 0.2-0.7l2.8-1.3 0.5-3.7z"/>
+  <path class="mxc-3" d="m147.6 103.9 2.8 2.1 3-4.1 0.2-0.3-2.2-1.7-0.3-0.2c-0.1 0-0.4 0.2-0.4 0.4l-2.7 3.9-0.4-0.1z"/>
+  <path class="mxc-4" d="m104.6 178.6c0 1 1.6 1.4 3.8 1.4s3.8-0.4 3.5-1.6c-0.7-1.8-6.7-3.2-7.3 0.2z"/>
+  <path class="mxc-4" d="m140 179c0-2.8-6.4-2.6-7.6-0.1-0.7 1.8 7.1 2.5 7.6 0.1z"/>
+  <linearGradient id="SVGID_1_" x1="-516.3" x2="-516.3" y1="431.3" y2="434" gradientTransform="matrix(1.062 0 0 1.062 635.9 -282)" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#7DC541" offset="0"/>
+    <stop stop-color="#A0CD3A" offset="1"/>
+  </linearGradient>
+  <polygon class="frag f2 mxc-22" points="106.2 167.1 108.1 167.1 108.1 169.6 106 169.6"/>
+  <rect class="frag f3 mxc-14" x="108.1" y="169.2" width="1.9" height="2"/>
+  <rect class="frag f4 mxc-23" x="103.9" y="156.4" width="1.7" height="1.9"/>
+  <rect class="frag f5 mxc-24" x="105.5" y="154.6" width="1.5" height="1.7"/>
+  <path class="mxc-21" d="m108.5 154.1h-1.3l-0.5 2.4-0.6 1.9h0.9c0.5-1.7 1.9-3.9 2-4.4l-0.5 0.1z"/>
+  <linearGradient id="SVGID_2_" x1="-496" x2="-495" y1="432.8" y2="434.1" gradientTransform="matrix(1.062 0 0 1.062 635.9 -282)" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#DEE4E3" offset="0"/>
+    <stop stop-color="#BCCAC4" offset="1"/>
+  </linearGradient>
+  <polyline class="mxc-26" points="125.4 159.1 125.1 160.6 125.9 160.6 126.4 160.6 126.4 159.1 125.4 159.1"/>
+  <path class="mxc-2" d="m121.9 155.7c-2 0-3.8 0.7-4.3 1.4l1.8 2c0.5-0.1 1.2-0.7 2.7-0.4l-0.2-3z"/>
+  <path class="mxc-21" d="m124 156.1-1-0.1v2.4c1 0 1.4 0 1.5 0.1-0.1-0.1 0.4-1.3 0.4-2.4h-0.9z"/>
+  <path class="mxc-2" d="m116.7 163.1c-0.3-1.5 0.2-3 1.4-3.7l-1-1.5c-0.6 0.1-2.6 2.1-1.5 6.2l1.1-1z"/>
+  <path class="mxc-14" d="m115.6 163.7c0.3 1.3 0.8 2 0.8 1.9v2.3h2.1v-2.3h-0.8v-0.5h1.9v-2.1l-4 0.1z"/>
+  <path class="mxc-14" d="m118.1 167-0.2 0.9h0.7v-0.8l-0.5-0.1"/>
+  <path class="mxc-2" d="m119.6 165.6h-1.9v1.3l1.9 0.2v1.6c0.4 0.3 2 0.4 2.8 0.4v-2.7c-2 0.2-2.7-0.7-2.8-0.8z"/>
+  <path class="mxc-21" d="m124.6 165.6h-0.1v1.8c-1.1 0.7-2 1-2.4 1v1.6c0.8-0.1 2-0.1 2.8-0.6v-0.4h1.7v-2.4l-0.6-1h-1.4z"/>
+  <path class="frag f11 mxc-25" d="m116.7 157.6v0.8c-0.3 0.2-0.5 0.8-0.6 1.1h2.6v-1.9h-2z"/>
+  <path class="mxc-24" d="m128.5 161.5h-2v1.7l-0.1 0.5v1.9h1.8v-0.6c0.5-1 0.4-3.3 0.3-3.5z"/>
+  <path class="mxc-21" d="m128.5 161.6v-1.5h-2.1v2h2.1v-0.5z"/>
+  <polygon class="mxc-21" points="125.4 156.6 125.4 158.5 127.2 158.5 127.2 156.6"/>
+  <path class="mxc-23" d="m124 157.1h-0.1v1.4h1.3v-1.4h-0.8"/>
+  <path class="mxc-24" d="m127 158.4-0.1 0.1 0.2 1.2h0.1v-0.6l-0.2-0.7"/>
+  <polygon class="frag f6 mxc-14" points="140.1 159.6 140.9 161.7 142.2 161.7 142.2 159.6"/>
+  <rect class="frag f7 mxc-25" x="142.1" y="157.7" width="1.7" height="1.9"/>
+  <rect class="frag f8 mxc-14" x="144" y="124.7" width="2.2" height="2.5"/>
+  <rect class="frag f9 mxc-10" x="146.4" y="131.6" width="2.4" height="2.5"/>
+  <rect class="frag f10 mxc-14" x="147.9" y="129" width="4.1" height="2.4"/>
+  <path class="mxc-2" d="m99 161.9v-0.4c-1.9 0.4-2.5-0.4-2.8-0.6l-0.1 0.2c0.5 0.8 1.8 1.5 2.9 0.8z"/>
+  <path class="mxc-2" d="m146.6 162.2c0.5 0.3 2.1 0.4 2.9-0.8l-0.3-0.2c-0.3 0.5-1.5 1.3-2.6 1z"/>
+</g></g>
+<g id="fragments"></g>
+<!-- Animation overlays (same coordinate space) -->
+<g id="eye-left">
+  <g class="eye-core">
+    <ellipse cx="236.2" cy="268.4" rx="14.5" ry="14.5" fill="#280445"/>
+    <ellipse class="shine" cx="236.2" cy="268.4" rx="12" ry="12" fill="#ffffff"/>
   </g>
-
-  <!-- right antenna: angular glitch ear -->
-  <g id="antenna-right">
-    <path d="M 462,272 L 448,150 L 486,62 L 552,80 L 546,124 L 584,132 L 566,246 L 508,272 Z"
-          fill="#8b3ff0" stroke="#4a1a8c" stroke-width="13"/>
-    <rect x="546" y="84" width="28" height="28" fill="#7ed321"/>
+  <ellipse class="lid" cx="228.1" cy="281.6" rx="49" ry="52" fill="#F6F0FD"/>
+  <path class="star-eye" d="M 228.1,253.9 L 236.9,274.1 L 259.6,275.9 L 242.5,290.4 L 248.2,313.1 L 228.1,301.1 L 207.9,313.1 L 213.6,290.4 L 196.6,275.9 L 219.2,274.1 Z" fill="#FFE03D" stroke="#9B157A" stroke-width="6" stroke-linejoin="round"/>
+</g>
+<g id="eye-right">
+  <g class="eye-core">
+    <ellipse cx="363.5" cy="277.2" rx="13.5" ry="13.5" fill="#280445"/>
+    <ellipse class="shine" cx="363.5" cy="277.2" rx="11" ry="11" fill="#ffffff"/>
   </g>
-
-  <!-- crest: pink lightning bolt -->
-  <g id="crest">
-    <path d="M 380,96 L 330,178 L 368,184 L 326,262 L 412,172 L 372,166 L 418,104 Z"
-          fill="#f932c7" stroke="#8c0a77" stroke-width="12"/>
+  <ellipse class="lid" cx="380.5" cy="287.9" rx="46" ry="49" fill="#F6F0FD"/>
+  <path class="star-eye" d="M 380.5,260.2 L 389.3,280.3 L 412.0,282.2 L 395.0,296.7 L 400.7,319.4 L 380.5,307.4 L 360.4,319.4 L 366.0,296.7 L 349.0,282.2 L 371.7,280.3 Z" fill="#FFE03D" stroke="#9B157A" stroke-width="6" stroke-linejoin="round"/>
+</g>
+<g id="mouth">
+  <g class="mouth-open"></g>
+  <g class="mouth-smile">
+    <ellipse cx="303.0" cy="335.2" rx="34" ry="26" fill="#F6F0FD"/>
+    <path d="M 278.5,325.7 Q 303.0,349.6 327.6,325.7" fill="none" stroke="#280445" stroke-width="10" stroke-linecap="round"/>
   </g>
-
-  <!-- head + face -->
-  <g id="face">
-    <path d="M 328,196 C 236,196 152,240 118,318 C 88,386 90,470 122,532 C 160,606 240,660 328,660 C 416,660 496,606 534,532 C 566,470 568,386 538,318 C 504,240 420,196 328,196 Z"
-          fill="#8b3ff0" stroke="#4a1a8c" stroke-width="14"/>
-    <ellipse cx="238" cy="252" rx="34" ry="14" fill="#c799ef" transform="rotate(-24 238 252)"/>
-    <path d="M 328,386 C 316,342 280,328 242,338 C 192,350 154,392 156,446 C 158,528 238,590 328,590 C 418,590 498,528 500,446 C 502,392 464,350 414,338 C 376,328 340,342 328,386 Z"
-          fill="#f7effc"/>
-    <!-- cheeky brow accent over right eye -->
-    <path d="M 428,346 Q 452,338 466,352" fill="none" stroke="#4a1a8c" stroke-width="11"/>
-  </g>
-
-  <!-- eyes -->
-  <g id="eye-left">
-    <g class="eye-core">
-      <ellipse cx="240" cy="452" rx="60" ry="66" fill="#ffffff" stroke="#1d073e" stroke-width="11"/>
-      <ellipse cx="242" cy="457" rx="48" ry="54" fill="#1d1650"/>
-      <path d="M 200,480 A 48 54 0 0 0 284,480 Q 242,514 200,480 Z" fill="#3fd8f5"/>
-      <ellipse cx="242" cy="450" rx="25" ry="27" fill="#12082b"/>
-      <ellipse class="shine" cx="229" cy="432" rx="14" ry="15" fill="#ffffff"/>
-      <ellipse cx="261" cy="474" rx="7" ry="7" fill="#ffffff"/>
-    </g>
-    <ellipse class="lid" cx="240" cy="452" rx="63" ry="69" fill="#f7effc"/>
-    <path class="star-eye" d="M 243,420 L 253,442 L 277,444 L 259,459 L 265,483 L 243,470 L 221,483 L 227,459 L 209,444 L 233,442 Z" fill="#ffd23e" stroke="#8c0a77" stroke-width="5"/>
-  </g>
-  <g id="eye-right">
-    <g class="eye-core">
-      <ellipse cx="416" cy="452" rx="60" ry="66" fill="#ffffff" stroke="#1d073e" stroke-width="11"/>
-      <ellipse cx="414" cy="457" rx="48" ry="54" fill="#1d1650"/>
-      <path d="M 372,480 A 48 54 0 0 0 456,480 Q 414,514 372,480 Z" fill="#3fd8f5"/>
-      <ellipse cx="414" cy="450" rx="25" ry="27" fill="#12082b"/>
-      <ellipse class="shine" cx="395" cy="432" rx="14" ry="15" fill="#ffffff"/>
-      <ellipse cx="427" cy="474" rx="7" ry="7" fill="#ffffff"/>
-    </g>
-    <ellipse class="lid" cx="416" cy="452" rx="63" ry="69" fill="#f7effc"/>
-    <path class="star-eye" d="M 413,420 L 423,442 L 447,444 L 429,459 L 435,483 L 413,470 L 391,483 L 397,459 L 379,444 L 403,442 Z" fill="#ffd23e" stroke="#8c0a77" stroke-width="5"/>
-  </g>
-
-  <!-- mouth -->
-  <g id="mouth">
-    <g class="mouth-open">
-      <path d="M 284,538 Q 328,528 372,538 C 375,582 353,605 328,605 C 303,605 281,582 284,538 Z" fill="#1d073e" stroke="#1d073e" stroke-width="6"/>
-      <path d="M 298,584 Q 328,566 358,584 C 350,598 340,602 328,602 C 316,602 306,598 298,584 Z" fill="#ed3879"/>
-    </g>
-    <path class="mouth-smile" d="M 290,548 Q 328,582 366,548" fill="none" stroke="#1d073e" stroke-width="11"/>
-    <g class="mouth-o">
-      <ellipse cx="328" cy="562" rx="17" ry="20" fill="#1d073e"/>
-      <ellipse cx="328" cy="569" rx="8.5" ry="9.5" fill="#ed3879"/>
-    </g>
-  </g>
-
-  <!-- arms (paw-wings) -->
-  <path d="M 248,676 C 202,664 158,672 128,694 C 108,708 108,726 126,732 C 116,743 126,757 146,755 C 140,769 154,779 173,771 C 202,759 230,738 249,716 C 263,700 266,681 248,676 Z"
-        fill="#8b3ff0" stroke="#4a1a8c" stroke-width="12"/>
-  <path d="M 409,676 C 455,664 499,672 529,694 C 549,708 549,726 531,732 C 541,743 531,757 511,755 C 517,769 503,779 484,771 C 455,759 427,738 408,716 C 394,700 391,681 409,676 Z"
-        fill="#8b3ff0" stroke="#4a1a8c" stroke-width="12"/>
-
-  <!-- body -->
-  <g id="body">
-    <path d="M 242,614 C 214,674 202,750 212,804 C 219,844 248,866 288,870 C 306,875 350,875 368,870 C 408,866 437,844 444,804 C 454,750 442,674 414,614 C 364,652 292,652 242,614 Z"
-          fill="#8b3ff0" stroke="#4a1a8c" stroke-width="13"/>
-    <ellipse cx="272" cy="878" rx="36" ry="22" fill="#a866f5" stroke="#4a1a8c" stroke-width="10"/>
-    <ellipse cx="384" cy="878" rx="36" ry="22" fill="#a866f5" stroke="#4a1a8c" stroke-width="10"/>
-  </g>
-
-  <!-- belly with glitch ring -->
-  <g id="belly">
-    <circle cx="328" cy="748" r="86" fill="#f7effc"/>
-    <g fill="none" stroke="#7c3aed" stroke-width="24">
-      <path d="M 372,712 A 57 57 0 1 0 380,770"/>
-    </g>
-    <rect x="366" y="756" width="22" height="22" fill="#7ed321"/>
-    <rect x="292" y="694" width="18" height="18" fill="#f932c7"/>
-    <rect x="352" y="700" width="16" height="16" fill="#53edf7"/>
-    <rect x="298" y="784" width="16" height="16" fill="#7c3aed"/>
-  </g>
-
-  <!-- glitch fragments -->
-  <g id="fragments">
-    <rect class="frag f0" x="502" y="420" width="24" height="24" fill="#53edf7"/>
-    <rect class="frag f1" x="530" y="452" width="18" height="18" fill="#f932c7"/>
-    <rect class="frag f2" x="490" y="490" width="16" height="16" fill="#7ed321"/>
-    <rect class="frag f3" x="148" y="490" width="20" height="20" fill="#53edf7"/>
-    <rect class="frag f4" x="170" y="522" width="14" height="14" fill="#f932c7"/>
-    <rect class="frag f5" x="452" y="368" width="16" height="16" fill="#c4b5fd"/>
-    <rect class="frag f6" x="208" y="382" width="14" height="14" fill="#53edf7"/>
-    <rect class="frag f7" x="238" y="620" width="18" height="18" fill="#7ed321"/>
-    <rect class="frag f8" x="212" y="648" width="14" height="14" fill="#53edf7"/>
-    <rect class="frag f9" x="262" y="668" width="14" height="14" fill="#f932c7"/>
-    <rect class="frag f10" x="422" y="640" width="18" height="18" fill="#53edf7"/>
-    <rect class="frag f11" x="448" y="668" width="14" height="14" fill="#7ed321"/>
-    <rect class="frag f12" x="252" y="720" width="16" height="16" fill="#7c3aed"/>
-    <rect class="frag f13" x="398" y="720" width="14" height="14" fill="#f932c7"/>
-    <rect class="frag f14" x="270" y="830" width="16" height="16" fill="#7ed321"/>
-    <rect class="frag f15" x="372" y="836" width="14" height="14" fill="#53edf7"/>
-    <rect class="frag f16" x="322" y="230" width="16" height="16" fill="#53edf7"/>
-    <rect class="frag f17" x="186" y="290" width="14" height="14" fill="#f932c7"/>
-    <rect class="frag f18" x="472" y="300" width="16" height="16" fill="#7ed321"/>
-    <rect class="frag f19" x="140" y="420" width="12" height="12" fill="#c4b5fd"/>
-    <rect class="frag f20" x="510" y="540" width="16" height="16" fill="#f932c7"/>
-    <rect class="frag f21" x="160" y="560" width="14" height="14" fill="#7ed321"/>
-    <rect class="frag f22" x="300" y="606" width="12" height="12" fill="#53edf7"/>
-    <rect class="frag f23" x="356" y="612" width="12" height="12" fill="#f932c7"/>
+  <g class="mouth-o">
+    <ellipse cx="303.0" cy="335.2" rx="34" ry="26" fill="#F6F0FD"/>
+    <ellipse cx="303.0" cy="335.2" rx="14" ry="17" fill="#280445"/>
+    <ellipse cx="303.0" cy="349.6" rx="7" ry="8" fill="#FF4270"/>
   </g>
 </g>
+<g id="antenna-left"></g><g id="antenna-right"></g><g id="crest"></g><g id="belly"></g>
 </svg>

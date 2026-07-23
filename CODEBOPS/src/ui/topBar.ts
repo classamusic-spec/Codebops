@@ -1,5 +1,5 @@
 /** Top bar: back · logo · level title pill · star progress · settings. */
-import { el, buildLogo } from './dom';
+import { el } from './dom';
 
 export interface TopBarEvents {
   onBack: () => void;
@@ -17,7 +17,9 @@ export class TopBar {
     back.setAttribute('aria-label', 'Back to title');
     back.addEventListener('click', events.onBack);
 
-    buildLogo(this.root, 'logo-chip');
+    const mark = el('img', 'logo-chip-img', this.root) as HTMLImageElement;
+    mark.src = './art/logo.svg';
+    mark.alt = 'CodeBops';
 
     el('div', 'top-bar-spacer', this.root);
 

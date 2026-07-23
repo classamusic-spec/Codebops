@@ -1,5 +1,5 @@
 /** App bootstrap + screen router (title → select/garden/editor → game). */
-import { el, buildLogo } from '../ui/dom';
+import { el } from '../ui/dom';
 import { GameScreen } from './gameScreen';
 import { ALL_LEVELS } from '../data/levels';
 import type { LevelDef } from '../data/schemas/level';
@@ -95,7 +95,21 @@ export class App {
     });
 
     const card = el('div', 'title-card', screen);
-    buildLogo(card, 'title-logo');
+    // Official CodeBops logo mark, animated: drop-bounce in, idle rock,
+    // masked glint sweep; tap it to make it pop again.
+    const logoBox = el('div', 'title-logo-art', card);
+    logoBox.setAttribute('role', 'img');
+    logoBox.setAttribute('aria-label', 'CodeBops');
+    void inlineSvgInto(logoBox, './art/logo.svg');
+    const shine = el('div', 'logo-shine', logoBox);
+    shine.style.webkitMaskImage = "url('./art/logo.svg')";
+    shine.style.maskImage = "url('./art/logo.svg')";
+    logoBox.addEventListener('pointerdown', () => {
+      sharedSfx.play('star');
+      logoBox.classList.remove('replay');
+      void logoBox.offsetWidth;
+      logoBox.classList.add('replay');
+    });
     const tag = el('div', 'title-tag', card);
     el('span', 'tag-star', tag, '⭐');
     el('span', undefined, tag, 'Teach tiny helpers. Build big ideas.');

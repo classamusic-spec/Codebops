@@ -1428,3 +1428,67 @@ button.stars-pill:active { transform: translateY(3px); }
   .title-spark { font-size: 16px; }
   .title-cloud.c3 { display: none; }
 }
+
+
+/* ============================================================
+   Official logo mark — splash animation + top-bar chip
+   ============================================================ */
+.title-logo-art {
+  position: relative;
+  width: min(80vw, 620px);
+  margin-bottom: auto;
+  filter: drop-shadow(0 10px 26px rgba(13,20,55,.42));
+  animation: logo-drop .95s var(--ease-bounce) both .1s;
+  cursor: pointer;
+}
+.title-logo-art svg {
+  width: 100%; height: auto; display: block;
+  transform-origin: 50% 60%;
+  animation: logo-rock 3.4s ease-in-out infinite 1.2s;
+}
+.title-logo-art.replay svg {
+  animation: logo-pop .6s var(--ease-bounce), logo-rock 3.4s ease-in-out infinite .6s;
+}
+@keyframes logo-drop {
+  0% { opacity: 0; transform: translateY(-58vh) scale(.55) rotate(-7deg); }
+  58% { opacity: 1; transform: translateY(3.5%) scale(1.07, .9) rotate(1.5deg); }
+  80% { transform: translateY(-2%) scale(.97, 1.05) rotate(-.6deg); }
+  100% { transform: none; }
+}
+@keyframes logo-rock {
+  0%, 100% { transform: rotate(-1.3deg) translateY(0); }
+  50% { transform: rotate(1.3deg) translateY(-2.5%); }
+}
+@keyframes logo-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.14, .88); }
+  70% { transform: scale(.95, 1.07); }
+  100% { transform: scale(1); }
+}
+.logo-shine {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat;
+}
+.logo-shine::after {
+  content: ''; position: absolute; top: -25%; bottom: -25%; width: 16%; left: -30%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.95), transparent);
+  transform: skewX(-18deg);
+  animation: logo-glint 4.6s ease-in-out infinite 1.8s;
+}
+@keyframes logo-glint { 0% { left: -30%; } 16% { left: 118%; } 100% { left: 118%; } }
+body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: none; }
+
+.logo-chip-img { height: clamp(28px, 3.4vw, 40px); width: auto; display: block; filter: drop-shadow(0 3px 6px rgba(13,20,55,.45)); }
+@media (max-width: 760px) { .logo-chip-img { display: none; } }
+
+/* Wave fallback for the flat official art: the whole Bop does a happy
+   rock (no separate arm part to rotate in the canon SVGs). */
+.char-sprite.waving svg, .title-mascot.waving svg {
+  animation: sprite-wave-all .55s ease-in-out var(--wave-count, 3);
+  transform-origin: 50% 88%;
+}
+@keyframes sprite-wave-all {
+  0%, 100% { transform: rotate(0); }
+  30% { transform: rotate(-7deg) translateY(-2%); }
+  70% { transform: rotate(5deg); }
+}
