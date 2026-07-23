@@ -17,7 +17,11 @@ function closeDialog(node: HTMLElement, previousFocus: Element | null): void {
 
 /* ---------------- Level brief ---------------- */
 
-export function showBrief(parent: HTMLElement, level: LevelDef, sfx: Sfx): Promise<void> {
+export function showBrief(
+  parent: HTMLElement,
+  level: { brief: { readonly title: string; readonly text: string; readonly emoji: string } },
+  sfx: Sfx,
+): Promise<void> {
   return new Promise((resolve) => {
     const previousFocus = document.activeElement;
     const s = scrim(parent);

@@ -7,6 +7,16 @@ import { createRenderer, RendererInfo } from './renderer';
 
 export type TickHandler = (dt: number, elapsed: number) => void;
 
+/** Optional per-world camera/lighting override (Gearworks bench views). */
+export interface StageViewConfig {
+  /** Normalized direction from look-target toward the camera. */
+  readonly viewDir?: { x: number; y: number; z: number };
+  /** FOV per aspect (defaults to the meadow worlds' curve). */
+  readonly fovFor?: (aspect: number) => number;
+  /** Indoor lighting rig (warmer key, cooler bounce) for the garage. */
+  readonly indoor?: boolean;
+}
+
 export class Stage {
   readonly renderer: THREE.WebGLRenderer;
   readonly info: RendererInfo;
@@ -26,12 +36,15 @@ export class Stage {
   private framePoints: THREE.Vector3[] = [];
   /** View direction (normalized) — the classic three-quarter storybook angle. */
   private static readonly VIEW_DIR = new THREE.Vector3(0.02, 0.62, 0.782).normalize();
+  /** Active view direction (defaults to VIEW_DIR; presets may override). */
+  private readonly viewDir: THREE.Vector3;
+  private readonly fovFor: (aspect: number) => number;
   private onVisibility = (): void => {
     if (document.hidden) this.stopLoop();
     else this.startLoop();
   };
 
-  constructor(wrap: HTMLElement) {
+  constructor(wrap: HTMLElement, view: StageViewConfig = {}) {
     this.wrap = wrap;
     this.canvas = document.createElement('canvas');
     this.canvas.setAttribute('aria-label', 'CodeBops 3D world');
@@ -40,6 +53,11 @@ export class Stage {
     const { renderer, info } = createRenderer(this.canvas);
     this.renderer = renderer;
     this.info = info;
+
+    this.viewDir = view.viewDir
+      ? new THREE.Vector3(view.viewDir.x, view.viewDir.y, view.viewDir.z).normalize()
+      : Stage.VIEW_DIR.clone();
+    this.fovFor = view.fovFor ?? ((aspect) => (aspect >= 1.4 ? 34 : aspect >= 1.0 ? 40 : 46));
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#6fc7ff');
@@ -50,11 +68,16 @@ export class Stage {
     this.camera.position.set(0.2, 8.8, 10.8);
     this.camera.lookAt(0.1, 0.2, 0.1);
 
-    // Soft theatrical lighting.
-    const hemi = new THREE.HemisphereLight('#cfeaff', '#79c95f', 1.15);
+    // Soft theatrical lighting (indoor rig: warm lamp key, cool bounce).
+    const hemi = view.indoor
+      ? new THREE.HemisphereLight('#a8b6e8', '#39406e', 0.95)
+      : new THREE.HemisphereLight('#cfeaff', '#79c95f', 1.15);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight('#fff3d6', 2.1);
-    sun.position.set(7, 14, 8);
+    const sun = view.indoor
+      ? new THREE.DirectionalLight('#ffe1b0', 1.7)
+      : new THREE.DirectionalLight('#fff3d6', 2.1);
+    if (view.indoor) sun.position.set(3, 10, 12);
+    else sun.position.set(7, 14, 8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.left = -14;
@@ -138,8 +161,10 @@ export class Stage {
     let dist = 11;
     const cam = this.camera;
     for (let pass = 0; pass < 4; pass++) {
-      cam.position.copy(this.frameCenter).addScaledVector(Stage.VIEW_DIR, dist);
-      cam.lookAt(this.frameCenter.x, 0.2, this.frameCenter.z);
+      cam.position.copy(this.frameCenter).addScaledVector(this.viewDir, dist);
+      // Vertical centering follows the caller's frame center (grid worlds
+      // pass y=0.2 for ground focus; the Gearworks bench passes bench height).
+      cam.lookAt(this.frameCenter.x, this.frameCenter.y, this.frameCenter.z);
       cam.updateMatrixWorld(true);
       cam.updateProjectionMatrix();
       let worst = 0;
@@ -170,7 +195,7 @@ export class Stage {
     // Widen the lens a touch as screens narrow; distance fitting handles
     // the rest via applyFrame.
     const aspect = w / h;
-    this.camera.fov = aspect >= 1.4 ? 34 : aspect >= 1.0 ? 40 : 46;
+    this.camera.fov = this.fovFor(aspect);
     // Portrait phones: shift the scene upward so the bottom command deck
     // never covers the puzzle (sprites project through the same matrix,
     // so characters stay glued to their tiles).

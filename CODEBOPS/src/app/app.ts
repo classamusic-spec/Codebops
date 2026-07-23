@@ -9,6 +9,8 @@ import { inlineSvgInto, startMascotLife, loadSvg } from '../rendering/spriteChar
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
+import { GearworksScreen } from './gearworksScreen';
+import { GEARWORKS_WORLD, GEARWORKS_LEVELS } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
@@ -37,6 +39,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
+  private gearworks: GearworksScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -57,6 +60,8 @@ export class App {
     this.garden = null;
     this.editor?.dispose();
     this.editor = null;
+    this.gearworks?.dispose();
+    this.gearworks = null;
     this.host.innerHTML = '';
   }
 
@@ -243,6 +248,41 @@ export class App {
       }
     }
 
+    // --- Gearworks Garage (new world — Phase 1 shell) ---
+    {
+      const section = el('div', 'world-panel wp-garage', wrap);
+      const title = el('div', 'world-title', section);
+      el('span', 'wemoji', title, GEARWORKS_WORLD.emoji);
+      el('span', undefined, title, GEARWORKS_WORLD.name);
+      el('span', 'gw-new-badge', title, 'NEW!');
+      const list = el('div', 'level-list', section);
+      GEARWORKS_LEVELS.forEach((lv, i) => {
+        const row = el('button', `level-item${lv.playable ? '' : ' locked'}`, list) as HTMLButtonElement;
+        row.type = 'button';
+        row.setAttribute('aria-label', lv.playable ? `Play ${lv.shortTitle}` : `${lv.shortTitle} — coming soon`);
+        const num = el('span', 'li-num gw-num', row);
+        el('span', 'li-num-text', num, String(i + 1));
+        el('span', 'li-leaf', num, '⚙️');
+        el('span', 'li-emoji', row, lv.emoji);
+        el('span', 'li-name', row, lv.shortTitle);
+        const right = el('span', 'li-right', row);
+        if (!lv.playable) el('span', 'li-lock', right, '🔒');
+        const starRow = el('span', 'li-stars', right);
+        for (let s = 0; s < 3; s++) el('span', '', starRow, '★');
+        if (lv.playable) {
+          row.addEventListener('click', () => this.showGearworks(i));
+        } else {
+          row.addEventListener('click', () => {
+            sharedSfx.play('bump');
+            row.classList.remove('shake');
+            void row.offsetWidth;
+            row.classList.add('shake');
+            this.hintToast('🔧 Zip is still building this machine!');
+          });
+        }
+      });
+    }
+
     // --- Imagination Island ---
     const customs = loadCustomLevels();
     const section = el('div', 'world-panel wp-island', wrap);
@@ -314,6 +354,19 @@ export class App {
       store: this.store,
     });
     this.gameScreen.enter();
+  }
+
+  // ---------- gearworks ----------
+
+  private showGearworks(index: number): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-gearworks';
+    this.gearworks = new GearworksScreen(screen, GEARWORKS_LEVELS[index], {
+      onExit: () => this.showSelect(),
+      store: this.store,
+    });
+    this.gearworks.enter();
   }
 
   // ---------- garden ----------

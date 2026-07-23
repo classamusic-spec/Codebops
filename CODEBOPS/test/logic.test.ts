@@ -19,6 +19,8 @@ import {
 } from '../src/data/levels/agentAcademy';
 import { assertLevelValid } from '../src/data/schemas/level';
 import { ALL_LEVELS } from '../src/data/levels/index';
+import { GEARWORKS_WORLD, GEARWORKS_LEVELS, GEARWORKS_TRAY_SHELL } from '../src/data/gearworks/world';
+import { CAMERA_PRESETS, presetIsNormalized } from '../src/rendering/gearworks/cameraPresets';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -228,6 +230,24 @@ const MUSH_RULE = { trigger: 'mushroom', action: 'grab' } as const;
 {
   const r = runProgram(BUBBLE_BAY_1, P('moveRight', ['repeat', 2], ['repeat', 2], 'grab'));
   check('back-to-back repeats stay bounded', r.events.length < MAX_STEPS * 3);
+}
+
+// --- Gearworks Garage (Phase 1 shell) ---
+{
+  check('gearworks world id registered', GEARWORKS_WORLD.id === 'gearworks-garage');
+  const ids = new Set(GEARWORKS_LEVELS.map((l) => l.id));
+  check('gearworks level ids unique', ids.size === GEARWORKS_LEVELS.length);
+  check('gearworks first level is playable', GEARWORKS_LEVELS[0].playable === true);
+  check('gearworks later levels locked in phase 1', GEARWORKS_LEVELS.slice(1).every((l) => !l.playable));
+  const tray = new Set(GEARWORKS_TRAY_SHELL.map((t) => t.id));
+  check('gearworks tray ids unique', tray.size === GEARWORKS_TRAY_SHELL.length);
+  check('camera presets normalized', Object.values(CAMERA_PRESETS).every(presetIsNormalized));
+  check('bench pitch is diorama-flat (gears face camera)', CAMERA_PRESETS.bench.pitchDeg <= 18);
+  check('factory pitch higher than bench (lane separation)',
+    CAMERA_PRESETS.factory.pitchDeg > CAMERA_PRESETS.workshop.pitchDeg
+    && CAMERA_PRESETS.workshop.pitchDeg > CAMERA_PRESETS.bench.pitchDeg);
+  check('preset fov widens on portrait aspect', Object.values(CAMERA_PRESETS)
+    .every((p) => p.fovFor(0.6) > p.fovFor(1.8)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
