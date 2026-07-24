@@ -2118,3 +2118,19 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .sm-label { display: none; }
   .sm-chip { width: clamp(46px, 15vw, 64px); }
 }
+
+/* ============================================================
+   Phase 18 — Maker Workshop gadget card (reuses job-card look)
+   ============================================================ */
+.gw-gadget .gw-jc-kicker { color: #8be04a; }
+.gw-gadget.calling {
+  animation: gadgetCall .6s ease;
+}
+@keyframes gadgetCall {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.05); box-shadow: 0 0 22px rgba(139,224,74,.7), var(--shadow-card); }
+  100% { transform: scale(1); }
+}
+.calm-mode .gw-gadget.calling { animation: none; }
+/* the parameter REPEAT tile reads as an input-driven loop */
+.gw-gadget .gw-jc-tile[data-gw-tone="loop"] { outline: 3px dashed rgba(139,224,74,.55); outline-offset: -6px; }

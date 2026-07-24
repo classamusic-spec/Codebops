@@ -14,17 +14,19 @@ import type { LlCommandId } from '../../gameplay/gearworks/logicMachine';
 import type { DvCommandId } from '../../gameplay/gearworks/deliveryMachine';
 import type { PpCommandId } from '../../gameplay/gearworks/paintMachine';
 import type { StoryEventId } from '../../gameplay/gearworks/storyMachine';
+import type { MkBodyId } from '../../gameplay/gearworks/makerMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
   GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS, GEARWORKS_ORCHESTRA_LEVELS,
   GEARWORKS_LIGHTHOUSE_LEVELS, GEARWORKS_DELIVERY_LEVELS, GEARWORKS_PAINT_LEVELS, GEARWORKS_STORY_LEVELS,
+  GEARWORKS_MAKER_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
   GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel, GearworksLighthouseLevel,
-  GearworksDeliveryLevel, GearworksPaintLevel, GearworksStoryLevel,
+  GearworksDeliveryLevel, GearworksPaintLevel, GearworksStoryLevel, GearworksMakerLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -270,6 +272,19 @@ export const GW_STORY_TILES: Readonly<Record<StoryEventId, GwTileDef>> = {
   stSleep:  { label: 'Sleep', spoken: 'Go to sleep', tone: 'stop', icon: ICON_MOON2 },
 };
 
+// ---------- Phase 18 Maker Workshop tiles ----------
+
+export type MkTileId = MkBodyId | 'mkMake';
+
+const ICON_BLOCK2 = '<rect x="5.5" y="5.5" width="13" height="13" rx="2.6"/><path d="M5.5 9.5 H18.5 M9.5 5.5 V18.5" stroke="var(--tile-deep, #333)" stroke-width="1.6"/>';
+const ICON_MAKE = '<rect x="4" y="12.5" width="16" height="7.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="2.3"/><path d="M9 12.5 V9.5 A3 3 0 0 1 15 9.5 V12.5" fill="none" stroke="currentColor" stroke-width="2.3"/><circle cx="12" cy="16.2" r="2.1"/><path d="M12 5 V3.2 M9 5.6 L8 4.2 M15 5.6 L16 4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+
+export const GW_MAKER_TILES: Readonly<Record<MkTileId, GwTileDef>> = {
+  mkPlace:       { label: 'Place', spoken: 'Place one block on the tower', tone: 'start', icon: ICON_BLOCK2 },
+  mkRepeatParam: { label: 'Repeat (in)', spoken: 'Repeat the tiles before this as many times as the input number', tone: 'loop', icon: ICON_REPEAT },
+  mkMake:        { label: 'Make', spoken: 'Call the Make gadget — tap the dial to set the tower height', tone: 'check', icon: ICON_MAKE },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -288,7 +303,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'lighthouse'; readonly level: GearworksLighthouseLevel }
   | { readonly kind: 'delivery'; readonly level: GearworksDeliveryLevel }
   | { readonly kind: 'painter'; readonly level: GearworksPaintLevel }
-  | { readonly kind: 'story'; readonly level: GearworksStoryLevel };
+  | { readonly kind: 'story'; readonly level: GearworksStoryLevel }
+  | { readonly kind: 'maker'; readonly level: GearworksMakerLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -307,6 +323,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_DELIVERY_LEVELS.map((level) => ({ kind: 'delivery' as const, level })),
   ...GEARWORKS_PAINT_LEVELS.map((level) => ({ kind: 'painter' as const, level })),
   ...GEARWORKS_STORY_LEVELS.map((level) => ({ kind: 'story' as const, level })),
+  ...GEARWORKS_MAKER_LEVELS.map((level) => ({ kind: 'maker' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -320,5 +337,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-maker-workshop', shortTitle: 'Maker Workshop', emoji: '🛠️' },
+  { kind: 'soon', id: 'gw-more-soon', shortTitle: 'More Soon!', emoji: '✨' },
 ];

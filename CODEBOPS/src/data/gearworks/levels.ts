@@ -32,6 +32,8 @@ import type { PpCommandId, PpStep, PaintGoal } from '../../gameplay/gearworks/pa
 import { runPaint } from '../../gameplay/gearworks/paintMachine';
 import type { StoryEventId, StoryStep, StoryTransition, StoryMachineDef } from '../../gameplay/gearworks/storyMachine';
 import { runStory, shortestStory, allStoryPaths } from '../../gameplay/gearworks/storyMachine';
+import type { MkBodyId, MkBodyStep, MkCall, MakerGoal } from '../../gameplay/gearworks/makerMachine';
+import { runMaker, MK_ARG_MAX } from '../../gameplay/gearworks/makerMachine';
 import type { SfxName } from '../../audio/sfx';
 import type { GearworksFamilyId } from './world';
 
@@ -1980,5 +1982,137 @@ export function assertStoryLevelValid(level: GearworksStoryLevel): void {
   const errors = validateStoryLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Story level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 18 — Maker Workshop: functions with a parameter
+//
+// Build one MAKE gadget with an INPUT dial (REPEAT the input), then call
+// it with different numbers to build a target block skyline. One
+// function, many inputs, many results.
+// ==================================================================
+
+export interface GearworksMakerLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly gadgetName: string;
+  readonly gadgetSlots: number;
+  readonly bodyPrims: readonly MkBodyId[];
+  /** Main deck holds MAKE(number) call tiles. */
+  readonly maxSlots: number;
+  /** Target tower heights, left to right. */
+  readonly target: readonly number[];
+  readonly bonus: { readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_BLOCK_BOT: GearworksMakerLevel = {
+  id: 'gw-block-bot',
+  title: 'Gearworks Garage',
+  shortTitle: 'Block Bot',
+  family: 'maker',
+  goalText: 'Build a gadget that stacks blocks — then make three towers of 2!',
+  emoji: '🛠️',
+  brief: {
+    title: 'Maker Workshop!',
+    text: 'Make your OWN machine! Build the MAKE gadget: PLACE a block, then REPEAT the input. Now MAKE has a number dial! Call MAKE 2 to stack two blocks. Build three towers of 2 — one gadget does it all!',
+    emoji: '🛠️',
+  },
+  gadgetName: 'MAKE',
+  gadgetSlots: 4,
+  bodyPrims: ['mkPlace', 'mkRepeatParam'],
+  maxSlots: 6,
+  target: [2, 2, 2],
+  bonus: { text: 'A gadget that reads its input dial' },
+  coachHint: 'Gadget: PLACE then REPEAT (input). Then call MAKE with the dial on 2, three times!',
+};
+
+export const GW_SKYLINE: GearworksMakerLevel = {
+  id: 'gw-skyline',
+  title: 'Gearworks Garage',
+  shortTitle: 'Skyline',
+  family: 'maker',
+  goalText: 'A city skyline — towers of 3, 1 and 2! One gadget, three inputs!',
+  emoji: '🏙️',
+  brief: {
+    title: 'Build a Skyline!',
+    text: 'Every tower is a different height: 3, then 1, then 2. You could NEVER do that with a gadget that ignores its input — so make MAKE REPEAT the input, then call it MAKE 3, MAKE 1, MAKE 2. Same gadget, three sizes!',
+    emoji: '🏙️',
+  },
+  gadgetName: 'MAKE',
+  gadgetSlots: 4,
+  bodyPrims: ['mkPlace', 'mkRepeatParam'],
+  maxSlots: 6,
+  target: [3, 1, 2],
+  bonus: { text: 'One gadget builds every size' },
+  coachHint: 'Make the gadget PLACE then REPEAT (input). Then MAKE 3, MAKE 1, MAKE 2 — one for each tower!',
+};
+
+export const GEARWORKS_MAKER_LEVELS: readonly GearworksMakerLevel[] = [
+  GW_BLOCK_BOT, GW_SKYLINE,
+];
+
+export function makerGoalOf(level: GearworksMakerLevel): MakerGoal {
+  return { target: level.target };
+}
+
+/** The parameterized gadget: PLACE then REPEAT(input) (reads the dial). */
+export function makerParamBody(): MkBodyStep[] {
+  return [{ cmd: 'mkPlace' }, { cmd: 'mkRepeatParam' }];
+}
+
+/** A fixed gadget that ignores its input (places a set number). */
+export function makerFixedBody(height: number): MkBodyStep[] {
+  return Array.from({ length: height }, () => ({ cmd: 'mkPlace' as const }));
+}
+
+/** One MAKE call per tower, dialled to each target height. */
+export function makerCalls(level: GearworksMakerLevel): MkCall[] {
+  return level.target.map((h) => ({ arg: h }));
+}
+
+/** works (skyline matches) / clever (one call per tower) / creative (gadget reads its input). */
+export function makerStars(level: GearworksMakerLevel, body: readonly MkBodyStep[], main: readonly MkCall[]): number {
+  const r = runMaker(body, main, makerGoalOf(level));
+  if (!r.match) return 0;
+  return 1 + (r.callCount === level.target.length ? 1 : 0) + (r.usesParam ? 1 : 0);
+}
+
+export function validateMakerLevel(level: GearworksMakerLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.target.length < 2) errors.push('A skyline needs at least two towers.');
+  if (level.target.some((h) => h < 1 || h > MK_ARG_MAX)) errors.push(`Every tower height must be 1..${MK_ARG_MAX}.`);
+  if (level.target.length > level.maxSlots) errors.push('The skyline must fit the main deck (one call per tower).');
+  if (makerParamBody().length > level.gadgetSlots) errors.push('The parameterized gadget must fit the gadget card.');
+  const goal = makerGoalOf(level);
+  const calls = makerCalls(level);
+  // the parameterized gadget must earn all 3 stars
+  if (!runMaker(makerParamBody(), calls, goal).match) errors.push('The parameterized gadget must build the skyline.');
+  if (makerStars(level, makerParamBody(), calls) !== 3) errors.push('The parameterized solution should earn all 3 stars.');
+  // a uniform skyline can also be built with a fixed gadget → 2 stars (no input used)
+  const uniform = level.target.every((h) => h === level.target[0]);
+  if (uniform) {
+    const fixed = makerFixedBody(level.target[0]);
+    if (!runMaker(fixed, calls, goal).match) errors.push('A fixed gadget should build a uniform skyline.');
+    if (makerStars(level, fixed, calls) !== 2) errors.push('A fixed gadget on a uniform skyline should earn 2 stars.');
+  } else {
+    // a varied skyline is impossible without reading the input
+    const fixed = makerFixedBody(level.target[0]);
+    if (runMaker(fixed, calls, goal).match) errors.push('A varied skyline must NOT be buildable by a fixed gadget.');
+  }
+  return errors;
+}
+
+export function assertMakerLevelValid(level: GearworksMakerLevel): void {
+  const errors = validateMakerLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Maker level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

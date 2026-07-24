@@ -143,6 +143,15 @@ import {
   GW_ROBOT_FEELINGS, GW_BEDTIME_STORY, GEARWORKS_STORY_LEVELS,
   validateStoryLevel, storyDef, storyShortestSolution, storyStars, storyStateLabel,
 } from '../src/data/gearworks/levels';
+import {
+  runGadget, runMaker, gadgetUsesParam, makerMisses,
+} from '../src/gameplay/gearworks/makerMachine';
+import type { MkBodyStep, MkCall } from '../src/gameplay/gearworks/makerMachine';
+import {
+  GW_BLOCK_BOT, GW_SKYLINE, GEARWORKS_MAKER_LEVELS,
+  validateMakerLevel, makerGoalOf, makerParamBody, makerFixedBody,
+  makerCalls, makerStars,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1243,6 +1252,52 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   for (const l of GEARWORKS_STORY_LEVELS) {
     check(`${l.id} validates`, validateStoryLevel(l).length === 0);
     check(`${l.id} shortest solution reaches target`, storyReached(storyShortestSolution(l), storyDef(l), l.target));
+  }
+}
+
+// --- Gearworks Maker Workshop (Phase 18) ---
+{
+  const B = (...cmds: MkBodyStep['cmd'][]): MkBodyStep[] => cmds.map((cmd) => ({ cmd }));
+  const calls = (...args: number[]): MkCall[] => args.map((arg) => ({ arg }));
+  const paramBody = makerParamBody(); // PLACE, REPEAT(input)
+
+  // the gadget reads its input dial
+  check('gadget MAKE(3) places 3 blocks', runGadget(paramBody, 3) === 3);
+  check('gadget MAKE(1) places 1 block', runGadget(paramBody, 1) === 1);
+  check('the SAME gadget makes different sizes', runGadget(paramBody, 4) === 4 && runGadget(paramBody, 2) === 2);
+  check('runGadget is a pure function of its input', runGadget(paramBody, 3) === runGadget(paramBody, 3));
+
+  // a fixed gadget ignores its input
+  const fixed = makerFixedBody(2); // PLACE, PLACE
+  check('a fixed gadget ignores the input dial', runGadget(fixed, 4) === 2 && runGadget(fixed, 1) === 2);
+  check('gadgetUsesParam is true only when REPEAT follows a PLACE', gadgetUsesParam(paramBody) && !gadgetUsesParam(fixed));
+  check('a lone REPEAT with nothing before it does not count as using the input', !gadgetUsesParam(B('mkRepeatParam')));
+
+  // building a skyline with the parameterized gadget
+  const goal = makerGoalOf(GW_SKYLINE); // [3,1,2]
+  const built = runMaker(paramBody, calls(3, 1, 2), goal);
+  check('one gadget + three inputs builds the 3-1-2 skyline', built.match && JSON.stringify(built.towers) === JSON.stringify([3, 1, 2]));
+  check('runMaker reports the gadget used its parameter', built.usesParam);
+  check('runMaker places one block-event per block', built.events.filter((e) => e.type === 'place').length === 6);
+  check('runMaker is deterministic', JSON.stringify(runMaker(paramBody, calls(3, 1, 2), goal)) === JSON.stringify(built));
+
+  // a fixed gadget CANNOT build a varied skyline
+  const fixedTry = runMaker(makerFixedBody(3), calls(3, 1, 2), goal);
+  check('a fixed gadget cannot build a varied skyline', !fixedTry.match);
+  check('the miss report tells the maker to use the input', makerMisses(makerFixedBody(3), calls(3, 1, 2), goal).some((m) => m.toLowerCase().includes('input')));
+
+  // stars — Skyline (varied): only the parameterized gadget wins, all 3 stars
+  check('a wrong skyline earns no stars', makerStars(GW_SKYLINE, fixed, calls(2, 2, 2)) === 0);
+  check('the parameterized skyline earns all 3 stars', makerStars(GW_SKYLINE, paramBody, calls(3, 1, 2)) === 3);
+
+  // stars — Block Bot (uniform): a fixed gadget still earns 2, param earns 3
+  check('uniform skyline with a fixed gadget earns 2 stars', makerStars(GW_BLOCK_BOT, makerFixedBody(2), calls(2, 2, 2)) === 2);
+  check('uniform skyline with a parameterized gadget earns 3 stars', makerStars(GW_BLOCK_BOT, paramBody, calls(2, 2, 2)) === 3);
+
+  // levels validate + canonical wins
+  for (const l of GEARWORKS_MAKER_LEVELS) {
+    check(`${l.id} validates`, validateMakerLevel(l).length === 0);
+    check(`${l.id} parameterized gadget builds the skyline`, runMaker(makerParamBody(), makerCalls(l), makerGoalOf(l)).match);
   }
 }
 
