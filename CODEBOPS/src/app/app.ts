@@ -10,8 +10,8 @@ import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
-import { GEARWORKS_WORLD, GEARWORKS_PICKER } from '../data/gearworks/world';
-import { GEARWORKS_MACHINE_LEVELS } from '../data/gearworks/levels';
+import { GearworksChainScreen } from './gearworksChainScreen';
+import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
@@ -40,7 +40,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
-  private gearworks: GearworksScreen | null = null;
+  private gearworks: GearworksScreen | GearworksChainScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -257,16 +257,16 @@ export class App {
       el('span', undefined, title, GEARWORKS_WORLD.name);
       el('span', 'gw-new-badge', title, 'NEW!');
       const list = el('div', 'level-list', section);
-      let machineIdx = 0;
+      let seqIdx = 0;
       GEARWORKS_PICKER.forEach((entry, i) => {
-        const isMachine = entry.kind === 'machine';
-        const thisMachineIdx = machineIdx;
-        // Machine levels unlock in order (first is always open).
-        const unlocked = isMachine && (thisMachineIdx === 0 ||
-          (this.store.stars[GEARWORKS_MACHINE_LEVELS[thisMachineIdx - 1].id] ?? 0) >= 1);
-        if (isMachine) machineIdx++;
-        const label = isMachine ? entry.level.shortTitle : entry.shortTitle;
-        const emoji = isMachine ? entry.level.emoji : entry.emoji;
+        const playable = entry.kind !== 'soon';
+        const thisSeqIdx = seqIdx;
+        // Playable levels unlock in order (first is always open).
+        const unlocked = playable && (thisSeqIdx === 0 ||
+          (this.store.stars[gwEntryId(GEARWORKS_SEQUENCE[thisSeqIdx - 1])] ?? 0) >= 1);
+        if (playable) seqIdx++;
+        const label = entry.kind === 'soon' ? entry.shortTitle : entry.level.shortTitle;
+        const emoji = entry.kind === 'soon' ? entry.emoji : entry.level.emoji;
         const row = el('button', `level-item${unlocked ? '' : ' locked'}`, list) as HTMLButtonElement;
         row.type = 'button';
         row.setAttribute('aria-label', unlocked ? `Play ${label}` : `${label} — locked`);
@@ -277,18 +277,18 @@ export class App {
         el('span', 'li-name', row, label);
         const right = el('span', 'li-right', row);
         if (!unlocked) el('span', 'li-lock', right, '🔒');
-        const stars = isMachine ? (this.store.stars[entry.level.id] ?? 0) : 0;
+        const stars = entry.kind === 'soon' ? 0 : (this.store.stars[entry.level.id] ?? 0);
         const starRow = el('span', 'li-stars', right);
         for (let s = 0; s < 3; s++) el('span', s < stars ? 'on' : '', starRow, '★');
         if (unlocked) {
-          row.addEventListener('click', () => this.showGearworks(thisMachineIdx));
+          row.addEventListener('click', () => this.showGearworks(thisSeqIdx));
         } else {
           row.addEventListener('click', () => {
             sharedSfx.play('bump');
             row.classList.remove('shake');
             void row.offsetWidth;
             row.classList.add('shake');
-            this.hintToast(isMachine
+            this.hintToast(playable
               ? '⭐ Win the machine before this one to unlock it!'
               : '🔧 Zip is still building this machine!');
           });
@@ -375,13 +375,17 @@ export class App {
     this.clearHost();
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-gearworks';
-    const hasNext = index < GEARWORKS_MACHINE_LEVELS.length - 1;
-    this.gearworks = new GearworksScreen(screen, GEARWORKS_MACHINE_LEVELS[index], {
+    const entry = GEARWORKS_SEQUENCE[index];
+    const hasNext = index < GEARWORKS_SEQUENCE.length - 1;
+    const events = {
       onExit: () => this.showSelect(),
       onNext: hasNext ? () => this.showGearworks(index + 1) : undefined,
       hasNext,
       store: this.store,
-    });
+    };
+    this.gearworks = entry.kind === 'machine'
+      ? new GearworksScreen(screen, entry.level, events)
+      : new GearworksChainScreen(screen, entry.level, events);
     this.gearworks.enter();
   }
 

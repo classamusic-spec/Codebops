@@ -1,8 +1,13 @@
 /**
  * Gearworks machine levels — Phase 2: Motor Start + Motor Programmer.
- * Typed definitions + dev-time validation (mirrors data/schemas/level.ts).
+ * Phase 3 adds CHAIN levels (Gear Train + Belt Builder) where the child
+ * builds the machine itself: tap anchors to place gears, tap slots to
+ * stretch belts, then BOP the motor and watch power (and direction!)
+ * travel down the chain. Typed definitions + dev-time validation.
  */
 import type { GearworksCommandId, GearworksStep, MachineGoal } from '../../gameplay/gearworks/machine';
+import type { ChainSpec } from '../../gameplay/gearworks/gearChain';
+import { finalDirection, neededPieces } from '../../gameplay/gearworks/gearChain';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -127,4 +132,105 @@ export function assertMachineLevelValid(level: GearworksMachineLevel): void {
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
+}
+
+// ==================================================================
+// Phase 3 — chain (builder) levels: Gear Train + Belt Builder
+// ==================================================================
+
+export interface GearworksChainLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly chain: ChainSpec;
+  /** What sits at the end of the chain and comes alive ("the bell"). */
+  readonly targetName: string;
+  /** Creative-star rule: BOP an unfinished chain and SEE power stop. */
+  readonly bonusText: string;
+  readonly coachHint: string;
+  /** Direction quiz shown before the first complete run (clever star). */
+  readonly prediction: { readonly prompt: string };
+}
+
+export const GW_GEAR_TRAIN: GearworksChainLevel = {
+  id: 'gw-gear-train',
+  title: 'Gearworks Garage',
+  shortTitle: 'Gear Train',
+  family: 'bench',
+  goalText: 'Connect the gears so the motor rings the bell!',
+  emoji: '⚙️',
+  brief: {
+    title: 'Build a Gear Train!',
+    text: 'The motor gear spins — but the bell is far away! Tap the glowing spots to place gears until every tooth touches. Watch closely: when gear teeth mesh, each gear spins the OPPOSITE way from its neighbor!',
+    emoji: '⚙️',
+  },
+  chain: {
+    nodes: [{ fixed: true }, { fixed: false }, { fixed: false }, { fixed: true }],
+    links: ['mesh', 'mesh', 'mesh'],
+  },
+  targetName: 'the bell',
+  bonusText: 'Test the machine before it is finished',
+  coachHint: 'Every empty spot needs a gear — teeth must touch teeth!',
+  prediction: { prompt: 'The motor gear spins FORWARD ⟳. Which way will the BELL gear spin?' },
+};
+
+export const GW_BELT_BUILDER: GearworksChainLevel = {
+  id: 'gw-belt-builder',
+  title: 'Gearworks Garage',
+  shortTitle: 'Belt Builder',
+  family: 'bench',
+  goalText: 'Use gears AND a belt to ring the bell!',
+  emoji: '🔗',
+  brief: {
+    title: 'Stretch a Belt!',
+    text: 'Some wheels are too far apart for teeth to touch — that is a job for a BELT! A belt carries the spin across the gap and keeps it turning the SAME way. Meshed teeth flip the direction; belts do not. Build the chain and watch the difference!',
+    emoji: '🔗',
+  },
+  chain: {
+    nodes: [{ fixed: true }, { fixed: false }, { fixed: false }, { fixed: true }],
+    links: ['mesh', 'beltSlot', 'mesh'],
+  },
+  targetName: 'the bell',
+  bonusText: 'Test the machine before it is finished',
+  coachHint: 'Gears go on the glowing spots — the belt stretches across the wide gap!',
+  prediction: { prompt: 'The motor gear spins FORWARD ⟳. Which way will the BELL gear spin?' },
+};
+
+export const GEARWORKS_CHAIN_LEVELS: readonly GearworksChainLevel[] = [
+  GW_GEAR_TRAIN,
+  GW_BELT_BUILDER,
+];
+
+export function validateChainLevel(level: GearworksChainLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  const { nodes, links } = level.chain;
+  if (nodes.length < 3) errors.push('A chain needs at least 3 nodes (motor, middle, target).');
+  if (links.length !== nodes.length - 1) errors.push('links.length must be nodes.length - 1.');
+  if (!nodes[0]?.fixed) errors.push('Node 0 (the motor gear) must be fixed.');
+  if (!nodes[nodes.length - 1]?.fixed) errors.push('The last node (the target) must be fixed.');
+  const pieces = neededPieces(level.chain);
+  if (pieces.gears + pieces.belts === 0) errors.push('Nothing for the child to place.');
+  if (pieces.gears + pieces.belts > 5) errors.push('Too many pieces for one sitting (max 5).');
+  return errors;
+}
+
+export function assertChainLevelValid(level: GearworksChainLevel): void {
+  const errors = validateChainLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Chain level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+/** Prediction choices, generated so the correct one always matches the spec. */
+export function chainPredictionChoices(level: GearworksChainLevel): Array<{ emoji: string; label: string; correct: boolean }> {
+  const final = finalDirection(level.chain);
+  return [
+    { emoji: '⟳', label: 'Forward — same as the motor', correct: final === 'cw' },
+    { emoji: '⟲', label: 'Backward — the other way', correct: final === 'ccw' },
+  ];
 }

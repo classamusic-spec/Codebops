@@ -1,6 +1,5 @@
 /** Accessible dialogs: prediction, celebration, glitch replay, settings. */
 import { el } from './dom';
-import type { LevelDef } from '../data/schemas/level';
 import type { ExecEvent } from '../gameplay/commands/interpreter';
 import type { Sfx } from '../audio/sfx';
 import type { SaveStore } from '../storage/saveStore';
@@ -70,9 +69,14 @@ export function showFredDialog(parent: HTMLElement, sfx: Sfx, onFix: () => void)
 
 /* ---------------- Prediction ---------------- */
 
+export interface PredictionSpec {
+  readonly prompt: string;
+  readonly choices: ReadonlyArray<{ emoji: string; label: string; correct: boolean }>;
+}
+
 export function showPrediction(
   parent: HTMLElement,
-  level: LevelDef,
+  level: { prediction: PredictionSpec },
   sfx: Sfx,
 ): Promise<{ predictedSuccess: boolean }> {
   return new Promise((resolve) => {
@@ -138,8 +142,9 @@ export function showCelebration(
   next.addEventListener('click', () => { sfx.play('tap'); closeDialog(s, previousFocus); actions.onContinue(); });
   next.focus();
 
-  // Pop stars one by one with sounds + names
-  info.starNames.forEach((starName, i) => {
+  // Pop stars one by one with sounds + names (only the EARNED ones —
+  // callers may pass the full 3-name roster alongside a smaller count)
+  info.starNames.slice(0, info.stars).forEach((starName, i) => {
     setTimeout(() => {
       starEls[i]?.classList.add('pop');
       name.textContent = `⭐ ${starName}`;

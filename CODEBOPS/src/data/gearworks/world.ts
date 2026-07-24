@@ -3,8 +3,8 @@
  * level-picker roster (playable machine levels + coming-soon slots).
  */
 import type { GearworksCommandId } from '../../gameplay/gearworks/machine';
-import { GEARWORKS_MACHINE_LEVELS } from './levels';
-import type { GearworksMachineLevel } from './levels';
+import { GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS } from './levels';
+import type { GearworksMachineLevel, GearworksChainLevel } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
 
@@ -59,12 +59,26 @@ export const GW_SPEED_NAMES: Readonly<Record<1 | 2 | 3, string>> = { 1: 'Slow', 
 
 // ---------- level picker roster ----------
 
-export type GearworksPickerEntry =
+/** A playable Gearworks level of either kind, in campaign order. */
+export type GearworksLevelEntry =
   | { readonly kind: 'machine'; readonly level: GearworksMachineLevel }
+  | { readonly kind: 'chain'; readonly level: GearworksChainLevel };
+
+export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
+  ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
+  ...GEARWORKS_CHAIN_LEVELS.map((level) => ({ kind: 'chain' as const, level })),
+];
+
+/** Save-store id of a sequence entry (unlock chain + star display). */
+export function gwEntryId(entry: GearworksLevelEntry): string {
+  return entry.level.id;
+}
+
+export type GearworksPickerEntry =
+  | GearworksLevelEntry
   | { readonly kind: 'soon'; readonly id: string; readonly shortTitle: string; readonly emoji: string };
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
-  ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
-  { kind: 'soon', id: 'gw-gear-train', shortTitle: 'Gear Train', emoji: '⚙️' },
-  { kind: 'soon', id: 'gw-belt-builder', shortTitle: 'Belt Builder', emoji: '🔗' },
+  ...GEARWORKS_SEQUENCE,
+  { kind: 'soon', id: 'gw-sensor-lab', shortTitle: 'Sensor Lab', emoji: '👀' },
 ];

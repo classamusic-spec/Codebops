@@ -28,7 +28,13 @@ import type { GearworksStep } from '../src/gameplay/gearworks/machine';
 import {
   GEARWORKS_MACHINE_LEVELS, GW_MOTOR_START, GW_MOTOR_PROGRAMMER,
   validateMachineLevel, canonicalSolution, bonusMet,
+  GEARWORKS_CHAIN_LEVELS, GW_GEAR_TRAIN, GW_BELT_BUILDER,
+  validateChainLevel, chainPredictionChoices,
 } from '../src/data/gearworks/levels';
+import {
+  emptyPlacement, withGear, withBelt, propagate, finalDirection,
+  neededPieces, chainComplete, chainMisses,
+} from '../src/gameplay/gearworks/gearChain';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -243,7 +249,7 @@ const MUSH_RULE = { trigger: 'mushroom', action: 'grab' } as const;
 // --- Gearworks Garage: world + camera ---
 {
   check('gearworks world id registered', GEARWORKS_WORLD.id === 'gearworks-garage');
-  const ids = new Set(GEARWORKS_PICKER.map((e) => (e.kind === 'machine' ? e.level.id : e.id)));
+  const ids = new Set(GEARWORKS_PICKER.map((e) => (e.kind === 'soon' ? e.id : e.level.id)));
   check('gearworks picker ids unique', ids.size === GEARWORKS_PICKER.length);
   check('gearworks picker leads with machine levels', GEARWORKS_PICKER[0].kind === 'machine');
   check('every gearworks command has a tile', GEARWORKS_MACHINE_LEVELS
@@ -317,6 +323,67 @@ for (const l of GEARWORKS_MACHINE_LEVELS) {
   const huge = runMachine(Array.from({ length: 100 }, () => ({ cmd: 'gwWait' as const })), GW_MOTOR_START.goal);
   check('tick cap bounds runaway programs', huge.overflowed && huge.finalState.ticks <= GW_MAX_TICKS);
   check('goalMet direct: fresh machine fails motor-start', !goalMet(GW_MOTOR_START.goal, initialMachine()));
+}
+
+// --- Gearworks gear chains (Phase 3) ---
+for (const l of GEARWORKS_CHAIN_LEVELS) {
+  const errs = validateChainLevel(l);
+  check(`${l.id} validates`, errs.length === 0);
+  check(`${l.id} has exactly one correct prediction`,
+    chainPredictionChoices(l).filter((c) => c.correct).length === 1);
+}
+
+{
+  // full gear train: mesh links reverse direction at every hand-off
+  const spec = GW_GEAR_TRAIN.chain;
+  let p = emptyPlacement(spec);
+  check('empty placement keeps fixed gears', p.gears[0] && p.gears[3] && !p.gears[1] && !p.gears[2]);
+  check('gear train needs 2 gears, 0 belts',
+    neededPieces(spec).gears === 2 && neededPieces(spec).belts === 0);
+  p = withGear(withGear(p, 1, true), 2, true);
+  check('placing all gears completes the chain', chainComplete(spec, p));
+  const flow = propagate(spec, p, true);
+  check('complete train reaches the target', flow.reachesTarget && flow.firstBrokenLink === -1);
+  check('mesh links alternate direction cw-ccw-cw-ccw',
+    flow.dirs[0] === 'cw' && flow.dirs[1] === 'ccw' && flow.dirs[2] === 'cw' && flow.dirs[3] === 'ccw');
+  check('finalDirection matches propagate on 3 meshes', finalDirection(spec) === 'ccw');
+  check('motor off = nothing turns', propagate(spec, p, false).turning.every((t) => !t));
+}
+{
+  // broken train: power stops at the first gap and the misses explain it
+  const spec = GW_GEAR_TRAIN.chain;
+  const p = withGear(emptyPlacement(spec), 2, true); // node 1 still empty
+  const flow = propagate(spec, p, true);
+  check('power stops at the first missing gear',
+    flow.firstBrokenLink === 0 && flow.turning[0] && !flow.turning[1] && !flow.turning[2] && !flow.reachesTarget);
+  check('node after the gap stays still even with a gear', p.gears[2] && !flow.turning[2]);
+  const misses = chainMisses(spec, p);
+  check('chain misses point at the empty anchor', misses.length === 1 && misses[0].includes('gear'));
+  check('immutable helpers do not mutate', !emptyPlacement(spec).gears[1]);
+}
+{
+  // belt builder: belts pass power but KEEP direction (the lesson)
+  const spec = GW_BELT_BUILDER.chain;
+  check('belt builder needs 2 gears + 1 belt',
+    neededPieces(spec).gears === 2 && neededPieces(spec).belts === 1);
+  let p = withGear(withGear(emptyPlacement(spec), 1, true), 2, true);
+  check('gears alone do not complete a belt chain', !chainComplete(spec, p));
+  const noBelt = propagate(spec, p, true);
+  check('missing belt breaks the chain at the belt slot',
+    noBelt.firstBrokenLink === 1 && noBelt.turning[1] && !noBelt.turning[2]);
+  check('belt miss says to stretch a belt', chainMisses(spec, p).some((m) => m.includes('BELT')));
+  p = withBelt(p, 1, true);
+  const flow = propagate(spec, p, true);
+  check('belted chain reaches the target', flow.reachesTarget);
+  check('belt KEEPS direction while meshes flip it',
+    flow.dirs[0] === 'cw' && flow.dirs[1] === 'ccw' && flow.dirs[2] === 'ccw' && flow.dirs[3] === 'cw');
+  check('belt-builder final direction is cw', finalDirection(spec) === 'cw');
+  check('prediction marks cw correct for belt builder',
+    chainPredictionChoices(GW_BELT_BUILDER).find((c) => c.correct)?.emoji === '⟳');
+  check('prediction marks ccw correct for gear train',
+    chainPredictionChoices(GW_GEAR_TRAIN).find((c) => c.correct)?.emoji === '⟲');
+  const beltNoGear = propagate(spec, withBelt(emptyPlacement(spec), 1, true), true);
+  check('belt without gears still breaks at first empty anchor', beltNoGear.firstBrokenLink === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
