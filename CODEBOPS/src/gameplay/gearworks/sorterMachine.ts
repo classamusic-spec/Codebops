@@ -21,7 +21,7 @@
 
 export type GtCommandId =
   | 'gtIfRed' | 'gtIfBlue' | 'gtIfRound' | 'gtIfSquare'
-  | 'gtSendLeft' | 'gtSendRight';
+  | 'gtSendLeft' | 'gtSendRight' | 'gtSendUp';
 
 export interface GtStep {
   cmd: GtCommandId;
@@ -35,7 +35,13 @@ export interface SortItem {
   readonly shape: ItemShape;
 }
 
-export type SortDest = 'left' | 'right' | 'pass';
+/** 'up' is the third bin (Basket C), added for the Conveyor Factory set. */
+export type SortDest = 'left' | 'right' | 'up' | 'pass';
+export type SendDir = 'left' | 'right' | 'up';
+
+const SEND_DIR: Readonly<Record<string, SendDir>> = {
+  gtSendLeft: 'left', gtSendRight: 'right', gtSendUp: 'up',
+};
 
 /** First-match routing rule (the level's answer key). */
 export interface RouteRule {
@@ -62,7 +68,7 @@ export type GtSorterEvent =
   | { type: 'commandStart'; index: number }
   | { type: 'guard'; index: number; cond: GtCommandId; holds: boolean }
   | { type: 'skipped'; index: number }
-  | { type: 'send'; index: number; dir: 'left' | 'right'; item: SortItem; correct: boolean }
+  | { type: 'send'; index: number; dir: SendDir; item: SortItem; correct: boolean }
   | { type: 'alreadySorted'; index: number }
   | { type: 'itemPass'; item: SortItem; correct: boolean }
   | { type: 'itemDone'; itemIndex: number }
@@ -119,7 +125,7 @@ export function runSorter(
         continue;
       }
       // send tile
-      const dir = step.cmd === 'gtSendLeft' ? 'left' : 'right';
+      const dir = SEND_DIR[step.cmd];
       if (sent !== null) {
         events.push({ type: 'alreadySorted', index: i });
         continue;

@@ -510,7 +510,9 @@ export interface GearworksSorterLevel {
    */
   readonly bonus: { readonly kind: GwSorterBonusKind; readonly text: string };
   readonly coachHint: string;
-  readonly binLabels: { readonly left: string; readonly right: string; readonly pass: string };
+  readonly binLabels: { readonly left: string; readonly right: string; readonly pass: string; readonly up?: string };
+  /** Explicit answer key when the heuristic canonical does not fit (3-bin levels). */
+  readonly canonical?: readonly GtStep[];
 }
 
 const R = (color: 'red' | 'blue', shape: 'round' | 'square'): SortItem => ({ color, shape });
@@ -576,6 +578,7 @@ export const GEARWORKS_SORTER_LEVELS: readonly GearworksSorterLevel[] = [
 ];
 
 export function canonicalSorterSolution(level: GearworksSorterLevel): GtStep[] {
+  if (level.canonical) return level.canonical.map((s) => ({ ...s }));
   return level.commands.includes('gtIfRound')
     ? [{ cmd: 'gtIfRed' }, { cmd: 'gtIfRound' }, { cmd: 'gtSendLeft' }, { cmd: 'gtIfBlue' }, { cmd: 'gtSendRight' }]
     : [{ cmd: 'gtIfRed' }, { cmd: 'gtSendLeft' }, { cmd: 'gtIfBlue' }, { cmd: 'gtSendRight' }];
@@ -613,6 +616,82 @@ export function validateSorterLevel(level: GearworksSorterLevel): string[] {
   }
   return errors;
 }
+
+// Phase 12 — the Conveyor Factory activity set: THREE bins + counters.
+export const GW_THREE_WAY: GearworksSorterLevel = {
+  id: 'gw-three-way',
+  title: 'Gearworks Garage',
+  shortTitle: 'Three-Way Sort',
+  family: 'factory',
+  goalText: 'THREE bins! Red berries → Jam, blue berries → Pie, blocks → Parts!',
+  emoji: '🏭',
+  brief: {
+    title: 'Three-Way Sort!',
+    text: 'The factory grew a THIRD basket! Round red berries go LEFT to Jam, round blue berries go RIGHT to Pie, and any square block goes UP to the Parts bin. Watch the bin counters climb as you sort!',
+    emoji: '🏭',
+  },
+  commands: ['gtIfRed', 'gtIfBlue', 'gtIfRound', 'gtIfSquare', 'gtSendLeft', 'gtSendRight', 'gtSendUp'],
+  maxSlots: 9,
+  par: 7,
+  stream: [R('red', 'round'), R('blue', 'round'), R('red', 'square'), R('blue', 'round'), R('blue', 'square')],
+  megaStream: [
+    R('red', 'round'), R('blue', 'square'), R('blue', 'round'), R('red', 'square'),
+    R('red', 'round'), R('blue', 'round'), R('red', 'square'),
+  ],
+  rules: [
+    { match: { color: 'red', shape: 'round' }, dest: 'left' },
+    { match: { color: 'blue', shape: 'round' }, dest: 'right' },
+    { match: { shape: 'square' }, dest: 'up' },
+  ],
+  canonical: [
+    { cmd: 'gtIfRound' }, { cmd: 'gtIfRed' }, { cmd: 'gtSendLeft' },
+    { cmd: 'gtIfRound' }, { cmd: 'gtSendRight' },
+    { cmd: 'gtIfSquare' }, { cmd: 'gtSendUp' },
+  ],
+  bonus: { kind: 'megaBatch', text: 'Sort the MEGA batch of 7' },
+  coachHint: 'Round + Red → Left. Round → Right. Square → Up. Pair each send with its IFs!',
+  binLabels: { left: 'Jam', right: 'Pie', up: 'Parts', pass: 'Lost' },
+};
+
+export const GW_FACTORY_RUSH: GearworksSorterLevel = {
+  id: 'gw-factory-rush',
+  title: 'Gearworks Garage',
+  shortTitle: 'Factory Rush',
+  family: 'factory',
+  goalText: 'Red AND round → Jam, blue → Pie, everything else → Parts!',
+  emoji: '⚙️',
+  brief: {
+    title: 'Factory Rush!',
+    text: 'Rush order! Only red-AND-round berries go to Jam. Any blue thing goes to Pie. Everything else — a plain SEND UP at the end catches it all for the Parts bin. Compound conditions AND a catch-all!',
+    emoji: '⚙️',
+  },
+  commands: ['gtIfRed', 'gtIfBlue', 'gtIfRound', 'gtIfSquare', 'gtSendLeft', 'gtSendRight', 'gtSendUp'],
+  maxSlots: 9,
+  par: 6,
+  stream: [R('red', 'round'), R('blue', 'round'), R('red', 'square'), R('blue', 'square'), R('red', 'round')],
+  megaStream: [
+    R('red', 'round'), R('red', 'square'), R('blue', 'round'), R('blue', 'square'),
+    R('red', 'round'), R('blue', 'round'), R('red', 'square'), R('red', 'round'),
+  ],
+  rules: [
+    { match: { color: 'red', shape: 'round' }, dest: 'left' },
+    { match: { color: 'blue' }, dest: 'right' },
+    { match: {}, dest: 'up' },
+  ],
+  canonical: [
+    { cmd: 'gtIfRed' }, { cmd: 'gtIfRound' }, { cmd: 'gtSendLeft' },
+    { cmd: 'gtIfBlue' }, { cmd: 'gtSendRight' },
+    { cmd: 'gtSendUp' },
+  ],
+  bonus: { kind: 'megaBatch', text: 'Sort the MEGA batch of 8' },
+  coachHint: 'IF RED + IF ROUND → Left. IF BLUE → Right. A bare SEND UP at the end catches everything else!',
+  binLabels: { left: 'Jam', right: 'Pie', up: 'Parts', pass: 'Lost' },
+};
+
+export const GEARWORKS_FACTORY_LEVELS: readonly GearworksSorterLevel[] = [
+  GW_THREE_WAY,
+  GW_FACTORY_RUSH,
+];
 
 export function assertSorterLevelValid(level: GearworksSorterLevel): void {
   const errors = validateSorterLevel(level);

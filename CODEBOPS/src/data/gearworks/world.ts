@@ -13,7 +13,7 @@ import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
-  GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS,
+  GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
@@ -116,6 +116,7 @@ const ICON_BLOCK = '<rect x="5" y="5" width="14" height="14" rx="2.6"/>';
 const ICON_ROUND = '<circle cx="12" cy="12" r="7.4" fill="none" stroke="currentColor" stroke-width="2.7"/><circle cx="12" cy="12" r="2.4"/>';
 const ICON_SEND_LEFT = '<path d="M20 6.4 H10 A4.4 4.4 0 0 0 5.6 10.8 V17" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M1.8 13.6 L5.6 19.4 L9.4 13.6 Z"/>';
 const ICON_SEND_RIGHT = '<path d="M4 6.4 H14 A4.4 4.4 0 0 1 18.4 10.8 V17" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14.6 13.6 L18.4 19.4 L22.2 13.6 Z"/>';
+const ICON_SEND_UP = '<path d="M12 21 V11 A0 0 0 0 1 12 11" fill="none"/><path d="M6.5 20 H17.5 A0 0 0 0 0 17.5 20" fill="none"/><path d="M12 20 V9" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M6.4 13 L12 6 L17.6 13 Z"/><path d="M6 20 H18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>';
 
 export const GW_SORTER_TILES: Readonly<Record<GtCommandId, GwTileDef>> = {
   gtIfRed:     { label: 'If Red', spoken: 'Only do the next tile if the item is red', tone: 'stop', icon: ICON_BERRY },
@@ -124,6 +125,7 @@ export const GW_SORTER_TILES: Readonly<Record<GtCommandId, GwTileDef>> = {
   gtIfSquare:  { label: 'If Square', spoken: 'Only do the next tile if the item is square', tone: 'check', icon: ICON_BLOCK },
   gtSendLeft:  { label: 'Send Left', spoken: 'Push the item into the left basket', tone: 'rotate', icon: ICON_SEND_LEFT },
   gtSendRight: { label: 'Send Right', spoken: 'Push the item into the right basket', tone: 'loop', icon: ICON_SEND_RIGHT },
+  gtSendUp:    { label: 'Send Up', spoken: 'Push the item into the back basket', tone: 'start', icon: ICON_SEND_UP },
 };
 
 // ---------- Phase 7 counter-level tiles ----------
@@ -218,6 +220,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_JOB_LEVELS.map((level) => ({ kind: 'job' as const, level })),
   ...GEARWORKS_SIGNAL_LEVELS.map((level) => ({ kind: 'signal' as const, level })),
   ...GEARWORKS_DEBUG_LEVELS.map((level) => ({ kind: 'debug' as const, level })),
+  ...GEARWORKS_FACTORY_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -231,5 +234,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-conveyor-factory-set', shortTitle: 'Factory Floor', emoji: '🏭' },
+  { kind: 'soon', id: 'gw-robot-orchestra', shortTitle: 'Robot Orchestra', emoji: '🥁' },
 ];

@@ -97,6 +97,10 @@ import { runJam, jamGoalMet, jamBugIndex } from '../src/gameplay/gearworks/jamMa
 import {
   GW_BROKEN_MACHINE, validateDebugLevel, debugBugIndex,
 } from '../src/data/gearworks/levels';
+import {
+  GEARWORKS_FACTORY_LEVELS, GW_THREE_WAY, GW_FACTORY_RUSH,
+  canonicalSorterSolution as sorterCanon,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -864,6 +868,38 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
 {
   // a correct program has no bug to locate
   check('a working program reports no bug', jamBugIndex(GW_BROKEN_MACHINE.puzzles[0].fixed, GW_BROKEN_MACHINE.puzzles[0].goal) === -1);
+}
+
+// --- Gearworks Conveyor Factory activity set (Phase 12) ---
+{
+  for (const l of GEARWORKS_FACTORY_LEVELS) {
+    check(`${l.id} validates`, validateSorterLevel(l).length === 0);
+    const canon = sorterCanon(l);
+    check(`${l.id} canonical sorts the batch within par`,
+      canon.length <= l.par && runSorter(canon, l.stream, l.rules).allCorrect);
+    check(`${l.id} canonical sorts the mega batch too`,
+      !!l.megaStream && runSorter(canon, l.megaStream, l.rules).allCorrect);
+  }
+}
+{
+  // three-way routing sends squares UP to the third bin
+  const r = runSorter(sorterCanon(GW_THREE_WAY), GW_THREE_WAY.stream, GW_THREE_WAY.rules);
+  check('three-way sort uses all three bins',
+    r.placements.includes('left') && r.placements.includes('right') && r.placements.includes('up'));
+  check('a square block routes UP', correctDest(GW_THREE_WAY.rules, IT('red', 'square')) === 'up'
+    && correctDest(GW_THREE_WAY.rules, IT('blue', 'square')) === 'up');
+  check('a red round routes LEFT, blue round RIGHT',
+    correctDest(GW_THREE_WAY.rules, IT('red', 'round')) === 'left'
+    && correctDest(GW_THREE_WAY.rules, IT('blue', 'round')) === 'right');
+}
+{
+  // Factory Rush: compound AND + a bare SEND UP catch-all
+  const r = runSorter(sorterCanon(GW_FACTORY_RUSH), GW_FACTORY_RUSH.stream, GW_FACTORY_RUSH.rules);
+  check('factory rush sorts its batch', r.allCorrect);
+  check('the bare Send Up catches everything else', correctDest(GW_FACTORY_RUSH.rules, IT('red', 'square')) === 'up');
+  // dropping the catch-all leaves red squares un-sorted (they would pass)
+  const noCatch = runSorter(TP('gtIfRed', 'gtIfRound', 'gtSendLeft', 'gtIfBlue', 'gtSendRight'), GW_FACTORY_RUSH.stream, GW_FACTORY_RUSH.rules);
+  check('without Send Up a red square rides past (needs the catch-all)', !noCatch.allCorrect);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

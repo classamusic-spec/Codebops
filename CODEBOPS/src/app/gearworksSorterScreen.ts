@@ -84,6 +84,7 @@ export class GearworksSorterScreen {
     this.rig = new SorterRig();
     this.rig.group.position.copy(this.scene.benchAnchor());
     this.stage.scene.add(this.rig.group);
+    this.rig.enableUpBin(this.level.commands.includes('gtSendUp'));
     this.rig.setQueue(this.currentStream());
 
     // --- mascots ---
@@ -157,6 +158,12 @@ export class GearworksSorterScreen {
   private statusLine(done: number): string {
     const total = this.currentStream().length;
     const mega = this.useMega ? ' MEGA' : '';
+    // Data counters: live bin tallies (three-bin Factory levels show all three)
+    if (this.level.binLabels.up) {
+      const c = this.rig.binCounts();
+      const b = this.level.binLabels;
+      return `${b.left} ${c.left} · ${b.right} ${c.right} · ${b.up} ${c.up} 🧺`;
+    }
     return `Batch${mega}: ${done} of ${total} sorted 🧺`;
   }
 
@@ -219,15 +226,19 @@ export class GearworksSorterScreen {
         case 'send': {
           this.rig.send(ev.dir, ev.correct);
           sharedSfx.play(ev.correct ? 'grab' : 'glitch');
-          const label = ev.dir === 'left' ? this.level.binLabels.left : this.level.binLabels.right;
+          const label = ev.dir === 'left' ? this.level.binLabels.left
+            : ev.dir === 'right' ? this.level.binLabels.right
+            : (this.level.binLabels.up ?? 'back');
+          const icon = ev.dir === 'left' ? '⬅️' : ev.dir === 'right' ? '➡️' : '⬆️';
           steps.push({
-            n: steps.length + 1, icon: ev.dir === 'left' ? '⬅️' : '➡️',
+            n: steps.length + 1, icon,
             text: ev.correct
               ? `${itemName(ev.item)} → ${label} basket!`
               : `Uh-oh — the ${itemName(ev.item)} landed in the ${label} basket!`,
             verdict: ev.correct ? 'ok' : 'no',
           });
           this.trail.setSteps(steps.slice(-7));
+          if (this.level.binLabels.up) this.trail.setMachineLine(this.statusLine(itemsDone));
           await this.delay(stepMs * 1.3);
           break;
         }

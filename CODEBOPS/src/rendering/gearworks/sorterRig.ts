@@ -46,7 +46,7 @@ class Basket {
   private readonly ring: THREE.Mesh;
   private flashT = 0;
   private flashGood = true;
-  private count = 0;
+  count = 0;
 
   constructor(color: string) {
     this.group.add(mesh(new THREE.CylinderGeometry(0.68, 0.52, 0.66, 14), toonMat(color), 0, 0.33, 0));
@@ -90,13 +90,15 @@ export class SorterRig {
   private readonly queue: THREE.Group[] = [];
   private readonly leftBasket = new Basket('#c9382a');
   private readonly rightBasket = new Basket('#2d5fc9');
+  private readonly upBasket = new Basket('#2b9a4a');
+  private hasUpBin = false;
   private readonly paddle: THREE.Group;
   private readonly iris: THREE.Mesh;
   private readonly cardColor: THREE.Mesh;
   private readonly cardShape: THREE.Mesh;
   private readonly card: THREE.Group;
   private active: THREE.Group | null = null;
-  private activeMode: 'idle' | 'enter' | 'toLeft' | 'toRight' | 'toPass' = 'idle';
+  private activeMode: 'idle' | 'enter' | 'toLeft' | 'toRight' | 'toUp' | 'toPass' = 'idle';
   private activeT = 0;
   private activeItem: SortItem | null = null;
   private paddleTarget = 0; // -1 left, 0 straight, +1 right
@@ -157,12 +159,28 @@ export class SorterRig {
     this.rightBasket.group.position.set(JUNCTION_X + 1.85, 0.3, 1.7);
     this.group.add(this.leftBasket.group, this.rightBasket.group);
 
+    // third bin (Basket C) up behind the junction — hidden unless the level uses it
+    this.upBasket.group.position.set(JUNCTION_X, 0.3, -1.9);
+    this.upBasket.group.visible = false;
+    this.group.add(this.upBasket.group);
+
     // pass-through crate at the end of the belt
     const crate = new THREE.Group();
     crate.add(mesh(new RoundedBoxGeometry(1.3, 0.9, 1.2, 2, 0.08), toonMat('#c9843c'), 0, 0.45, 0));
     crate.add(mesh(new RoundedBoxGeometry(1.4, 0.16, 1.3, 1, 0.05), toonMat('#a86a2c'), 0, 0.9, 0));
     crate.position.set(4.0, 0.3, 0);
     this.group.add(crate);
+  }
+
+  /** Reveal the third bin (Conveyor Factory levels). */
+  enableUpBin(on: boolean): void {
+    this.hasUpBin = on;
+    this.upBasket.group.visible = on;
+  }
+
+  /** Live bin tallies for the data-counter readout. */
+  binCounts(): { left: number; right: number; up: number } {
+    return { left: this.leftBasket.count, right: this.rightBasket.count, up: this.upBasket.count };
   }
 
   /** Show the upcoming batch queued at the left end of the belt. */
@@ -209,12 +227,12 @@ export class SorterRig {
       : new THREE.BoxGeometry(0.36, 0.36, 0.12);
   }
 
-  /** Paddle pushes the current item into a basket. */
-  send(dir: 'left' | 'right', correct: boolean): void {
-    this.paddleTarget = dir === 'left' ? -1 : 1;
-    this.activeMode = dir === 'left' ? 'toLeft' : 'toRight';
+  /** Paddle pushes the current item into a basket (left / right / up=back). */
+  send(dir: 'left' | 'right' | 'up', correct: boolean): void {
+    this.paddleTarget = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+    this.activeMode = dir === 'left' ? 'toLeft' : dir === 'right' ? 'toRight' : 'toUp';
     this.activeT = 0;
-    const basket = dir === 'left' ? this.leftBasket : this.rightBasket;
+    const basket = dir === 'left' ? this.leftBasket : dir === 'right' ? this.rightBasket : this.upBasket;
     const item = this.activeItem;
     window.setTimeout(() => { if (item) basket.drop(item, correct); }, 620);
   }
@@ -240,6 +258,7 @@ export class SorterRig {
     this.activeMode = 'idle';
     this.leftBasket.clearItems();
     this.rightBasket.clearItems();
+    this.upBasket.clearItems();
     this.itemDone();
     this.beltOn = false;
     for (const q of this.queue) this.group.remove(q);
@@ -269,6 +288,13 @@ export class SorterRig {
         this.active.position.z = 1.7 * t;
         this.active.position.y = BELT_TOP + 0.34 + Math.sin(t * Math.PI) * 0.7 - t * 0.3;
         if (t >= 1) { this.group.remove(this.active); this.active = null; }
+      } else if (this.activeMode === 'toUp') {
+        this.activeT = Math.min(1, this.activeT + dt * 1.9);
+        const t = this.activeT;
+        this.active.position.x = JUNCTION_X;
+        this.active.position.z = -1.9 * t;
+        this.active.position.y = BELT_TOP + 0.34 + Math.sin(t * Math.PI) * 0.9 - t * 0.3;
+        if (t >= 1) { this.group.remove(this.active); this.active = null; }
       } else if (this.activeMode === 'toPass') {
         this.activeT = Math.min(1, this.activeT + dt * 1.4);
         this.active.position.x = JUNCTION_X + (4.0 - JUNCTION_X) * this.activeT;
@@ -278,5 +304,6 @@ export class SorterRig {
     }
     this.leftBasket.update(dt, elapsed);
     this.rightBasket.update(dt, elapsed);
+    if (this.hasUpBin) this.upBasket.update(dt, elapsed);
   }
 }
