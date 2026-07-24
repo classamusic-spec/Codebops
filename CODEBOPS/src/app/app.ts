@@ -11,6 +11,7 @@ import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
 import { GearworksChainScreen } from './gearworksChainScreen';
+import { GearworksLoopScreen } from './gearworksLoopScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
@@ -40,7 +41,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
-  private gearworks: GearworksScreen | GearworksChainScreen | null = null;
+  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -385,7 +386,9 @@ export class App {
     };
     this.gearworks = entry.kind === 'machine'
       ? new GearworksScreen(screen, entry.level, events)
-      : new GearworksChainScreen(screen, entry.level, events);
+      : entry.kind === 'chain'
+        ? new GearworksChainScreen(screen, entry.level, events)
+        : new GearworksLoopScreen(screen, entry.level, events);
     this.gearworks.enter();
   }
 

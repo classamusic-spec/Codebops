@@ -1650,6 +1650,23 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .gw-tile[data-gw-tone="wait"]   { --tile-deep: #a8820a; background: radial-gradient(120% 120% at 50% 12%, #ffe9a0 0%, #ffd23e 46%, #eab613 100%); }
 .gw-tile[data-gw-tone="wait"] .lbl, .gw-tile[data-gw-tone="wait"] .cmd-ico { color: #4a3500; }
 .gw-tile[data-gw-tone="move"]   { --tile-deep: #1257a8; background: radial-gradient(120% 120% at 50% 12%, #74d0ff 0%, #37a2f2 46%, #1f79df 100%); }
+.gw-tile[data-gw-tone="loop"]   { --tile-deep: #5c2ba8; background: radial-gradient(120% 120% at 50% 12%, #cba4ff 0%, #a06bff 46%, #7e3fe8 100%); }
+
+/* Loop visualization: body tiles read as one group feeding the Repeat */
+.slot.in-loop {
+  box-shadow: inset 0 0 0 3px rgba(160,107,255,.65), inset 0 2px 6px rgba(42,24,69,.25);
+  border-radius: 18px;
+}
+/* Live k/n badge while a loop runs */
+.count-badge.looping {
+  background: #fff; color: #5c2ba8;
+  animation: gwLoopPulse .5s ease infinite alternate;
+}
+@keyframes gwLoopPulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.18); box-shadow: 0 0 10px rgba(160,107,255,.8); }
+}
+.calm-mode .count-badge.looping { animation: none; }
 
 .gw-toast { z-index: 60; }
 

@@ -3,8 +3,9 @@
  * level-picker roster (playable machine levels + coming-soon slots).
  */
 import type { GearworksCommandId } from '../../gameplay/gearworks/machine';
-import { GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS } from './levels';
-import type { GearworksMachineLevel, GearworksChainLevel } from './levels';
+import type { GwLoopCommandId } from '../../gameplay/gearworks/loopMachine';
+import { GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS } from './levels';
+import type { GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
 
@@ -30,7 +31,7 @@ export type GearworksFamilyId =
 
 // ---------- command-tile registry (semantic tones from the locked palette) ----------
 
-export type GwTileTone = 'start' | 'stop' | 'rotate' | 'wait' | 'move';
+export type GwTileTone = 'start' | 'stop' | 'rotate' | 'wait' | 'move' | 'loop';
 
 export interface GwTileDef {
   readonly label: string;
@@ -57,16 +58,34 @@ export const GW_TILES: Readonly<Record<GearworksCommandId, GwTileDef>> = {
 
 export const GW_SPEED_NAMES: Readonly<Record<1 | 2 | 3, string>> = { 1: 'Slow', 2: 'Medium', 3: 'Fast' };
 
+// ---------- Phase 4 loop-level tiles ----------
+
+const ICON_GEAR = '<path d="M12 3.2 L13.4 5.4 A6.8 6.8 0 0 1 15.4 6.2 L18 5.5 L19.6 8.3 L17.8 10.2 A6.8 6.8 0 0 1 17.8 12.4 L19.6 14.3 L18 17.1 L15.4 16.4 A6.8 6.8 0 0 1 13.4 17.2 L12 19.4 L10.6 17.2 A6.8 6.8 0 0 1 8.6 16.4 L6 17.1 L4.4 14.3 L6.2 12.4 A6.8 6.8 0 0 1 6.2 10.2 L4.4 8.3 L6 5.5 L8.6 6.2 A6.8 6.8 0 0 1 10.6 5.4 Z"/><circle cx="12" cy="11.3" r="2.6" fill="var(--tile-deep, #333)"/>';
+const ICON_BELL = '<path d="M12 3.6 a5.6 5.6 0 0 1 5.6 5.6 c0 3.1 .9 4.6 2 5.6 H4.4 c1.1 -1 2 -2.5 2 -5.6 A5.6 5.6 0 0 1 12 3.6 Z"/><circle cx="12" cy="17.9" r="2.1"/><path d="M3.2 8.4 A9.6 9.6 0 0 1 5.6 4.4 M20.8 8.4 A9.6 9.6 0 0 0 18.4 4.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>';
+const ICON_LIFT_UP = '<rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M12 15.6 V8.6 M8.8 11.4 L12 8.2 L15.2 11.4" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>';
+const ICON_LIFT_DOWN = '<rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M12 8.4 V15.4 M8.8 12.6 L12 15.8 L15.2 12.6" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>';
+const ICON_REPEAT = '<path d="M7.2 7.4 H15.2 A4 4 0 0 1 19.2 11.4 V12.4" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/><path d="M16.8 16.6 H8.8 A4 4 0 0 1 4.8 12.6 V11.6" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/><path d="M19.2 10.2 L21.4 13.4 L16.9 13.6 Z"/><path d="M4.8 13.8 L2.6 10.6 L7.1 10.4 Z"/>';
+
+export const GW_LOOP_TILES: Readonly<Record<GwLoopCommandId, GwTileDef>> = {
+  glTurnGear: { label: 'Turn Gear', spoken: 'Turn the gear to wind the bell', tone: 'rotate', icon: ICON_GEAR },
+  glRingBell: { label: 'Ring Bell', spoken: 'Ring the bell', tone: 'wait', icon: ICON_BELL },
+  glLiftUp:   { label: 'Lift Up', spoken: 'Lift up one floor', tone: 'start', icon: ICON_LIFT_UP },
+  glLiftDown: { label: 'Lift Down', spoken: 'Lift down one floor', tone: 'move', icon: ICON_LIFT_DOWN },
+  glRepeat:   { label: 'Repeat', spoken: 'Repeat the tiles before this one — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
 export type GearworksLevelEntry =
   | { readonly kind: 'machine'; readonly level: GearworksMachineLevel }
-  | { readonly kind: 'chain'; readonly level: GearworksChainLevel };
+  | { readonly kind: 'chain'; readonly level: GearworksChainLevel }
+  | { readonly kind: 'loop'; readonly level: GearworksLoopLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
   ...GEARWORKS_CHAIN_LEVELS.map((level) => ({ kind: 'chain' as const, level })),
+  ...GEARWORKS_LOOP_LEVELS.map((level) => ({ kind: 'loop' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */

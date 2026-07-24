@@ -35,6 +35,14 @@ import {
   emptyPlacement, withGear, withBelt, propagate, finalDirection,
   neededPieces, chainComplete, chainMisses,
 } from '../src/gameplay/gearworks/gearChain';
+import {
+  runLoopMachine, loopGoalMisses, GL_MAX_ACTIONS,
+} from '../src/gameplay/gearworks/loopMachine';
+import type { GwLoopStep } from '../src/gameplay/gearworks/loopMachine';
+import {
+  GEARWORKS_LOOP_LEVELS, GW_GEAR_LOOP, GW_LOOP_LIFT,
+  validateLoopLevel, canonicalLoopSolution, longLoopSolution,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -384,6 +392,66 @@ for (const l of GEARWORKS_CHAIN_LEVELS) {
     chainPredictionChoices(GW_GEAR_TRAIN).find((c) => c.correct)?.emoji === '⟲');
   const beltNoGear = propagate(spec, withBelt(emptyPlacement(spec), 1, true), true);
   check('belt without gears still breaks at first empty anchor', beltNoGear.firstBrokenLink === 0);
+}
+
+// --- Gearworks loops and lifts (Phase 4) ---
+const LP = (...cmds: Array<GwLoopStep['cmd'] | [GwLoopStep['cmd'], number]>): GwLoopStep[] =>
+  cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
+
+for (const l of GEARWORKS_LOOP_LEVELS) {
+  const errs = validateLoopLevel(l);
+  check(`${l.id} validates`, errs.length === 0);
+  const short = runLoopMachine(canonicalLoopSolution(l), l.goal, l.machine);
+  check(`${l.id} loop solution wins within par`, short.success && canonicalLoopSolution(l).length <= l.par);
+  check(`${l.id} loop solution actually loops`, short.usedLoop);
+  const long = runLoopMachine(longLoopSolution(l), l.goal, l.machine);
+  check(`${l.id} long solution wins too (efficiency comparison)`,
+    long.success && !long.usedLoop && longLoopSolution(l).length > l.par);
+  check(`${l.id} both plans do the same work`, long.actionsRun === short.actionsRun);
+}
+
+{
+  // Repeat semantics match the meadow interpreter: body = tiles before it,
+  // consumed by the loop (they do NOT also run on their own first)
+  const r = runLoopMachine(LP('glTurnGear', 'glRingBell', ['glRepeat', 4]), GW_GEAR_LOOP.goal, 'gearBell');
+  check('turn+ring+repeat×4 rings exactly 4 times', r.success && r.finalState.bellRings === 4);
+  check('loop events narrate every turn', r.events.filter((e) => e.type === 'loopIter').length === 4);
+  const empty = runLoopMachine(LP(['glRepeat', 3]), GW_GEAR_LOOP.goal, 'gearBell');
+  check('repeat with nothing before it fails gently', !empty.success
+    && empty.events.some((e) => e.type === 'loopFail'));
+  const clamped = runLoopMachine(LP('glTurnGear', 'glRingBell', ['glRepeat', 9]), GW_GEAR_LOOP.goal, 'gearBell');
+  check('repeat count clamps to 4', clamped.finalState.bellRings === 4);
+}
+{
+  // The bell needs winding: ring without a turn = friendly clunk
+  const r = runLoopMachine(LP('glRingBell', ['glRepeat', 4]), GW_GEAR_LOOP.goal, 'gearBell');
+  check('unwound rings clunk instead of ring', !r.success
+    && r.finalState.bellRings === 0 && r.finalState.clunks === 4);
+  check('clunk miss explains the power rule',
+    loopGoalMisses(GW_GEAR_LOOP.goal, r.finalState).some((m) => m.includes('power')));
+  const partial = runLoopMachine(LP('glTurnGear', 'glRingBell', 'glTurnGear', 'glRingBell'), GW_GEAR_LOOP.goal, 'gearBell');
+  check('2-of-4 miss suggests the Repeat tile', !partial.success
+    && loopGoalMisses(GW_GEAR_LOOP.goal, partial.finalState).some((m) => m.includes('Repeat')));
+}
+{
+  // Lift: counted loops move the machine; ends of track bump gently
+  const win = runLoopMachine(LP('glLiftUp', ['glRepeat', 3], 'glRingBell'), GW_LOOP_LIFT.goal, 'lift');
+  check('lift loop reaches floor 3 and delivers', win.success && win.finalState.floor === 3);
+  const past = runLoopMachine(LP('glLiftUp', ['glRepeat', 4], 'glRingBell'), GW_LOOP_LIFT.goal, 'lift');
+  check('lifting past the top bumps but still delivers', past.success
+    && past.events.some((e) => e.type === 'liftBump' && e.at === 'top'));
+  const low = runLoopMachine(LP('glLiftUp', 'glLiftUp', 'glRingBell'), GW_LOOP_LIFT.goal, 'lift');
+  check('ringing below the top fails with floor coaching', !low.success
+    && loopGoalMisses(GW_LOOP_LIFT.goal, low.finalState).some((m) => m.includes('floor')));
+  const down = runLoopMachine(LP('glLiftDown'), GW_LOOP_LIFT.goal, 'lift');
+  check('down at the bottom bumps', down.events.some((e) => e.type === 'liftBump' && e.at === 'bottom'));
+  const trip = runLoopMachine(LP('glLiftUp', ['glRepeat', 3], 'glRingBell', 'glLiftDown', ['glRepeat', 3]), GW_LOOP_LIFT.goal, 'lift');
+  check('round trip delivers AND comes home (creative star)', trip.success && trip.finalState.floor === 0);
+}
+{
+  // Step-limit protection bounds any plan
+  const huge = runLoopMachine(Array.from({ length: 60 }, () => ({ cmd: 'glTurnGear' as const })), GW_GEAR_LOOP.goal, 'gearBell');
+  check('action cap bounds runaway loop plans', huge.overflowed && huge.finalState.actions <= GL_MAX_ACTIONS);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

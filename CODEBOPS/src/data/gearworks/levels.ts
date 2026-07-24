@@ -8,6 +8,8 @@
 import type { GearworksCommandId, GearworksStep, MachineGoal } from '../../gameplay/gearworks/machine';
 import type { ChainSpec } from '../../gameplay/gearworks/gearChain';
 import { finalDirection, neededPieces } from '../../gameplay/gearworks/gearChain';
+import type { GwLoopCommandId, GwLoopGoal, GwLoopMachineKind, GwLoopStep } from '../../gameplay/gearworks/loopMachine';
+import { runLoopMachine } from '../../gameplay/gearworks/loopMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -233,4 +235,124 @@ export function chainPredictionChoices(level: GearworksChainLevel): Array<{ emoj
     { emoji: '⟳', label: 'Forward — same as the motor', correct: final === 'cw' },
     { emoji: '⟲', label: 'Backward — the other way', correct: final === 'ccw' },
   ];
+}
+
+// ==================================================================
+// Phase 4 — loop levels: Gear Loop Challenge + Loop Lift
+// ==================================================================
+
+export type GwLoopBonusKind = 'bothWays' | 'roundTrip';
+
+export interface GearworksLoopLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly machine: GwLoopMachineKind;
+  readonly commands: readonly GwLoopCommandId[];
+  readonly maxSlots: number;
+  /** Clever star: solve in this many tiles or fewer (forces the loop). */
+  readonly par: number;
+  readonly goal: GwLoopGoal;
+  /**
+   * Creative star:
+   *  'bothWays'  — win once WITHOUT a loop and once WITH one (the spec's
+   *                efficiency comparison: see both work, loop is shorter)
+   *  'roundTrip' — after delivering at the top, bring the lift home (floor 0)
+   */
+  readonly bonus: { readonly kind: GwLoopBonusKind; readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_GEAR_LOOP: GearworksLoopLevel = {
+  id: 'gw-gear-loop',
+  title: 'Gearworks Garage',
+  shortTitle: 'Gear Loop',
+  family: 'bench',
+  goalText: 'Ring the bell 4 times — turn the gear to wind it first!',
+  emoji: '🔁',
+  brief: {
+    title: 'The Gear Loop Challenge!',
+    text: 'This bell machine needs TURN GEAR to wind up, then RING BELL to ding — four times! You can write it the long way… or put TURN GEAR + RING BELL before a REPEAT ×4 tile and let the loop do it. Loops make plans shorter AND easier to change!',
+    emoji: '🔁',
+  },
+  machine: 'gearBell',
+  commands: ['glTurnGear', 'glRingBell', 'glRepeat'],
+  maxSlots: 10,
+  par: 3,
+  goal: { needRings: 4 },
+  bonus: { kind: 'bothWays', text: 'Win it the long way AND the loop way' },
+  coachHint: 'Tiles before a REPEAT tile go inside the loop — Repeat ×4 runs them four times!',
+};
+
+export const GW_LOOP_LIFT: GearworksLoopLevel = {
+  id: 'gw-loop-lift',
+  title: 'Gearworks Garage',
+  shortTitle: 'Loop Lift',
+  family: 'bench',
+  goalText: 'Lift the berries to floor 3 and ring the delivery bell!',
+  emoji: '🛗',
+  brief: {
+    title: 'Loop Lift!',
+    text: 'The berry basket rides the lift — but the kitchen is on floor 3! LIFT UP climbs one floor at a time. Put LIFT UP before a REPEAT ×3 and the loop climbs the whole way. Ring the bell AT THE TOP to deliver!',
+    emoji: '🛗',
+  },
+  machine: 'lift',
+  commands: ['glLiftUp', 'glLiftDown', 'glRingBell', 'glRepeat'],
+  maxSlots: 8,
+  par: 3,
+  goal: { topFloor: 3, needTopRing: true },
+  bonus: { kind: 'roundTrip', text: 'Bring the lift back down for the next load' },
+  coachHint: 'LIFT UP then Repeat ×3 climbs three floors — then RING BELL at the top!',
+};
+
+export const GEARWORKS_LOOP_LEVELS: readonly GearworksLoopLevel[] = [GW_GEAR_LOOP, GW_LOOP_LIFT];
+
+/** Shortest winning plan (uses the loop — proves par is honest). */
+export function canonicalLoopSolution(level: GearworksLoopLevel): GwLoopStep[] {
+  if (level.machine === 'gearBell') {
+    return [{ cmd: 'glTurnGear' }, { cmd: 'glRingBell' }, { cmd: 'glRepeat', arg: level.goal.needRings ?? 2 }];
+  }
+  return [{ cmd: 'glLiftUp' }, { cmd: 'glRepeat', arg: level.goal.topFloor ?? 2 }, { cmd: 'glRingBell' }];
+}
+
+/** The long, loop-free plan the child discovers first (both must work!). */
+export function longLoopSolution(level: GearworksLoopLevel): GwLoopStep[] {
+  if (level.machine === 'gearBell') {
+    const out: GwLoopStep[] = [];
+    for (let i = 0; i < (level.goal.needRings ?? 2); i++) out.push({ cmd: 'glTurnGear' }, { cmd: 'glRingBell' });
+    return out;
+  }
+  const out: GwLoopStep[] = [];
+  for (let i = 0; i < (level.goal.topFloor ?? 2); i++) out.push({ cmd: 'glLiftUp' });
+  out.push({ cmd: 'glRingBell' });
+  return out;
+}
+
+export function validateLoopLevel(level: GearworksLoopLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (!level.commands.includes('glRepeat')) errors.push('Loop levels must offer the Repeat tile.');
+  if (level.machine === 'gearBell' && !level.goal.needRings) errors.push('gearBell goal needs needRings.');
+  if (level.machine === 'lift' && !(level.goal.topFloor && level.goal.needTopRing)) {
+    errors.push('lift goal needs topFloor + needTopRing.');
+  }
+  const short = canonicalLoopSolution(level);
+  if (short.length > level.par) errors.push('Canonical loop solution must fit par.');
+  if (!runLoopMachine(short, level.goal, level.machine).success) errors.push('Canonical loop solution must win.');
+  const long = longLoopSolution(level);
+  if (long.length <= level.par) errors.push('Long solution must NOT fit par (or the loop teaches nothing).');
+  if (long.length > level.maxSlots) errors.push('Long solution must fit the deck (both ways must be buildable).');
+  if (!runLoopMachine(long, level.goal, level.machine).success) errors.push('Long solution must win too.');
+  return errors;
+}
+
+export function assertLoopLevelValid(level: GearworksLoopLevel): void {
+  const errors = validateLoopLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Loop level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
 }

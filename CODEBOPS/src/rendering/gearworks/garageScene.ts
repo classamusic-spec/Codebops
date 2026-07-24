@@ -113,7 +113,7 @@ function blueprintTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-export type GarageLayout = 'showcase' | 'motorLab';
+export type GarageLayout = 'showcase' | 'motorLab' | 'liftBay';
 
 export class GarageScene {
   readonly group = new THREE.Group();
@@ -189,15 +189,17 @@ export class GarageScene {
       this.group.add(lamp);
     }
 
-    // ---- workbench ----
-    const bench = new THREE.Group();
-    bench.add(mesh(new RoundedBoxGeometry(13.5, 0.7, 5.2, 3, 0.18), toonMat('#d9a45c'), 0, 1.55, 0));
-    bench.add(mesh(new RoundedBoxGeometry(13.9, 0.32, 5.6, 2, 0.12), toonMat('#39406e'), 0, 1.15, 0));
-    for (const [lx, lz] of [[-6.2, -2.1], [6.2, -2.1], [-6.2, 2.1], [6.2, 2.1]] as const) {
-      bench.add(mesh(new RoundedBoxGeometry(0.55, 1.2, 0.55, 1, 0.1), toonMat('#2c3f8f'), lx, 0.55, lz));
+    // ---- workbench (lift bay keeps the floor clear for the tower) ----
+    if (this.layout !== 'liftBay') {
+      const bench = new THREE.Group();
+      bench.add(mesh(new RoundedBoxGeometry(13.5, 0.7, 5.2, 3, 0.18), toonMat('#d9a45c'), 0, 1.55, 0));
+      bench.add(mesh(new RoundedBoxGeometry(13.9, 0.32, 5.6, 2, 0.12), toonMat('#39406e'), 0, 1.15, 0));
+      for (const [lx, lz] of [[-6.2, -2.1], [6.2, -2.1], [-6.2, 2.1], [6.2, 2.1]] as const) {
+        bench.add(mesh(new RoundedBoxGeometry(0.55, 1.2, 0.55, 1, 0.1), toonMat('#2c3f8f'), lx, 0.55, lz));
+      }
+      bench.position.set(0, 0, -1.5);
+      this.group.add(bench);
     }
-    bench.position.set(0, 0, -1.5);
-    this.group.add(bench);
 
     // ---- bench contents depend on the layout ----
     const benchTop = 1.9;
