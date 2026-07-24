@@ -2075,3 +2075,46 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-paint-board { padding: 6px 8px 8px; }
   .pb-cell { width: 18px; height: 18px; }
 }
+
+/* ============================================================
+   Phase 17 — Story Studio state map (the scenes)
+   ============================================================ */
+.gw-state-map {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: calc(max(8px, var(--sat)) + 118px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, rgba(30,20,64,.92), rgba(16,12,42,.92));
+  border: 3px solid rgba(255,255,255,.14); border-radius: var(--r-lg);
+  padding: 8px 14px 10px; box-shadow: var(--shadow-card); z-index: 20;
+}
+.sm-title {
+  font-family: var(--font-display); font-weight: 800; font-size: 11px;
+  letter-spacing: 2px; color: #ffcf7a;
+}
+.sm-row { display: flex; gap: 8px; }
+.sm-chip {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  width: clamp(58px, 7.5vw, 82px); padding: 8px 6px 6px;
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.14);
+  border-radius: 14px; opacity: .62;
+  transition: transform .2s var(--ease-bounce), opacity .2s, border-color .18s, box-shadow .18s;
+}
+.sm-chip .sm-emoji { font-size: clamp(22px, 2.6vw, 30px); line-height: 1; filter: grayscale(.3); transition: filter .2s; }
+.sm-chip .sm-label { font-family: var(--font-display); font-weight: 700; font-size: 10.5px; color: #e7dfff; text-transform: capitalize; }
+.sm-chip.visited { opacity: .9; }
+.sm-chip.here {
+  opacity: 1; border-color: #fff;
+  background: color-mix(in srgb, var(--scene) 30%, rgba(13,20,55,.6));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--scene) 60%, transparent);
+  transform: translateY(-5px) scale(1.08);
+}
+.sm-chip.here .sm-emoji { filter: none; }
+.sm-chip.target { border-style: dashed; border-color: color-mix(in srgb, var(--scene) 70%, #fff); }
+.sm-flag { position: absolute; top: -10px; right: -6px; font-size: 15px; }
+.sm-chip.shake { animation: locked-shake .4s ease; }
+
+@media (max-width: 700px) {
+  .gw-state-map { left: max(8px, var(--sal)); transform: none; padding: 6px 8px 8px; }
+  .sm-label { display: none; }
+  .sm-chip { width: clamp(46px, 15vw, 64px); }
+}

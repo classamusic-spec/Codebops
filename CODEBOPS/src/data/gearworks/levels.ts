@@ -30,6 +30,8 @@ import type { DvCommandId, DvStep, DeliveryPackage, DeliveryGoal } from '../../g
 import { runDelivery, DV_REPEAT_MAX } from '../../gameplay/gearworks/deliveryMachine';
 import type { PpCommandId, PpStep, PaintGoal } from '../../gameplay/gearworks/paintMachine';
 import { runPaint } from '../../gameplay/gearworks/paintMachine';
+import type { StoryEventId, StoryStep, StoryTransition, StoryMachineDef } from '../../gameplay/gearworks/storyMachine';
+import { runStory, shortestStory, allStoryPaths } from '../../gameplay/gearworks/storyMachine';
 import type { SfxName } from '../../audio/sfx';
 import type { GearworksFamilyId } from './world';
 
@@ -1807,5 +1809,176 @@ export function assertPaintLevelValid(level: GearworksPaintLevel): void {
   const errors = validatePaintLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Paint level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 17 — Story Studio: state machines
+//
+// An actor is always in ONE scene (a state). Each event only moves it
+// if there is a transition from the current scene — the same action does
+// different things depending on where you are. Reach the target scene.
+// ==================================================================
+
+export interface StoryStateDef {
+  readonly id: string;
+  readonly label: string;
+  readonly emoji: string;
+  readonly color: string;
+}
+
+export interface GearworksStoryLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly actorName: string;
+  readonly states: readonly StoryStateDef[];
+  readonly transitions: readonly StoryTransition[];
+  readonly start: string;
+  readonly target: string;
+  readonly commands: readonly StoryEventId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  readonly bonus: { readonly text: string };
+  readonly coachHint: string;
+}
+
+export function storyDef(level: GearworksStoryLevel): StoryMachineDef {
+  return { states: level.states.map((s) => s.id), transitions: level.transitions, start: level.start };
+}
+
+export function storyStateLabel(level: GearworksStoryLevel, id: string): string {
+  return level.states.find((s) => s.id === id)?.label ?? id;
+}
+
+export const GW_ROBOT_FEELINGS: GearworksStoryLevel = {
+  id: 'gw-robot-feelings',
+  title: 'Gearworks Garage',
+  shortTitle: 'Robot Feelings',
+  family: 'story',
+  goalText: 'Take Bloop from sleepy to HAPPY — the right events for each mood!',
+  emoji: '📖',
+  brief: {
+    title: 'Story Studio!',
+    text: 'Meet Bloop the actor! Bloop is always in one MOOD. Each tile is a thing that happens — but it only works from the right mood! WAKE only works when sleepy; HUG only when curious. Make Bloop happy!',
+    emoji: '📖',
+  },
+  actorName: 'Bloop',
+  states: [
+    { id: 'sleepy', label: 'sleepy', emoji: '😴', color: '#6f7bd6' },
+    { id: 'curious', label: 'curious', emoji: '🤔', color: '#ffb43e' },
+    { id: 'happy', label: 'happy', emoji: '😄', color: '#8be04a' },
+    { id: 'giggly', label: 'giggly', emoji: '🤪', color: '#ff7ad0' },
+  ],
+  transitions: [
+    { from: 'sleepy', event: 'stWake', to: 'curious' },
+    { from: 'curious', event: 'stHug', to: 'happy' },
+    { from: 'curious', event: 'stTickle', to: 'giggly' },
+    { from: 'happy', event: 'stTickle', to: 'giggly' },
+    { from: 'giggly', event: 'stCalm', to: 'happy' },
+    { from: 'happy', event: 'stCalm', to: 'curious' },
+  ],
+  start: 'sleepy',
+  target: 'happy',
+  commands: ['stWake', 'stHug', 'stTickle', 'stCalm'],
+  maxSlots: 6,
+  par: 2,
+  bonus: { text: 'Reach happy a whole different way' },
+  coachHint: 'WAKE the sleepy robot, then HUG the curious one to make it happy!',
+};
+
+export const GW_BEDTIME_STORY: GearworksStoryLevel = {
+  id: 'gw-bedtime-story',
+  title: 'Gearworks Garage',
+  shortTitle: 'Bedtime Story',
+  family: 'story',
+  goalText: 'Tell the bedtime story — get Bloop all the way to ASLEEP!',
+  emoji: '🌙',
+  brief: {
+    title: 'Bedtime Story!',
+    text: 'A whole day for Bloop! PLAY and EAT keep the day going, then a big YAWN makes Bloop sleepy — and only then does SLEEP work. Every event needs the right scene before it. Tuck Bloop into bed!',
+    emoji: '🌙',
+  },
+  actorName: 'Bloop',
+  states: [
+    { id: 'awake', label: 'awake', emoji: '🙂', color: '#6bd0ff' },
+    { id: 'playing', label: 'playing', emoji: '😄', color: '#ffcf3e' },
+    { id: 'hungry', label: 'hungry', emoji: '😋', color: '#ff7a4d' },
+    { id: 'sleepy', label: 'sleepy', emoji: '🥱', color: '#c79bff' },
+    { id: 'asleep', label: 'asleep', emoji: '😴', color: '#6f7bd6' },
+  ],
+  transitions: [
+    { from: 'awake', event: 'stPlay', to: 'playing' },
+    { from: 'hungry', event: 'stPlay', to: 'playing' },
+    { from: 'awake', event: 'stEat', to: 'hungry' },
+    { from: 'playing', event: 'stEat', to: 'hungry' },
+    { from: 'playing', event: 'stYawn', to: 'sleepy' },
+    { from: 'hungry', event: 'stYawn', to: 'sleepy' },
+    { from: 'sleepy', event: 'stSleep', to: 'asleep' },
+  ],
+  start: 'awake',
+  target: 'asleep',
+  commands: ['stPlay', 'stEat', 'stYawn', 'stSleep'],
+  maxSlots: 8,
+  par: 3,
+  bonus: { text: 'Reach bedtime a whole different way' },
+  coachHint: 'PLAY or EAT first, then YAWN to get sleepy, then SLEEP — sleep only works when sleepy!',
+};
+
+export const GEARWORKS_STORY_LEVELS: readonly GearworksStoryLevel[] = [
+  GW_ROBOT_FEELINGS, GW_BEDTIME_STORY,
+];
+
+export function storyShortestSolution(level: GearworksStoryLevel): StoryStep[] {
+  const seq = shortestStory(storyDef(level), level.target) ?? [];
+  return seq.map((cmd) => ({ cmd }));
+}
+
+/** works (reached target) / clever (par, no blocked) / creative (two distinct paths). */
+export function storyStars(level: GearworksStoryLevel, program: readonly StoryStep[], everBothPaths: boolean): number {
+  const r = runStory(program, storyDef(level));
+  if (r.finalState !== level.target) return 0;
+  return 1 + (program.length <= level.par && r.blockedCount === 0 ? 1 : 0) + (everBothPaths ? 1 : 0);
+}
+
+export function validateStoryLevel(level: GearworksStoryLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  const def = storyDef(level);
+  const stateIds = new Set(level.states.map((s) => s.id));
+  if (!stateIds.has(level.start)) errors.push('Start state is not in the state list.');
+  if (!stateIds.has(level.target)) errors.push('Target state is not in the state list.');
+  if (level.start === level.target) errors.push('Start and target must differ (or there is no story).');
+  for (const t of level.transitions) {
+    if (!stateIds.has(t.from) || !stateIds.has(t.to)) errors.push(`Transition ${t.event} names an unknown state.`);
+    if (!level.commands.includes(t.event)) errors.push(`Transition uses event ${t.event} that is not an available tile.`);
+  }
+  const shortest = storyShortestSolution(level);
+  if (shortest.length === 0) errors.push('Target must be reachable from the start.');
+  if (shortest.length !== level.par) errors.push(`Par (${level.par}) must equal the shortest path (${shortest.length}).`);
+  if (shortest.length > level.maxSlots) errors.push('Shortest path must fit the deck.');
+  const paths = allStoryPaths(def, level.target);
+  const distinct = new Set(paths.map((p) => p.join('>')));
+  if (distinct.size < 2) errors.push('There must be at least two distinct paths (so the creative star is reachable).');
+  // star ladder
+  if (storyStars(level, shortest, false) !== 2) errors.push('Shortest clean path should earn 2 stars.');
+  if (storyStars(level, shortest, true) !== 3) errors.push('Two distinct paths should earn all 3 stars.');
+  // a longer valid path should still reach (works) but miss clever
+  const longer = paths.map((p) => p.map((cmd) => ({ cmd }))).find((p) => p.length > level.par);
+  if (longer) {
+    if (runStory(longer, def).finalState !== level.target) errors.push('A longer path should still reach the target.');
+    if (storyStars(level, longer, false) !== 1) errors.push('A longer path should earn just 1 star.');
+  }
+  return errors;
+}
+
+export function assertStoryLevelValid(level: GearworksStoryLevel): void {
+  const errors = validateStoryLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Story level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

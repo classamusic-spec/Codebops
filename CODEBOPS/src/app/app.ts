@@ -23,6 +23,7 @@ import { GearworksOrchestraScreen } from './gearworksOrchestraScreen';
 import { GearworksLighthouseScreen } from './gearworksLighthouseScreen';
 import { GearworksDeliveryScreen } from './gearworksDeliveryScreen';
 import { GearworksPaintScreen } from './gearworksPaintScreen';
+import { GearworksStoryScreen } from './gearworksStoryScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
@@ -52,7 +53,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
-  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | null = null;
+  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -421,7 +422,9 @@ export class App {
                             ? new GearworksLighthouseScreen(screen, entry.level, events)
                             : entry.kind === 'delivery'
                               ? new GearworksDeliveryScreen(screen, entry.level, events)
-                              : new GearworksPaintScreen(screen, entry.level, events);
+                              : entry.kind === 'painter'
+                                ? new GearworksPaintScreen(screen, entry.level, events)
+                                : new GearworksStoryScreen(screen, entry.level, events);
     this.gearworks.enter();
   }
 

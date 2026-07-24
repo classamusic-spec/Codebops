@@ -135,6 +135,14 @@ import {
   validatePaintLevel, paintGoalOf, paintManualSolution,
   paintOneLoopSolution, paintNestedSolution, paintStars,
 } from '../src/data/gearworks/levels';
+import {
+  runStory, storyReached, takenPath, shortestStory, allStoryPaths, storyMisses,
+} from '../src/gameplay/gearworks/storyMachine';
+import type { StoryStep } from '../src/gameplay/gearworks/storyMachine';
+import {
+  GW_ROBOT_FEELINGS, GW_BEDTIME_STORY, GEARWORKS_STORY_LEVELS,
+  validateStoryLevel, storyDef, storyShortestSolution, storyStars, storyStateLabel,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1178,6 +1186,64 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     check(`${l.id} nested solution wins`, runPaint(paintNestedSolution(l), paintGoalOf(l)).success);
   }
   check('Big Banner fills 12 dots with the nested loop', runPaint(paintNestedSolution(GW_BIG_BANNER), paintGoalOf(GW_BIG_BANNER)).painted.size === 12);
+}
+
+// --- Gearworks Story Studio (Phase 17) ---
+{
+  const P = (...cmds: StoryStep['cmd'][]): StoryStep[] => cmds.map((cmd) => ({ cmd }));
+  const def = storyDef(GW_ROBOT_FEELINGS);
+
+  // an event only fires from the right state
+  const wakeThenHug = runStory(P('stWake', 'stHug'), def);
+  check('WAKE from sleepy then HUG from curious reaches happy', wakeThenHug.finalState === 'happy' && wakeThenHug.blockedCount === 0);
+
+  const hugFirst = runStory(P('stHug'), def);
+  check('HUG while sleepy is blocked (wrong scene)', hugFirst.finalState === 'sleepy' && hugFirst.blockedCount === 1);
+  check('a blocked event leaves the state unchanged', hugFirst.path.length === 1);
+
+  // the same event does different things from different states
+  check('TICKLE from curious goes to giggly', runStory(P('stWake', 'stTickle'), def).finalState === 'giggly');
+  check('TICKLE from happy also goes to giggly', runStory(P('stWake', 'stHug', 'stTickle'), def).finalState === 'giggly');
+
+  // start/done events bookend the stream
+  check('the run starts with a start event', wakeThenHug.events[0].type === 'start');
+  check('the run ends with a done event', wakeThenHug.events[wakeThenHug.events.length - 1].type === 'done');
+  check('runStory is deterministic', JSON.stringify(runStory(P('stWake', 'stHug'), def)) === JSON.stringify(wakeThenHug));
+
+  // reached / taken path
+  check('storyReached agrees with finalState', storyReached(P('stWake', 'stHug'), def, 'happy'));
+  check('takenPath drops blocked no-ops', JSON.stringify(takenPath(P('stHug', 'stWake', 'stHug'), def)) === JSON.stringify(['stWake', 'stHug']));
+
+  // shortest + distinct paths
+  check('shortest story to happy is 2 events', shortestStory(def, 'happy')?.length === 2);
+  const paths = allStoryPaths(def, 'happy');
+  check('there are at least two distinct paths to happy', new Set(paths.map((p) => p.join('>'))).size >= 2);
+
+  // a scenic route reaches happy a different way
+  const scenic = runStory(P('stWake', 'stTickle', 'stCalm'), def);
+  check('the giggly detour also reaches happy', scenic.finalState === 'happy');
+
+  // miss report speaks in scene labels
+  check('the miss report names the stuck scene', storyMisses(P('stHug'), def, 'happy', (id) => storyStateLabel(GW_ROBOT_FEELINGS, id)).some((m) => m.includes('sleepy') || m.includes('happy')));
+
+  // stars ladder
+  const shortest = storyShortestSolution(GW_ROBOT_FEELINGS);
+  check('a failed story earns no stars', storyStars(GW_ROBOT_FEELINGS, P('stTickle'), false) === 0);
+  check('reaching happy over par (blocked detour) earns just works', storyStars(GW_ROBOT_FEELINGS, P('stHug', 'stWake', 'stHug'), false) === 1);
+  check('the tidy shortest path earns 2 stars', storyStars(GW_ROBOT_FEELINGS, shortest, false) === 2);
+  check('two different paths earn all 3 stars', storyStars(GW_ROBOT_FEELINGS, shortest, true) === 3);
+
+  // bedtime: SLEEP only works when sleepy
+  const bd = storyDef(GW_BEDTIME_STORY);
+  check('SLEEP while awake is blocked', runStory(P('stSleep'), bd).blockedCount === 1);
+  check('play, yawn, sleep tucks Bloop in', runStory(P('stPlay', 'stYawn', 'stSleep'), bd).finalState === 'asleep');
+  check('eat, yawn, sleep is a different bedtime route', runStory(P('stEat', 'stYawn', 'stSleep'), bd).finalState === 'asleep');
+
+  // levels validate
+  for (const l of GEARWORKS_STORY_LEVELS) {
+    check(`${l.id} validates`, validateStoryLevel(l).length === 0);
+    check(`${l.id} shortest solution reaches target`, storyReached(storyShortestSolution(l), storyDef(l), l.target));
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

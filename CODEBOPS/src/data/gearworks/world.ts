@@ -13,17 +13,18 @@ import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
 import type { LlCommandId } from '../../gameplay/gearworks/logicMachine';
 import type { DvCommandId } from '../../gameplay/gearworks/deliveryMachine';
 import type { PpCommandId } from '../../gameplay/gearworks/paintMachine';
+import type { StoryEventId } from '../../gameplay/gearworks/storyMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
   GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS, GEARWORKS_ORCHESTRA_LEVELS,
-  GEARWORKS_LIGHTHOUSE_LEVELS, GEARWORKS_DELIVERY_LEVELS, GEARWORKS_PAINT_LEVELS,
+  GEARWORKS_LIGHTHOUSE_LEVELS, GEARWORKS_DELIVERY_LEVELS, GEARWORKS_PAINT_LEVELS, GEARWORKS_STORY_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
   GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel, GearworksLighthouseLevel,
-  GearworksDeliveryLevel, GearworksPaintLevel,
+  GearworksDeliveryLevel, GearworksPaintLevel, GearworksStoryLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -247,6 +248,28 @@ export const GW_PAINT_TILES: Readonly<Record<PpCommandId, GwTileDef>> = {
   ppRepeatParade:  { label: 'Repeat Parade', spoken: 'Repeat the whole design so far down the banner — tap the badge to change how many', tone: 'check', icon: ICON_REPEAT_PARADE },
 };
 
+// ---------- Phase 17 Story Studio event tiles ----------
+
+const ICON_SUN = '<circle cx="12" cy="12" r="4.6"/><g stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 2.6 V5.2"/><path d="M12 18.8 V21.4"/><path d="M2.6 12 H5.2"/><path d="M18.8 12 H21.4"/><path d="M5.2 5.2 L7 7"/><path d="M17 17 L18.8 18.8"/><path d="M18.8 5.2 L17 7"/><path d="M7 17 L5.2 18.8"/></g>';
+const ICON_HUG = '<path d="M12 20.4 C6 16.4 3.4 12.8 3.4 9.4 A4.2 4.2 0 0 1 12 7.4 A4.2 4.2 0 0 1 20.6 9.4 C20.6 12.8 18 16.4 12 20.4 Z"/>';
+const ICON_TICKLE = '<path d="M6 18 C6 10 10 4.4 15.6 4.4 C18 4.4 19.6 6 19.6 8.4 C19.6 13.6 12.4 15.6 6 18 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M15.6 4.4 L6 18" stroke="currentColor" stroke-width="1.8"/><path d="M4.4 18.4 L7.4 17.2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
+const ICON_CALM = '<path d="M4 14 C7 14 8 11.4 12 11.4 C16 11.4 17 14 20 14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M4 18.2 C7 18.2 8 15.6 12 15.6 C16 15.6 17 18.2 20 18.2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="6.2" r="2.2"/>';
+const ICON_BALL = '<circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 3.8 C9 7 9 17 12 20.2 M12 3.8 C15 7 15 17 12 20.2 M3.8 12 H20.2" fill="none" stroke="currentColor" stroke-width="1.9"/>';
+const ICON_APPLE = '<path d="M12 7 C12 7 10.4 4.4 7.6 5.2 C10 5.6 11 7 11.4 8 M12 8 C9.6 6.4 5.6 7.2 5 11 C4.4 15.4 7.6 20 10 20 C11 20 11.4 19.4 12 19.4 C12.6 19.4 13 20 14 20 C16.4 20 19.6 15.4 19 11 C18.4 7.2 14.4 6.4 12 8 Z"/>';
+const ICON_YAWN = '<circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2.4"/><ellipse cx="12" cy="14.4" rx="3.2" ry="4" /><circle cx="8.6" cy="9.4" r="1.1"/><circle cx="15.4" cy="9.4" r="1.1"/>';
+const ICON_MOON2 = '<path d="M14.6 3.4 A8.6 8.6 0 1 0 20.6 14.2 A6.6 6.6 0 0 1 14.6 3.4 Z"/><path d="M15 5.4 H19 L15 8.4 H19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+
+export const GW_STORY_TILES: Readonly<Record<StoryEventId, GwTileDef>> = {
+  stWake:   { label: 'Wake', spoken: 'Wake up', tone: 'start', icon: ICON_SUN },
+  stHug:    { label: 'Hug', spoken: 'Give a hug', tone: 'move', icon: ICON_HUG },
+  stTickle: { label: 'Tickle', spoken: 'Tickle', tone: 'loop', icon: ICON_TICKLE },
+  stCalm:   { label: 'Calm', spoken: 'Calm down', tone: 'check', icon: ICON_CALM },
+  stPlay:   { label: 'Play', spoken: 'Play', tone: 'start', icon: ICON_BALL },
+  stEat:    { label: 'Eat', spoken: 'Eat a snack', tone: 'move', icon: ICON_APPLE },
+  stYawn:   { label: 'Yawn', spoken: 'Yawn a big yawn', tone: 'wait', icon: ICON_YAWN },
+  stSleep:  { label: 'Sleep', spoken: 'Go to sleep', tone: 'stop', icon: ICON_MOON2 },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -264,7 +287,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'orchestra'; readonly level: GearworksOrchestraLevel }
   | { readonly kind: 'lighthouse'; readonly level: GearworksLighthouseLevel }
   | { readonly kind: 'delivery'; readonly level: GearworksDeliveryLevel }
-  | { readonly kind: 'painter'; readonly level: GearworksPaintLevel };
+  | { readonly kind: 'painter'; readonly level: GearworksPaintLevel }
+  | { readonly kind: 'story'; readonly level: GearworksStoryLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -282,6 +306,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_LIGHTHOUSE_LEVELS.map((level) => ({ kind: 'lighthouse' as const, level })),
   ...GEARWORKS_DELIVERY_LEVELS.map((level) => ({ kind: 'delivery' as const, level })),
   ...GEARWORKS_PAINT_LEVELS.map((level) => ({ kind: 'painter' as const, level })),
+  ...GEARWORKS_STORY_LEVELS.map((level) => ({ kind: 'story' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -295,5 +320,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-story-studio', shortTitle: 'Story Studio', emoji: '📖' },
+  { kind: 'soon', id: 'gw-maker-workshop', shortTitle: 'Maker Workshop', emoji: '🛠️' },
 ];
