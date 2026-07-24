@@ -406,6 +406,16 @@ body.calm-mode *, body.calm-mode *::before, body.calm-mode *::after {
   animation-iteration-count: 1 !important;
   transition-duration: .01ms !important;
 }
+/* Honour the OS "reduce motion" preference the same way Calm Mode does,
+   so motion-sensitive players are protected even without toggling it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 body.high-contrast {
   --ink-800: #0a1140; --ink-600: #16225c;
   --cream: #ffffff;
