@@ -10,15 +10,17 @@ import type { GcCommandId } from '../../gameplay/gearworks/counterMachine';
 import type { GjCommandId } from '../../gameplay/gearworks/jamMachine';
 import type { JobMainId } from '../../gameplay/gearworks/jobMachine';
 import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
+import type { LlCommandId } from '../../gameplay/gearworks/logicMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
   GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS, GEARWORKS_ORCHESTRA_LEVELS,
+  GEARWORKS_LIGHTHOUSE_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
-  GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel,
+  GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel, GearworksLighthouseLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -194,6 +196,26 @@ export const GW_SIGNAL_TILES: Readonly<Record<SignalCommandId, GwTileDef>> = {
   sgRepeat:     { label: 'Repeat', spoken: 'Repeat the tiles before this — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
 };
 
+// ---------- Phase 14 Lighthouse Logic tiles ----------
+
+const ICON_MOON = '<path d="M14.6 3.4 A8.6 8.6 0 1 0 20.6 14.2 A6.6 6.6 0 0 1 14.6 3.4 Z"/><circle cx="17.4" cy="6.6" r="0.9"/><circle cx="19.6" cy="10.2" r="0.7"/>';
+const ICON_BOAT = '<path d="M3 14 H21 L18.4 19 H5.6 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><path d="M12 3.4 V13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M12 4.4 L18 11.6 H12 Z"/>';
+const ICON_FOG = '<g stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M4 8.5 H18"/><path d="M6 12 H20"/><path d="M4 15.5 H16"/><path d="M8 19 H19"/></g>';
+const ICON_STORM = '<path d="M6 4 H15 L12 10 H17 L7 21 L10 12 H5 Z"/>';
+const ICON_NOT = '<circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2.8"/><path d="M6.4 6.4 L17.6 17.6" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>';
+const ICON_AND = '<path d="M8 5 H12 A6 6 0 0 1 12 17 H8 Z M8 5 V17" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linejoin="round" stroke-linecap="round"/><path d="M5 9 H8 M5 13 H8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M18 9 V15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>';
+const ICON_OR = '<path d="M6 5 Q11 5 15 12 Q11 19 6 19 Q9 12 6 5 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M3.4 9 H6.6 M3.4 13 H6.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M19.4 12 H15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
+
+export const GW_LIGHTHOUSE_TILES: Readonly<Record<LlCommandId, GwTileDef>> = {
+  llIfDark:  { label: 'If Dark', spoken: 'True when the sky is dark', tone: 'check', icon: ICON_MOON },
+  llIfShip:  { label: 'If Ship', spoken: 'True when a ship is near', tone: 'move', icon: ICON_BOAT },
+  llIfFog:   { label: 'If Fog', spoken: 'True when it is foggy', tone: 'check', icon: ICON_FOG },
+  llIfStorm: { label: 'If Storm', spoken: 'True when a storm is blowing', tone: 'stop', icon: ICON_STORM },
+  llNot:     { label: 'Not', spoken: 'Flip the next condition — true becomes false', tone: 'stop', icon: ICON_NOT },
+  llAnd:     { label: 'And', spoken: 'Both must be true', tone: 'rotate', icon: ICON_AND },
+  llOr:      { label: 'Or', spoken: 'Either one can be true', tone: 'loop', icon: ICON_OR },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -208,7 +230,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'job'; readonly level: GearworksJobLevel }
   | { readonly kind: 'signal'; readonly level: GearworksSignalLevel }
   | { readonly kind: 'debug'; readonly level: GearworksDebugLevel }
-  | { readonly kind: 'orchestra'; readonly level: GearworksOrchestraLevel };
+  | { readonly kind: 'orchestra'; readonly level: GearworksOrchestraLevel }
+  | { readonly kind: 'lighthouse'; readonly level: GearworksLighthouseLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -223,6 +246,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_DEBUG_LEVELS.map((level) => ({ kind: 'debug' as const, level })),
   ...GEARWORKS_FACTORY_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
   ...GEARWORKS_ORCHESTRA_LEVELS.map((level) => ({ kind: 'orchestra' as const, level })),
+  ...GEARWORKS_LIGHTHOUSE_LEVELS.map((level) => ({ kind: 'lighthouse' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -236,5 +260,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-lighthouse-logic', shortTitle: 'Lighthouse Logic', emoji: '🗼' },
+  { kind: 'soon', id: 'gw-delivery-depot', shortTitle: 'Delivery Depot', emoji: '📦' },
 ];

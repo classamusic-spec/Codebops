@@ -24,6 +24,8 @@ import type { SignalCommandId, SignalStep, SignalGoal } from '../../gameplay/gea
 import { runParallel } from '../../gameplay/gearworks/signalMachine';
 import type { BeatPattern } from '../../gameplay/gearworks/beatMachine';
 import { emptyPattern, toggleCell, beatStars, beatStats, BEAT_LOOP_MAX } from '../../gameplay/gearworks/beatMachine';
+import type { LlCommandId, LlStep, LlSignal, LighthouseScenario } from '../../gameplay/gearworks/logicMachine';
+import { runLighthouse, evalRule, condOrder, isCond } from '../../gameplay/gearworks/logicMachine';
 import type { SfxName } from '../../audio/sfx';
 import type { GearworksFamilyId } from './world';
 
@@ -1380,5 +1382,151 @@ export function assertOrchestraLevelValid(level: GearworksOrchestraLevel): void 
   const errors = validateOrchestraLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Orchestra level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 14 — Lighthouse Logic: combine conditions with AND / OR / NOT
+//
+// One rule, tested against a whole truth table of skies. The lamp must
+// be right for EVERY sky — a rule is right because it holds for every
+// case, not because it worked once.
+// ==================================================================
+
+export interface GearworksLighthouseLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  /** Sensors in play (drives the rig's sky readout). */
+  readonly signals: readonly LlSignal[];
+  readonly commands: readonly LlCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  readonly scenarios: readonly LighthouseScenario[];
+  /** The intended rule (the answer key). */
+  readonly canonical: readonly LlStep[];
+  readonly bonus: { readonly text: string };
+  readonly coachHint: string;
+}
+
+const LL_D: LlStep = { cmd: 'llIfDark' };
+const LL_S: LlStep = { cmd: 'llIfShip' };
+const LL_F: LlStep = { cmd: 'llIfFog' };
+const LL_T: LlStep = { cmd: 'llIfStorm' };
+const LL_OR: LlStep = { cmd: 'llOr' };
+
+export const GW_NIGHT_LIGHT: GearworksLighthouseLevel = {
+  id: 'gw-night-light',
+  title: 'Gearworks Garage',
+  shortTitle: 'Night Light',
+  family: 'lighthouse',
+  goalText: 'Shine the lamp only when it is DARK and a SHIP is near!',
+  emoji: '🗼',
+  brief: {
+    title: 'Lighthouse Logic!',
+    text: 'The lighthouse should shine its lamp ONLY when it is dark AND a ship is near — both must be true! Put two condition tiles side by side and they mean AND. We will test your rule on every sky: day, night, ship, no ship. Get the lamp right for ALL of them to win!',
+    emoji: '🗼',
+  },
+  signals: ['dark', 'ship'],
+  commands: ['llIfDark', 'llIfShip', 'llNot', 'llAnd', 'llOr'],
+  maxSlots: 5,
+  par: 2,
+  scenarios: [
+    { id: 'calm-day', label: 'calm day', emoji: '☀️', inputs: { dark: false, ship: false }, want: false },
+    { id: 'busy-day', label: 'ship at noon', emoji: '⛵', inputs: { dark: false, ship: true }, want: false },
+    { id: 'empty-night', label: 'empty night', emoji: '🌙', inputs: { dark: true, ship: false }, want: false },
+    { id: 'ship-night', label: 'ship at night', emoji: '🌊', inputs: { dark: true, ship: true }, want: true },
+  ],
+  canonical: [LL_D, LL_S],
+  bonus: { text: 'Win it the other way round — Ship and Dark' },
+  coachHint: 'Two conditions side by side mean AND. If Dark next to If Ship shines only when BOTH are true!',
+};
+
+export const GW_STORM_WATCH: GearworksLighthouseLevel = {
+  id: 'gw-storm-watch',
+  title: 'Gearworks Garage',
+  shortTitle: 'Storm Watch',
+  family: 'lighthouse',
+  goalText: 'Flash the warning beam when it is FOGGY or STORMY!',
+  emoji: '⚡',
+  brief: {
+    title: 'Storm Watch!',
+    text: 'Now the beam warns sailors when the weather turns bad — flash it if it is FOGGY or STORMY. OR means ANY one is enough! Drop an OR tile between two conditions. On a clear calm day the beam stays off. Test every sky and get them all right!',
+    emoji: '⚡',
+  },
+  signals: ['fog', 'storm'],
+  commands: ['llIfFog', 'llIfStorm', 'llNot', 'llAnd', 'llOr'],
+  maxSlots: 5,
+  par: 3,
+  scenarios: [
+    { id: 'clear', label: 'clear sky', emoji: '☀️', inputs: { fog: false, storm: false }, want: false },
+    { id: 'foggy', label: 'foggy morning', emoji: '🌫️', inputs: { fog: true, storm: false }, want: true },
+    { id: 'stormy', label: 'wild storm', emoji: '⛈️', inputs: { fog: false, storm: true }, want: true },
+    { id: 'both', label: 'foggy storm', emoji: '🌊', inputs: { fog: true, storm: true }, want: true },
+  ],
+  canonical: [LL_F, LL_OR, LL_T],
+  bonus: { text: 'Win it the other way round — Storm or Fog' },
+  coachHint: 'Put an OR tile between If Fog and If Storm — OR flashes the beam when EITHER one is true!',
+};
+
+export const GEARWORKS_LIGHTHOUSE_LEVELS: readonly GearworksLighthouseLevel[] = [
+  GW_NIGHT_LIGHT, GW_STORM_WATCH,
+];
+
+/** The same rule with its conditions in the opposite order (the creative
+ *  "other way round" — AND and OR are both commutative). */
+export function altOrderSolution(level: GearworksLighthouseLevel): LlStep[] {
+  const conds = level.canonical.filter((s) => isCond(s.cmd)).reverse();
+  const op = level.canonical.find((s) => s.cmd === 'llAnd' || s.cmd === 'llOr');
+  if (!op) return conds; // pure AND-by-juxtaposition rule
+  return [conds[0], op, ...conds.slice(1)];
+}
+
+/** works (lamp right on every sky) / clever (par) / creative (both orders). */
+export function lighthouseStars(
+  level: GearworksLighthouseLevel,
+  program: readonly LlStep[],
+  everPar: boolean,
+  everBothOrders: boolean,
+): number {
+  if (!runLighthouse(program, level.scenarios).allCorrect) return 0;
+  return 1 + (everPar ? 1 : 0) + (everBothOrders ? 1 : 0);
+}
+
+export function validateLighthouseLevel(level: GearworksLighthouseLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.scenarios.length < 2) errors.push('A logic level needs at least two skies to test.');
+  if (level.canonical.length > level.par) errors.push('Canonical rule must fit par.');
+  if (level.canonical.length > level.maxSlots) errors.push('Canonical rule must fit the deck.');
+  if (!level.canonical.every((s) => level.commands.includes(s.cmd))) errors.push('Canonical uses unavailable tiles.');
+  // The answer key must be self-consistent: each scenario's want matches
+  // what the canonical rule actually produces.
+  for (const sc of level.scenarios) {
+    if (evalRule(level.canonical, sc.inputs) !== sc.want) {
+      errors.push(`Scenario "${sc.id}" want does not match the canonical rule.`);
+    }
+  }
+  if (!runLighthouse(level.canonical, level.scenarios).allCorrect) errors.push('Canonical rule must light every sky correctly.');
+  // The creative "other way round" must also be a full solution.
+  if (!runLighthouse(altOrderSolution(level), level.scenarios).allCorrect) errors.push('The reversed-order rule must also solve it.');
+  if (condOrder(altOrderSolution(level)).join() === condOrder(level.canonical).join()) {
+    errors.push('The reversed order must actually differ (needs 2+ conditions).');
+  }
+  // Every sky must be distinguishable: at least one wants ON and one OFF.
+  if (!level.scenarios.some((s) => s.want) || !level.scenarios.some((s) => !s.want)) {
+    errors.push('Scenarios must include both a lamp-on and a lamp-off sky.');
+  }
+  return errors;
+}
+
+export function assertLighthouseLevelValid(level: GearworksLighthouseLevel): void {
+  const errors = validateLighthouseLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Lighthouse level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

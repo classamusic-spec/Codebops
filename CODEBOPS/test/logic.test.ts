@@ -109,6 +109,14 @@ import {
   GW_ROBOT_ORCHESTRA, GEARWORKS_ORCHESTRA_LEVELS, validateOrchestraLevel,
   orchestraTrackIds, orchestraStarterPattern, orchestraStars,
 } from '../src/data/gearworks/levels';
+import {
+  evalRule, runLighthouse, lighthouseMisses, condOrder,
+} from '../src/gameplay/gearworks/logicMachine';
+import type { LlStep } from '../src/gameplay/gearworks/logicMachine';
+import {
+  GW_NIGHT_LIGHT, GW_STORM_WATCH, GEARWORKS_LIGHTHOUSE_LEVELS,
+  validateLighthouseLevel, altOrderSolution, lighthouseStars,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -971,6 +979,70 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   let full = emptyPattern(ids, GW_ROBOT_ORCHESTRA.steps);
   ids.forEach((id, i) => { full = toggleCell(full, id, i % GW_ROBOT_ORCHESTRA.steps); });
   check('a full looped ensemble earns all three stars', orchestraStars(GW_ROBOT_ORCHESTRA, full, BEAT_LOOP_MAX) === 3);
+}
+
+// --- Gearworks Lighthouse Logic (Phase 14) ---
+{
+  const P = (...cmds: LlStep['cmd'][]): LlStep[] => cmds.map((cmd) => ({ cmd }));
+
+  // AND: juxtaposition means AND (app-wide guard-chaining rule)
+  const and = P('llIfDark', 'llIfShip');
+  check('AND: both true → true', evalRule(and, { dark: true, ship: true }) === true);
+  check('AND: one false → false', evalRule(and, { dark: true, ship: false }) === false);
+  check('AND: other false → false', evalRule(and, { dark: false, ship: true }) === false);
+  check('AND: both false → false', evalRule(and, { dark: false, ship: false }) === false);
+
+  // OR: any true → true
+  const or = P('llIfFog', 'llOr', 'llIfStorm');
+  check('OR: both false → false', evalRule(or, { fog: false, storm: false }) === false);
+  check('OR: one true → true', evalRule(or, { fog: true, storm: false }) === true);
+  check('OR: other true → true', evalRule(or, { fog: false, storm: true }) === true);
+  check('OR: both true → true', evalRule(or, { fog: true, storm: true }) === true);
+
+  // NOT flips the next condition
+  check('NOT flips a true to false', evalRule(P('llNot', 'llIfShip'), { ship: true }) === false);
+  check('NOT flips a false to true', evalRule(P('llNot', 'llIfShip'), { ship: false }) === true);
+  check('NOT only binds the next condition', evalRule(P('llNot', 'llIfDark', 'llIfShip'), { dark: false, ship: true }) === true);
+
+  // left-to-right fold: "dark and ship or fog"
+  const mix = P('llIfDark', 'llIfShip', 'llOr', 'llIfFog');
+  check('mixed folds left-to-right: (dark AND ship) OR fog — fog alone wins', evalRule(mix, { dark: false, ship: false, fog: true }) === true);
+  check('mixed: dark+ship but no fog still wins', evalRule(mix, { dark: true, ship: true, fog: false }) === true);
+  check('mixed: nothing → false', evalRule(mix, { dark: false, ship: false, fog: false }) === false);
+
+  check('an empty rule leaves the lamp dark', evalRule([], { dark: true }) === false);
+  check('evalRule is a pure function of inputs', evalRule(and, { dark: true, ship: true }) === evalRule(and, { dark: true, ship: true }));
+
+  // runLighthouse over a truth table
+  const rL = runLighthouse(GW_NIGHT_LIGHT.canonical, GW_NIGHT_LIGHT.scenarios);
+  check('night-light canonical lights every sky right', rL.allCorrect && rL.wrongCount === 0);
+  check('runLighthouse produces one lamp per sky', rL.lamps.length === GW_NIGHT_LIGHT.scenarios.length);
+  check('runLighthouse ends with done', rL.events[rL.events.length - 1].type === 'done');
+  check('runLighthouse is deterministic', JSON.stringify(runLighthouse(GW_NIGHT_LIGHT.canonical, GW_NIGHT_LIGHT.scenarios)) === JSON.stringify(rL));
+
+  // a plausible-but-wrong rule fails the truth table (the whole lesson)
+  const orInstead = runLighthouse(P('llIfDark', 'llOr', 'llIfShip'), GW_NIGHT_LIGHT.scenarios);
+  check('OR where AND is needed fails some skies', !orInstead.allCorrect);
+  check('the miss report names a wrong sky', lighthouseMisses(P('llIfDark', 'llOr', 'llIfShip'), GW_NIGHT_LIGHT.scenarios).length >= 1);
+  check('a single condition is not enough for AND', !runLighthouse(P('llIfDark'), GW_NIGHT_LIGHT.scenarios).allCorrect);
+
+  // storm-watch OR level
+  check('storm-watch canonical solves it', runLighthouse(GW_STORM_WATCH.canonical, GW_STORM_WATCH.scenarios).allCorrect);
+  check('AND where OR is needed fails storm-watch', !runLighthouse(P('llIfFog', 'llIfStorm'), GW_STORM_WATCH.scenarios).allCorrect);
+
+  // creative "other way round" — reversed order also solves, and differs
+  for (const l of GEARWORKS_LIGHTHOUSE_LEVELS) {
+    check(`${l.id} validates`, validateLighthouseLevel(l).length === 0);
+    const alt = altOrderSolution(l);
+    check(`${l.id} reversed order still solves`, runLighthouse(alt, l.scenarios).allCorrect);
+    check(`${l.id} reversed order actually differs`, condOrder(alt).join() !== condOrder(l.canonical).join());
+  }
+
+  // star tiers
+  check('no solution earns no stars', lighthouseStars(GW_NIGHT_LIGHT, P('llIfDark'), false, false) === 0);
+  check('solved over par earns just works', lighthouseStars(GW_NIGHT_LIGHT, GW_NIGHT_LIGHT.canonical, false, false) === 1);
+  check('solved at par earns works + clever', lighthouseStars(GW_NIGHT_LIGHT, GW_NIGHT_LIGHT.canonical, true, false) === 2);
+  check('solved both ways earns all three', lighthouseStars(GW_NIGHT_LIGHT, GW_NIGHT_LIGHT.canonical, true, true) === 3);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

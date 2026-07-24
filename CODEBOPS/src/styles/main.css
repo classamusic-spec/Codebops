@@ -1946,3 +1946,58 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .seq-beam { margin-left: clamp(64px, 20vw, 94px); }
   .bop-btn.seq-bop { height: 50px; font-size: 18px; }
 }
+
+/* ============================================================
+   Phase 14 — Lighthouse Logic sky board (the truth table)
+   ============================================================ */
+.gw-sky-board {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: calc(max(8px, var(--sat)) + 118px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, rgba(20,28,74,.92), rgba(13,20,55,.92));
+  border: 3px solid rgba(255,255,255,.14); border-radius: var(--r-lg);
+  padding: 8px 14px 10px; box-shadow: var(--shadow-card); z-index: 20;
+}
+.sky-title {
+  font-family: var(--font-display); font-weight: 800; font-size: 11px;
+  letter-spacing: 2px; color: #9fb0ff;
+}
+.sky-row { display: flex; gap: 8px; }
+.sky-chip {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: clamp(64px, 8vw, 92px); padding: 8px 6px 6px;
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.14);
+  border-radius: 14px; transition: transform .16s var(--ease-bounce), border-color .16s, background .16s;
+}
+.sky-chip.active { border-color: var(--yellow); background: rgba(255,210,62,.12); transform: translateY(-4px) scale(1.05); }
+.sky-emoji { font-size: clamp(22px, 2.6vw, 30px); line-height: 1; }
+.sky-label {
+  font-family: var(--font-display); font-weight: 700; font-size: 10.5px;
+  color: #dfe6ff; text-align: center; line-height: 1.1;
+}
+.sky-lamp {
+  width: 14px; height: 14px; border-radius: 50%; margin-top: 2px;
+  background: #2a3157; border: 2px solid rgba(255,255,255,.2);
+  transition: background .2s, box-shadow .2s;
+}
+.sky-chip.lit .sky-lamp { background: #ffe27a; box-shadow: 0 0 12px #ffd84a, inset 0 0 4px #fff; border-color: #fff; }
+/* a faint ring shows what the answer SHOULD be */
+.sky-chip[data-want="on"] .sky-lamp { outline: 2px dashed rgba(255,226,122,.5); outline-offset: 2px; }
+.sky-mark {
+  position: absolute; top: -8px; right: -6px;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 900; font-size: 14px; color: #fff;
+  opacity: 0; transform: scale(.4); transition: opacity .2s, transform .2s var(--ease-bounce);
+}
+.sky-chip.pass .sky-mark { opacity: 1; transform: scale(1); background: var(--green); box-shadow: 0 2px 0 var(--green-deep); }
+.sky-chip.fail .sky-mark { opacity: 1; transform: scale(1); background: #ff5a6a; box-shadow: 0 2px 0 #b32d3d; }
+
+@media (max-width: 900px) {
+  .gw-sky-board { top: calc(max(8px, var(--sat)) + 108px); padding: 6px 10px 8px; }
+  .sky-chip { width: clamp(52px, 15vw, 72px); }
+  .sky-label { font-size: 9.5px; }
+}
+@media (max-width: 700px) {
+  .gw-sky-board { left: max(8px, var(--sal)); transform: none; }
+  .sky-label { display: none; }
+}
