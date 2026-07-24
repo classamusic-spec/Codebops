@@ -28,13 +28,29 @@ export interface SpriteCharacterOptions {
 
 const svgCache = new Map<string, Promise<string>>();
 
+/**
+ * The exported art all uses generic `.cls-0`, `.cls-1`, … class names with
+ * per-file colours. We inline several of these SVGs into ONE document
+ * (Zip, GlitchBop, the logo), so their <style> blocks would collide and
+ * the last one loaded would repaint every other mascot. Scope each file's
+ * classes to itself before inlining.
+ */
+function scopeSvgClasses(text: string, url: string): string {
+  if (!text.includes('.cls-')) return text;
+  const tag = `s${Math.abs([...url].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)).toString(36)}`;
+  return text
+    .replace(/\.cls-(\d+)/g, (_m, n) => `.${tag}-cls${n}`)
+    .replace(/class="([^"]*)"/g, (_m, list: string) =>
+      `class="${list.split(/\s+/).map((c) => (/^cls-\d+$/.test(c) ? `${tag}-cls${c.slice(4)}` : c)).join(' ')}"`);
+}
+
 export function loadSvg(url: string): Promise<string> {
   let p = svgCache.get(url);
   if (!p) {
     p = fetch(url).then((r) => {
       if (!r.ok) throw new Error(`[CodeBops] Failed to load ${url}`);
       return r.text();
-    });
+    }).then((text) => scopeSvgClasses(text, url));
     svgCache.set(url, p);
   }
   return p;
