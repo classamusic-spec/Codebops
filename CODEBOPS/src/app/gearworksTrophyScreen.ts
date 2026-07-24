@@ -14,6 +14,9 @@ import { GEARWORKS_CONCEPTS, conceptProgress, garageTotals } from '../data/gearw
 
 export class GearworksTrophyScreen {
   private stops: Array<() => void> = [];
+  private timers: number[] = [];
+  /** The mascot SVG loads async — if we're gone by then, don't start it. */
+  private disposed = false;
 
   constructor(
     private readonly root: HTMLElement,
@@ -51,13 +54,17 @@ export class GearworksTrophyScreen {
       const dip = el('div', 'gw-tr-diploma', screen);
       const mascot = el('div', 'gw-tr-dip-mascot', dip);
       void inlineSvgInto(mascot, './art/characters/zip/zip.svg').then((svg) => {
-        if (svg) this.stops.push(startMascotLife(svg));
+        if (!svg) return;
+        // Navigating away mid-load must not start (or orphan) the
+        // self-re-arming blink/glance timers.
+        if (this.disposed) return;
+        this.stops.push(startMascotLife(svg));
       });
       const dtext = el('div', 'gw-tr-dip-text', dip);
       el('div', 'gw-tr-dip-kicker', dtext, 'GEARWORKS GARAGE');
       el('div', 'gw-tr-dip-title', dtext, 'Master Inventor Diploma');
       el('div', 'gw-tr-dip-sub', dtext, 'Every machine mastered — you can code! 🎉');
-      window.setTimeout(() => spawnConfetti(screen), 300);
+      this.timers.push(window.setTimeout(() => spawnConfetti(screen), 300));
       sharedSfx.play('celebrate');
     } else {
       const nudge = el('div', 'gw-tr-nudge', screen);
@@ -83,6 +90,9 @@ export class GearworksTrophyScreen {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.timers.forEach((t) => window.clearTimeout(t));
+    this.timers = [];
     this.stops.forEach((s) => s());
     this.stops = [];
     this.root.classList.remove('gw-trophy-screen');
