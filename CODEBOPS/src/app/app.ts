@@ -66,29 +66,16 @@ export class App {
   }
 
   start(): void {
-    this.buildRotateNudge();
     this.showTitle();
   }
 
   /**
-   * The play screens are designed landscape — a phone held upright leaves
-   * the machine squeezed into a thin band. Menus are fine either way, so
-   * this only appears (via `body.needs-landscape`) on gameplay screens.
+   * Marks that a PLAY screen is active (as opposed to a menu). Both
+   * orientations are fully supported — this only lets the CSS give the
+   * deck and panels a tighter, portrait-friendly shape while playing.
    */
-  private buildRotateNudge(): void {
-    if (document.querySelector('.rotate-nudge')) return;
-    const n = el('div', 'rotate-nudge', document.body);
-    n.setAttribute('role', 'alertdialog');
-    n.setAttribute('aria-label', 'Turn your phone sideways to play');
-    const card = el('div', 'rn-card', n);
-    el('div', 'rn-phone', card, '📱');
-    el('div', 'rn-title', card, 'Turn your phone sideways!');
-    el('div', 'rn-sub', card, 'The workshop is much bigger this way 🔧');
-  }
-
-  /** Gameplay screens want landscape; menus do not. */
   private setNeedsLandscape(on: boolean): void {
-    document.body.classList.toggle('needs-landscape', on);
+    document.body.classList.toggle('playing', on);
   }
 
   private clearHost(): void {

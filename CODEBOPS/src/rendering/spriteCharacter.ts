@@ -137,7 +137,38 @@ export function rigMascotParts(svg: SVGSVGElement): void {
       p.el.classList.add('cb-glitch-bit');
     }
   }
+
+  // The art has no star-eye artwork, so build it: drop a star over each
+  // pupil, hidden until the mascot is excited.
+  addStarEyes(parts.filter((p) => p.el.classList.contains('cb-pupil')));
   svg.dataset.cbRigged = '1';
+}
+
+/** Five-pointed star path centred on (cx, cy). */
+function starPath(cx: number, cy: number, r: number): string {
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 === 0 ? r : r * 0.44;
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    pts.push(`${(cx + Math.cos(a) * rad).toFixed(2)},${(cy + Math.sin(a) * rad).toFixed(2)}`);
+  }
+  return `M${pts.join('L')}Z`;
+}
+
+function addStarEyes(pupils: Array<{ el: SVGGraphicsElement }>): void {
+  const NS = 'http://www.w3.org/2000/svg';
+  for (const p of pupils) {
+    let bb: DOMRect;
+    try { bb = p.el.getBBox(); } catch { continue; }
+    const star = document.createElementNS(NS, 'path');
+    star.setAttribute('d', starPath(bb.x + bb.width / 2, bb.y + bb.height / 2, Math.max(bb.width, bb.height) * 0.62));
+    star.setAttribute('fill', '#FFD23E');
+    star.setAttribute('stroke', '#FF9E1B');
+    star.setAttribute('stroke-width', String(Math.max(0.6, bb.width * 0.07)));
+    star.setAttribute('stroke-linejoin', 'round');
+    star.setAttribute('class', 'cb-star');
+    p.el.parentNode?.insertBefore(star, p.el.nextSibling);
+  }
 }
 
 /**
@@ -325,11 +356,21 @@ export class SpriteCharacter {
     this.moodTimer = window.setTimeout(() => this.setMood('idle'), ms);
   }
 
+  /** One blink — and now and then a quick double, which reads as alive. */
   private blink(): void {
     const s = this.svg;
     if (!s || this.calm) return;
-    s.classList.add('blink');
-    window.setTimeout(() => s.classList.remove('blink'), 150);
+    const once = (delay: number): void => {
+      window.setTimeout(() => {
+        if (!this.svg) return;
+        s.classList.remove('blink');
+        void s.getBoundingClientRect();     // restart the keyframe
+        s.classList.add('blink');
+        window.setTimeout(() => s.classList.remove('blink'), 200);
+      }, delay);
+    };
+    once(0);
+    if (Math.random() < 0.3) once(280);
   }
 
   /** Per-frame: project the 3D anchor to screen + idle life. */

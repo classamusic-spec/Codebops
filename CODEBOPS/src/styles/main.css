@@ -166,19 +166,38 @@ button { font-family: inherit; border: 0; cursor: pointer; }
   bottom: max(10px, var(--sab));
   display: flex; align-items: stretch; gap: 14px;
 }
+/**
+ * The plan reads top-down: the program slots sit ABOVE the tile choices,
+ * so a child builds into the row they can already see rather than across
+ * a divider. Same shape on every screen size.
+ */
 .deck-panel {
-  flex: 1 1 0; display: flex; align-items: center; gap: 10px;
+  flex: 1 1 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px;
   background: linear-gradient(180deg, #202f77 0%, var(--ink-800) 70%);
   border: 3px solid rgba(255,255,255,.14);
   border-radius: var(--r-xl);
-  padding: 10px 14px;
+  padding: 10px 14px 12px;
   box-shadow: 0 6px 0 var(--ink-line), var(--shadow-card);
-  min-height: 96px;
+  min-height: 0;
   min-width: 0;
 }
-.deck-tray { display: flex; gap: 8px; }
-.deck-divider { width: 3px; border-radius: 3px; background: rgba(255,255,255,.14); }
-.deck-sequence { display: flex; gap: 8px; flex: 1; min-width: 0; overflow: visible; justify-content: center; }
+.deck-tray {
+  order: 2; display: flex; gap: 8px; flex-wrap: wrap;
+  justify-content: center; padding-top: 2px;
+}
+.deck-divider { display: none; }
+.deck-sequence {
+  order: 1; display: flex; gap: 8px; min-width: 0;
+  justify-content: center; align-items: center;
+  padding: 10px 4px 2px;
+  overflow-x: auto; overflow-y: visible;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.deck-sequence::-webkit-scrollbar { display: none; }
+/* a soft well behind the slots so the two rows read as separate jobs */
+.deck-sequence::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+}
 
 /* Command tiles — chunky colored buttons */
 .tile {
@@ -186,14 +205,20 @@ button { font-family: inherit; border: 0; cursor: pointer; }
   width: clamp(64px, 6.4vw, 92px); height: clamp(64px, 6.4vw, 92px);
   border-radius: var(--r-md);
   border: 0; padding: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 3px 2px 4px; overflow: hidden;
   color: var(--white); font-weight: 900;
   box-shadow: 0 5px 0 var(--tile-deep), 0 10px 18px rgba(13,20,55,.35);
   transition: transform var(--dur-fast) var(--ease-bounce), box-shadow var(--dur-fast), filter var(--dur-fast);
   touch-action: none;
 }
-.tile .ico { font-size: clamp(26px, 2.8vw, 38px); line-height: 1; filter: drop-shadow(0 2px 0 rgba(13,20,55,.3)); }
-.tile .lbl { font-size: clamp(9px, 1vw, 12px); letter-spacing: .4px; text-transform: uppercase; opacity: .95; }
+/* Icon + label must BOTH fit the square — two-word labels like
+   "MOVE DOWN" wrap, so keep the type tight and clip nothing. */
+.tile .ico { font-size: clamp(21px, 2.3vw, 32px); line-height: 1; filter: drop-shadow(0 2px 0 rgba(13,20,55,.3)); }
+.tile .lbl {
+  font-size: clamp(7.5px, .82vw, 10.5px); line-height: 1.03; letter-spacing: .2px;
+  text-transform: uppercase; opacity: .95; max-width: 100%; text-align: center;
+}
 .tile:active { transform: translateY(4px) scale(.97); box-shadow: 0 1px 0 var(--tile-deep); }
 .tile[data-cmd="move"],
 .tile[data-cmd="moveUp"],
@@ -379,41 +404,6 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 }
 
 /* ============================================================
-   Rotate-to-play nudge (gameplay screens only, portrait phones)
-   ============================================================ */
-.rotate-nudge { display: none; }
-body.needs-landscape .rotate-nudge {
-  position: fixed; inset: 0; z-index: 400;
-  display: none; place-items: center;
-  background: radial-gradient(120% 90% at 50% 20%, #2a2158 0%, #12102e 75%);
-  padding: 24px;
-}
-@media (orientation: portrait) and (max-width: 950px) {
-  body.needs-landscape .rotate-nudge { display: grid; }
-  /* The play screen keeps running underneath — just don't let it scroll. */
-  body.needs-landscape { overflow: hidden; }
-}
-.rn-card {
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-  text-align: center; max-width: 320px;
-}
-.rn-phone {
-  font-size: 76px; line-height: 1;
-  animation: rnTilt 2.2s var(--ease-bounce) infinite;
-  filter: drop-shadow(0 8px 18px rgba(0,0,0,.45));
-}
-@keyframes rnTilt {
-  0%, 45% { transform: rotate(0deg); }
-  60%, 90% { transform: rotate(-90deg); }
-  100% { transform: rotate(0deg); }
-}
-.rn-title {
-  font-family: var(--font-display); font-weight: 800; color: #fff;
-  font-size: clamp(20px, 5.6vw, 28px); line-height: 1.2;
-}
-.rn-sub { color: #c7b3ff; font-weight: 700; font-size: clamp(13px, 3.6vw, 16px); }
-
-/* ============================================================
    Responsive landscape tuning
    ============================================================ */
 @media (max-aspect-ratio: 1/1) {
@@ -485,9 +475,47 @@ svg .cb-ear, svg .cb-crest, svg .cb-glitch-bit {
   transform-origin: 50% 50%;
 }
 
-/* --- blink: the eyes squash shut, shines go with them --- */
-svg .cb-eye, svg .cb-shine { transition: transform .09s ease; }
-svg.blink .cb-eye, svg.blink .cb-shine { transform: scaleY(.08); }
+/* --- blink: a real close-hold-open, not a linear fade --- */
+@keyframes cb-blink {
+  0%, 100% { transform: scaleY(1); }
+  35%, 62% { transform: scaleY(.06); }
+}
+svg.blink .cb-eye, svg.blink .cb-shine, svg.blink .cb-star {
+  animation: cb-blink .19s ease-in-out;
+}
+
+/* --- star eyes: injected over each pupil, revealed when excited --- */
+svg .cb-star {
+  opacity: 0; pointer-events: none;
+  transform-box: fill-box; transform-origin: 50% 50%;
+  transform: scale(.2) rotate(-45deg);
+  transition: opacity .16s ease, transform .34s var(--ease-bounce);
+}
+svg.excited .cb-star {
+  opacity: 1;
+  animation: cb-star-twinkle 1.3s ease-in-out infinite;
+}
+@keyframes cb-star-twinkle {
+  0%, 100% { transform: scale(1) rotate(-9deg); }
+  50% { transform: scale(1.16) rotate(9deg); }
+}
+/* the pupil steps aside so the star reads cleanly */
+svg.excited .cb-pupil { opacity: 0; }
+
+/* --- thinking: heavy lids and a slow ponder sway --- */
+svg.thinking .cb-eye { transform: scaleY(.5); }
+@keyframes cb-ponder { 0%, 100% { transform: rotate(-3.5deg); } 50% { transform: rotate(3.5deg); } }
+.char-sprite.mood-thinking svg { transform-origin: 50% 88%; animation: cb-ponder 2.5s ease-in-out infinite; }
+
+/* --- happy: a couple of pleased nods --- */
+@keyframes cb-nod {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4%) rotate(2.5deg); }
+}
+.char-sprite.mood-happy svg { transform-origin: 50% 88%; animation: cb-nod 1.15s ease-in-out 2; }
+
+/* --- surprised: eyes go wide --- */
+svg.surprised .cb-eye { transform: scale(1.16); }
 
 /* --- glances: only the pupils + shine slide, whites stay put --- */
 svg .cb-pupil, svg .cb-shine { transition: transform .22s var(--ease-bounce); }
@@ -592,6 +620,24 @@ svg .cb-glitch-bit { animation: cb-glitch-bit 3.6s steps(1, end) infinite; }
   80% { transform: translateX(-3px) rotate(-1deg) }
 }
 .char-sprite.celebrate svg { animation: sprite-cele .8s var(--ease-bounce) 2; }
+
+/* --- GLITCH: the head shakes it off with eyes screwed shut.
+       Declared after the action animations so it always wins. --- */
+@keyframes cb-glitch-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  15% { transform: translateX(-5%) rotate(-5deg); }
+  35% { transform: translateX(5%) rotate(4deg); }
+  55% { transform: translateX(-4%) rotate(-3deg); }
+  75% { transform: translateX(3%) rotate(3deg); }
+}
+.char-sprite.glitching svg {
+  transform-origin: 50% 88%;
+  animation: cb-glitch-shake .3s linear infinite;
+}
+.char-sprite.glitching .cb-eye,
+.char-sprite.glitching .cb-shine,
+.char-sprite.glitching .cb-star { transform: scaleY(.1); animation: none; }
+.char-sprite.glitching .cb-mouth { transform: scale(.85, .7); }
 @keyframes sprite-cele {
   0%, 100% { transform: translateY(0) scale(1) }
   40% { transform: translateY(-13%) scale(1.05, 1.08) }
@@ -800,7 +846,7 @@ body.left-handed .deck-tools { right: auto; left: 6px; }
   .deck-sequence::-webkit-scrollbar { display: none; }
   .tile, .slot, .drag-ghost { width: 54px; height: 54px; flex: 0 0 auto; border-radius: 14px; }
   .tile .ico { font-size: 21px; }
-  .tile .cmd-ico { width: 30px; height: 30px; }
+  .tile .cmd-ico { width: 26px; height: 26px; }
   .tile .lbl { font-size: 8px; }
   .slot .num { width: 19px; height: 19px; font-size: 10.5px; top: -8px; left: -5px; box-shadow: 0 2px 0 #1c55ab; }
   .slot .count-badge { width: 24px; height: 24px; font-size: 11px; top: -9px; right: -7px; }
@@ -1624,7 +1670,9 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 
 .tile .ico { position: relative; z-index: 3; display: grid; place-items: center; }
 .cmd-ico {
-  width: clamp(30px, 3.2vw, 46px); height: clamp(30px, 3.2vw, 46px);
+  /* Sized to leave room for a TWO-LINE label ("MOVE DOWN") in the same
+     square — the icon used to win and the caption got clipped. */
+  width: clamp(23px, 2.5vw, 34px); height: clamp(23px, 2.5vw, 34px);
   color: #fff;
   filter: drop-shadow(0 2px 0 rgba(13,20,55,.34)) drop-shadow(0 1px 3px rgba(13,20,55,.3));
 }
@@ -2350,13 +2398,9 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 @media (max-height: 540px) and (orientation: landscape) {
   /* --- command tiles: labels must never clip --- */
   .tile, .slot, .drag-ghost { width: 52px; height: 52px; border-radius: 13px; }
-  .tile { overflow: hidden; gap: 0; padding: 3px 2px; }
-  .tile .ico { font-size: 18px; }
-  .tile .cmd-ico { width: 25px; height: 25px; }
-  .tile .lbl {
-    font-size: 7px; line-height: 1.05; letter-spacing: 0;
-    max-width: 100%; word-break: break-word; hyphens: none;
-  }
+  .tile .ico { font-size: 17px; }
+  .tile .cmd-ico { width: 24px; height: 24px; }
+  .tile .lbl { font-size: 7px; }
 
   /* --- goal card: a slim chip, not a poster --- */
   .goal-card { max-width: 210px; padding: 6px 10px 6px 7px; gap: 6px; border-width: 2px; }
@@ -2396,4 +2440,54 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .bop-btn { height: 54px; font-size: 18px; padding: 0 18px; }
   .bop-btn .tri { border-left-width: 13px; border-top-width: 9px; border-bottom-width: 9px; }
   .gw-jobcard, .gw-gadget { transform: scale(.82); transform-origin: left top; }
+}
+
+/* ============================================================
+   Portrait play — upright is a first-class way to hold the phone.
+   The slots-above-tiles deck stacks naturally, so the job here is
+   to keep the chrome slim and let the camera (which frames into
+   whatever space is left) hand the rest to the toy.
+   ============================================================ */
+@media (orientation: portrait) and (max-width: 820px) {
+  body.playing .goal-card {
+    top: calc(max(8px, var(--sat)) + 48px); left: max(8px, var(--sal));
+    transform: none; width: auto; max-width: min(58vw, 300px);
+    flex-direction: row; align-items: center; gap: 8px;
+    padding: 7px 11px 7px 8px; border-width: 3px; border-radius: 16px;
+  }
+  body.playing .goal-card .goal-flag { font-size: 9.5px; padding: 2px 10px; top: -10px; left: 11px; transform: none; }
+  body.playing .goal-text { font-size: 11.5px; text-align: left; line-height: 1.2; }
+  body.playing .goal-visual { font-size: 20px; } 
+  body.playing .goal-visual img { height: 24px; }
+
+  /* Think Trail: a slim rail on the right, never over the toy */
+  body.playing .gw-trail {
+    top: calc(max(8px, var(--sat)) + 48px); bottom: auto;
+    right: max(8px, var(--sar)); width: 34vw; max-width: 168px; padding: 12px 8px 8px;
+  }
+  body.playing .gw-trail-list { max-height: 22vh; }
+  body.playing .gw-trail-step { font-size: 10.5px; padding: 5px 6px; }
+  body.playing .gw-machine-line { font-size: 11px; padding: 6px 7px; }
+
+  /* concept boards tuck under the bar, centred */
+  body.playing .gw-sky-board, body.playing .gw-queue-strip,
+  body.playing .gw-state-map, body.playing .gw-paint-board {
+    top: auto; bottom: calc(var(--deck-h, 190px) + 8px);
+    left: 50%; transform: translateX(-50%);
+  }
+
+  /* the deck: slots + tiles get the full width, BOP becomes a big
+     thumb-friendly bar underneath instead of stealing a third of the row */
+  .bottom-deck { flex-direction: column; align-items: stretch; gap: 7px; }
+  /* the panel sizes to its content in a column — `flex:1 1 0` would
+     collapse it to zero height and hide the tiles entirely */
+  .deck-panel { flex: 0 0 auto; }
+  .bop-wrap { width: 100%; }
+  .bop-btn { width: 100%; }
+  .deck-panel { padding: 8px 10px 10px; gap: 5px; }
+  .tile, .slot, .drag-ghost { width: clamp(44px, 11.6vw, 54px); height: clamp(44px, 11.6vw, 54px); }
+  .deck-tray { gap: 6px; }
+  .deck-sequence { gap: 6px; justify-content: flex-start; }
+  .bop-btn { height: auto; min-height: 60px; font-size: 21px; padding: 0 14px; }
+  .bop-wrap { flex: 0 0 auto; }
 }
