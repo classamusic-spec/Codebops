@@ -333,9 +333,10 @@ export function gwEntryId(entry: GearworksLevelEntry): string {
 
 export type GearworksPickerEntry =
   | GearworksLevelEntry
-  | { readonly kind: 'soon'; readonly id: string; readonly shortTitle: string; readonly emoji: string };
+  | { readonly kind: 'soon'; readonly id: string; readonly shortTitle: string; readonly emoji: string }
+  | { readonly kind: 'trophy'; readonly id: string; readonly shortTitle: string; readonly emoji: string };
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-more-soon', shortTitle: 'More Soon!', emoji: '✨' },
+  { kind: 'trophy', id: 'gw-trophy-room', shortTitle: 'Inventor\'s Trophies', emoji: '🏆' },
 ];

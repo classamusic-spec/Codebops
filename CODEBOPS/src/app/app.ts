@@ -26,6 +26,8 @@ import { GearworksPaintScreen } from './gearworksPaintScreen';
 import { GearworksStoryScreen } from './gearworksStoryScreen';
 import { GearworksMakerScreen } from './gearworksMakerScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
+import { garageTotals } from '../data/gearworks/progress';
+import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
@@ -53,6 +55,7 @@ export class App {
   private readonly host: HTMLElement;
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
+  private trophy: GearworksTrophyScreen | null = null;
   private editor: EditorScreen | null = null;
   private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | GearworksMakerScreen | null = null;
   private store = new SaveStore();
@@ -73,6 +76,8 @@ export class App {
     this.gameScreen = null;
     this.garden?.dispose();
     this.garden = null;
+    this.trophy?.dispose();
+    this.trophy = null;
     this.editor?.dispose();
     this.editor = null;
     this.gearworks?.dispose();
@@ -273,6 +278,24 @@ export class App {
       const list = el('div', 'level-list', section);
       let seqIdx = 0;
       GEARWORKS_PICKER.forEach((entry, i) => {
+        // The Trophy Room is a special always-open golden capstone row.
+        if (entry.kind === 'trophy') {
+          const totals = garageTotals(this.store.stars);
+          const row = el('button', `level-item gw-trophy-row${totals.allComplete ? ' complete' : ''}`, list) as HTMLButtonElement;
+          row.type = 'button';
+          row.setAttribute('aria-label', 'Open the Inventor\'s Trophy Room');
+          const num = el('span', 'li-num gw-num', row);
+          el('span', 'li-num-text', num, String(i + 1));
+          el('span', 'li-leaf', num, '🏆');
+          el('span', 'li-emoji', row, entry.emoji);
+          el('span', 'li-name', row, entry.shortTitle);
+          const right = el('span', 'li-right', row);
+          const pill = el('span', 'stars-pill gw-trophy-pill', right);
+          el('span', 'star earned', pill, '★');
+          el('span', undefined, pill, ` ${totals.earned}/${totals.total}`);
+          row.addEventListener('click', () => { sharedSfx.play('bop'); this.showGearworksTrophy(); });
+          return;
+        }
         const playable = entry.kind !== 'soon';
         const thisSeqIdx = seqIdx;
         // Playable levels unlock in order (first is always open).
@@ -429,6 +452,19 @@ export class App {
                                   ? new GearworksStoryScreen(screen, entry.level, events)
                                   : new GearworksMakerScreen(screen, entry.level, events);
     this.gearworks.enter();
+  }
+
+  // ---------- gearworks trophy room ----------
+
+  private showGearworksTrophy(): void {
+    this.clearHost();
+    this.store = new SaveStore(); // read the latest stars
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-gw-trophy';
+    this.trophy = new GearworksTrophyScreen(screen, this.store, {
+      onBack: () => this.showSelect(),
+    });
+    this.trophy.enter();
   }
 
   // ---------- garden ----------

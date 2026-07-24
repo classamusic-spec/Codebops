@@ -152,6 +152,10 @@ import {
   validateMakerLevel, makerGoalOf, makerParamBody, makerFixedBody,
   makerCalls, makerStars,
 } from '../src/data/gearworks/levels';
+import { GEARWORKS_SEQUENCE } from '../src/data/gearworks/world';
+import {
+  GEARWORKS_CONCEPTS, conceptLevels, conceptProgress, garageTotals, nextConcept, diplomaEarned,
+} from '../src/data/gearworks/progress';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -366,7 +370,7 @@ const MUSH_RULE = { trigger: 'mushroom', action: 'grab' } as const;
 // --- Gearworks Garage: world + camera ---
 {
   check('gearworks world id registered', GEARWORKS_WORLD.id === 'gearworks-garage');
-  const ids = new Set(GEARWORKS_PICKER.map((e) => (e.kind === 'soon' ? e.id : e.level.id)));
+  const ids = new Set(GEARWORKS_PICKER.map((e) => (e.kind === 'soon' || e.kind === 'trophy' ? e.id : e.level.id)));
   check('gearworks picker ids unique', ids.size === GEARWORKS_PICKER.length);
   check('gearworks picker leads with machine levels', GEARWORKS_PICKER[0].kind === 'machine');
   check('every gearworks command has a tile', GEARWORKS_MACHINE_LEVELS
@@ -1299,6 +1303,53 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     check(`${l.id} validates`, validateMakerLevel(l).length === 0);
     check(`${l.id} parameterized gadget builds the skyline`, runMaker(makerParamBody(), makerCalls(l), makerGoalOf(l)).match);
   }
+}
+
+// --- Gearworks Inventor's Trophy Room (Phase 19) ---
+{
+  const GC = GEARWORKS_CONCEPTS;
+  const SEQ = GEARWORKS_SEQUENCE;
+
+  // every concept maps to at least one real level, and every level maps to exactly one concept
+  check('every concept has at least one level', GC.every((c) => conceptLevels(c).length >= 1));
+  const kindsCovered = new Set(GC.flatMap((c) => c.kinds));
+  check('every level kind is covered by a concept', SEQ.every((e) => kindsCovered.has(e.kind)));
+  const totalMapped = GC.reduce((n, c) => n + conceptLevels(c).length, 0);
+  check('concepts partition the whole sequence', totalMapped === SEQ.length);
+  check('concept ids are unique', new Set(GC.map((c) => c.id)).size === GC.length);
+
+  // an empty save → nothing started, nothing mastered
+  const empty: Record<string, number> = {};
+  const t0 = garageTotals(empty);
+  check('an empty save has zero earned stars', t0.earned === 0);
+  check('an empty save has the full possible total', t0.total === SEQ.length * 3);
+  check('an empty save masters no concept', t0.conceptsComplete === 0 && !t0.allComplete);
+  check('an empty save starts no concept', t0.conceptsStarted === 0);
+  check('nextConcept on an empty save is the first concept', nextConcept(empty)?.id === GC[0].id);
+  check('no diploma on an empty save', !diplomaEarned(empty));
+
+  // a partial save: master exactly the first concept
+  const partial: Record<string, number> = {};
+  for (const e of conceptLevels(GC[0])) partial[e.level.id] = 3;
+  const tp = conceptProgress(GC[0], partial);
+  check('a fully-3-starred concept is complete', tp.complete && tp.earned === tp.total);
+  check('mastering the first concept still leaves the garage incomplete', !garageTotals(partial).allComplete);
+  check('nextConcept skips the mastered first concept', nextConcept(partial)?.id === GC[1].id);
+  check('one star short is not complete', conceptProgress(GC[0], { ...partial, [conceptLevels(GC[0])[0].level.id]: 2 }).complete === false);
+
+  // a full save → diploma
+  const full: Record<string, number> = {};
+  for (const e of SEQ) full[e.level.id] = 3;
+  const tf = garageTotals(full);
+  check('a full save masters every concept', tf.conceptsComplete === GC.length && tf.allComplete);
+  check('a full save earns the diploma', diplomaEarned(full));
+  check('nextConcept on a full save is null', nextConcept(full) === null);
+  check('garage earned never exceeds total', tf.earned === tf.total);
+
+  // over-cap stars are clamped to 3 per level
+  const over: Record<string, number> = {};
+  for (const e of SEQ) over[e.level.id] = 9;
+  check('stars above 3 per level are clamped in totals', garageTotals(over).earned === SEQ.length * 3);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

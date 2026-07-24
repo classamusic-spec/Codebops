@@ -2134,3 +2134,95 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .calm-mode .gw-gadget.calling { animation: none; }
 /* the parameter REPEAT tile reads as an input-driven loop */
 .gw-gadget .gw-jc-tile[data-gw-tone="loop"] { outline: 3px dashed rgba(139,224,74,.55); outline-offset: -6px; }
+
+/* ============================================================
+   Phase 19 — Inventor's Trophy Room
+   ============================================================ */
+.gw-trophy-row { background: linear-gradient(180deg, #3a2f6a, #2a2350); }
+.gw-trophy-row .li-leaf { filter: none; }
+.gw-trophy-row.complete { background: linear-gradient(180deg, #6a5316, #8a6a1e); box-shadow: 0 0 18px rgba(255,207,62,.5), var(--shadow-card); }
+.gw-trophy-pill { background: linear-gradient(180deg, #ffcf3e, #f0a81e); color: #5a3d00; }
+
+.gw-trophy-screen {
+  overflow-y: auto; padding: max(14px, var(--sat)) max(14px, var(--sar)) 40px max(14px, var(--sal));
+  background: radial-gradient(120% 80% at 50% 0%, #2a2158 0%, #161033 70%);
+}
+.gw-tr-header {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.gw-tr-titles { flex: 1; min-width: 180px; }
+.gw-tr-titles h1 { font-family: var(--font-display); font-weight: 800; color: #fff; font-size: clamp(22px, 3vw, 34px); margin: 0; }
+.gw-tr-titles p { color: #c7b3ff; font-weight: 700; margin: 2px 0 0; font-size: clamp(13px, 1.5vw, 16px); }
+
+.gw-tr-ring {
+  --pct: 0;
+  width: 92px; height: 92px; border-radius: 50%; flex: 0 0 auto;
+  background: conic-gradient(#ffcf3e calc(var(--pct) * 1%), rgba(255,255,255,.12) 0);
+  display: grid; place-items: center;
+  box-shadow: 0 4px 14px rgba(13,20,55,.5);
+}
+.gw-tr-ring-in {
+  width: 76px; height: 76px; border-radius: 50%;
+  background: #201847; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+}
+.gw-tr-ring-star { color: #ffcf3e; font-size: 16px; line-height: 1; }
+.gw-tr-ring-num { color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1.1; }
+.gw-tr-ring-of { color: #9a8fd0; font-size: 11px; font-weight: 700; }
+
+.gw-tr-diploma {
+  display: flex; align-items: center; gap: 16px;
+  background: linear-gradient(180deg, #ffe9a8, #ffcf3e); color: #5a3d00;
+  border: 4px solid #fff3c4; border-radius: var(--r-xl); padding: 14px 18px; margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(255,180,40,.4);
+}
+.gw-tr-dip-mascot { width: 64px; height: 64px; flex: 0 0 auto; }
+.gw-tr-dip-mascot svg { width: 100%; height: 100%; }
+.gw-tr-dip-kicker { font-family: var(--font-display); font-weight: 800; font-size: 11px; letter-spacing: 2px; opacity: .8; }
+.gw-tr-dip-title { font-family: var(--font-display); font-weight: 800; font-size: clamp(18px, 2.4vw, 26px); }
+.gw-tr-dip-sub { font-weight: 700; font-size: 13px; }
+
+.gw-tr-nudge {
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,207,62,.4);
+  border-radius: var(--r-lg); padding: 10px 14px; margin-bottom: 16px;
+  color: #ffe9a8; font-weight: 700; font-size: clamp(12px, 1.5vw, 15px);
+}
+
+.gw-tr-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;
+}
+.gw-tr-badge {
+  position: relative; background: rgba(255,255,255,.06);
+  border: 2px solid rgba(255,255,255,.12); border-radius: var(--r-lg);
+  padding: 14px 12px 12px; text-align: center;
+  animation: trBadgeIn .4s var(--ease-bounce) backwards;
+  animation-delay: calc(var(--i) * 0.03s);
+}
+@keyframes trBadgeIn { from { opacity: 0; transform: translateY(10px) scale(.94); } }
+.gw-tr-badge.locked { opacity: .5; filter: grayscale(.6); }
+.gw-tr-badge.started { border-color: rgba(255,207,62,.35); }
+.gw-tr-badge.mastered {
+  border-color: #ffcf3e;
+  background: linear-gradient(180deg, rgba(255,207,62,.18), rgba(255,207,62,.06));
+  box-shadow: 0 0 16px rgba(255,207,62,.35);
+}
+.gw-tr-medal {
+  position: relative; width: 62px; height: 62px; margin: 0 auto 8px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.2), rgba(13,20,55,.35));
+  border: 2px solid rgba(255,255,255,.18);
+}
+.gw-tr-badge.mastered .gw-tr-medal { border-color: #ffcf3e; background: radial-gradient(circle at 50% 35%, #fff2c4, #f0a81e); }
+.gw-tr-emoji { font-size: 30px; line-height: 1; }
+.gw-tr-crown { position: absolute; top: -12px; right: -6px; font-size: 20px; }
+.gw-tr-name { font-family: var(--font-display); font-weight: 800; color: #fff; font-size: 14px; line-height: 1.15; }
+.gw-tr-blurb { color: #b9aee6; font-size: 11px; margin: 3px 0 7px; line-height: 1.25; min-height: 28px; }
+.gw-tr-pips { display: flex; justify-content: center; gap: 2px; flex-wrap: wrap; }
+.gw-tr-pips span { color: rgba(255,255,255,.2); font-size: 13px; }
+.gw-tr-pips span.on { color: #ffcf3e; }
+.gw-tr-stamp {
+  margin-top: 7px; display: inline-block;
+  font-family: var(--font-display); font-weight: 800; font-size: 10px; letter-spacing: 1.5px;
+  color: #5a3d00; background: #ffcf3e; border-radius: 999px; padding: 2px 10px;
+  transform: rotate(-3deg);
+}
