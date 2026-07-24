@@ -1736,6 +1736,46 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-jc-foot { display: none; }
 }
 
+/* Phase 10 parallel deck (two lanes, one BOP) */
+.gw-parallel .gw-lanes { display: flex; flex-direction: column; gap: 8px; }
+.gw-lane {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(20,28,74,.4); border-radius: 16px; padding: 6px 10px;
+}
+.gw-lane-packer { box-shadow: inset 4px 0 0 #2f6fe0; }
+.gw-lane-mailer { box-shadow: inset 4px 0 0 #a06bff; }
+.gw-lane-label {
+  display: flex; flex-direction: column; align-items: center; min-width: 58px; gap: 1px;
+}
+.gw-lane-icon { font-size: 22px; }
+.gw-lane-name {
+  font-family: var(--font-display); font-weight: 800; font-size: 10.5px; color: #cdd7f5; letter-spacing: .3px;
+}
+.gw-lane-body { display: flex; align-items: center; gap: 8px; flex: 1; }
+.gw-lane-tray, .gw-lane-seq { display: flex; gap: 6px; }
+.gw-lane-seq { flex: 1; }
+.gw-lane-tile { width: 50px; height: 50px; }
+.gw-lane-tile .lbl { font-size: 8px; }
+.gw-lane-tile .cmd-ico { width: 21px; height: 21px; }
+.gw-lane .slot { width: 50px; height: 50px; }
+/* signal pass: a tile pulses green when a message crosses lanes */
+.slot.sig-flash .gw-tile {
+  box-shadow: 0 0 0 3px #3ed35f, 0 0 16px #7dee8e;
+  animation: gwSigFlash .45s ease 2;
+}
+@keyframes gwSigFlash { from { transform: scale(1); } 50% { transform: scale(1.12); } to { transform: scale(1); } }
+.calm-mode .slot.sig-flash .gw-tile { animation: none; }
+@media (max-width: 900px) {
+  .gw-lane-tile, .gw-lane .slot { width: 44px; height: 44px; }
+  .gw-lane-label { min-width: 46px; }
+  .gw-lane-name { font-size: 9.5px; }
+}
+@media (max-width: 700px) {
+  .gw-lane { gap: 6px; padding: 4px 6px; }
+  .gw-lane-tile, .gw-lane .slot { width: 38px; height: 38px; }
+  .gw-lane-tile .lbl { display: none; }
+}
+
 /* Loop visualization: body tiles read as one group feeding the Repeat */
 .slot.in-loop {
   box-shadow: inset 0 0 0 3px rgba(160,107,255,.65), inset 0 2px 6px rgba(42,24,69,.25);

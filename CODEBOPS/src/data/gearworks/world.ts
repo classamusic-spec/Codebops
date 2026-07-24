@@ -9,13 +9,16 @@ import type { GtCommandId } from '../../gameplay/gearworks/sorterMachine';
 import type { GcCommandId } from '../../gameplay/gearworks/counterMachine';
 import type { GjCommandId } from '../../gameplay/gearworks/jamMachine';
 import type { JobMainId } from '../../gameplay/gearworks/jobMachine';
+import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
+  GEARWORKS_SIGNAL_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
+  GearworksSignalLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -172,6 +175,23 @@ export const GW_JOB_TILES: Readonly<Record<JobMainId, GwTileDef>> = {
   jbRepeat: { label: 'Repeat', spoken: 'Repeat the tiles before this — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
 };
 
+// ---------- Phase 10 signal-lane tiles ----------
+
+const ICON_GIFT = '<path d="M4.5 9.5 H19.5 V11.5 H4.5 Z"/><path d="M5.6 11.5 H18.4 V20 H5.6 Z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 6 C12 4 9 3.4 9 5.4 C9 7 11 8 12 9.5 C13 8 15 7 15 5.4 C15 3.4 12 4 12 6 Z"/><path d="M12 9.5 V20" stroke="currentColor" stroke-width="2.2"/>';
+const ICON_PACK = '<path d="M12 3 L20 7 V17 L12 21 L4 17 V7 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><path d="M4 7 L12 11 L20 7 M12 11 V21" fill="none" stroke="currentColor" stroke-width="2.1"/>';
+const ICON_SEND_SIG = '<circle cx="7" cy="17" r="2.2"/><path d="M6 11 A6 6 0 0 1 12 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M6 6.6 A10.4 10.4 0 0 1 16.4 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
+const ICON_WAIT_SIG = '<circle cx="17" cy="17" r="2.2"/><path d="M18 11 A6 6 0 0 0 12 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M18 6.6 A10.4 10.4 0 0 0 7.6 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="17" cy="17" r="6.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2.4" opacity="0.7"/>';
+const ICON_SHIP = '<path d="M2.6 13 H15 V18 H2.6 Z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15 14.4 H18.4 L21 17 V18 H15 Z"/><circle cx="6" cy="19.4" r="1.6"/><circle cx="16.4" cy="19.4" r="1.6"/><path d="M6.5 9.5 H12.5 M9.5 6.5 V12.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+
+export const GW_SIGNAL_TILES: Readonly<Record<SignalCommandId, GwTileDef>> = {
+  sgFetch:      { label: 'Fetch', spoken: 'Fetch a gift', tone: 'move', icon: ICON_GIFT },
+  sgPack:       { label: 'Pack', spoken: 'Pack the gift into the crate', tone: 'rotate', icon: ICON_PACK },
+  sgSendSignal: { label: 'Send Signal', spoken: 'Send a signal to the other machine', tone: 'start', icon: ICON_SEND_SIG },
+  sgWaitSignal: { label: 'Wait Signal', spoken: 'Wait until a signal arrives', tone: 'check', icon: ICON_WAIT_SIG },
+  sgSendCrate:  { label: 'Ship', spoken: 'Ship the crate to the delivery station', tone: 'stop', icon: ICON_SHIP },
+  sgRepeat:     { label: 'Repeat', spoken: 'Repeat the tiles before this — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -183,7 +203,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'sorter'; readonly level: GearworksSorterLevel }
   | { readonly kind: 'counter'; readonly level: GearworksCounterLevel }
   | { readonly kind: 'jam'; readonly level: GearworksJamLevel }
-  | { readonly kind: 'job'; readonly level: GearworksJobLevel };
+  | { readonly kind: 'job'; readonly level: GearworksJobLevel }
+  | { readonly kind: 'signal'; readonly level: GearworksSignalLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -194,6 +215,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_COUNTER_LEVELS.map((level) => ({ kind: 'counter' as const, level })),
   ...GEARWORKS_JAM_LEVELS.map((level) => ({ kind: 'jam' as const, level })),
   ...GEARWORKS_JOB_LEVELS.map((level) => ({ kind: 'job' as const, level })),
+  ...GEARWORKS_SIGNAL_LEVELS.map((level) => ({ kind: 'signal' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -207,5 +229,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-two-machine', shortTitle: 'Team Machines', emoji: '🤝' },
+  { kind: 'soon', id: 'gw-broken-machine', shortTitle: 'Broken Machine', emoji: '🔧' },
 ];

@@ -17,6 +17,7 @@ import { GearworksSorterScreen } from './gearworksSorterScreen';
 import { GearworksCounterScreen } from './gearworksCounterScreen';
 import { GearworksJamScreen } from './gearworksJamScreen';
 import { GearworksJobScreen } from './gearworksJobScreen';
+import { GearworksSignalScreen } from './gearworksSignalScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
@@ -46,7 +47,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
-  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | null = null;
+  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -403,7 +404,9 @@ export class App {
                 ? new GearworksCounterScreen(screen, entry.level, events)
                 : entry.kind === 'jam'
                   ? new GearworksJamScreen(screen, entry.level, events)
-                  : new GearworksJobScreen(screen, entry.level, events);
+                  : entry.kind === 'job'
+                    ? new GearworksJobScreen(screen, entry.level, events)
+                    : new GearworksSignalScreen(screen, entry.level, events);
     this.gearworks.enter();
   }
 

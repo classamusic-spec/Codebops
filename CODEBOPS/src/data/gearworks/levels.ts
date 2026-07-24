@@ -20,6 +20,8 @@ import type { GjCommandId, GjStep, JamGoal } from '../../gameplay/gearworks/jamM
 import { runJam, jamGoalMet } from '../../gameplay/gearworks/jamMachine';
 import type { JobPrimId, JobMainId, JobStep, JobGoal } from '../../gameplay/gearworks/jobMachine';
 import { runJobProgram } from '../../gameplay/gearworks/jobMachine';
+import type { SignalCommandId, SignalStep, SignalGoal } from '../../gameplay/gearworks/signalMachine';
+import { runParallel } from '../../gameplay/gearworks/signalMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -976,5 +978,108 @@ export function assertJobLevelValid(level: GearworksJobLevel): void {
   const errors = validateJobLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Job level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 10 — signals and parallelism: Two-Machine Teamwork
+// ==================================================================
+
+export interface GearworksSignalLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly lanes: {
+    readonly packer: { readonly name: string; readonly icon: string; readonly commands: readonly SignalCommandId[]; readonly maxSlots: number };
+    readonly mailer: { readonly name: string; readonly icon: string; readonly commands: readonly SignalCommandId[]; readonly maxSlots: number };
+  };
+  readonly target: number;
+  readonly coachHint: string;
+}
+
+const gFetch: SignalStep = { cmd: 'sgFetch' };
+const gPack: SignalStep = { cmd: 'sgPack' };
+const gSend: SignalStep = { cmd: 'sgSendSignal' };
+const gWait: SignalStep = { cmd: 'sgWaitSignal' };
+const gShip: SignalStep = { cmd: 'sgSendCrate' };
+
+export const GW_TWO_MACHINE: GearworksSignalLevel = {
+  id: 'gw-two-machine',
+  title: 'Gearworks Garage',
+  shortTitle: 'Team Machines',
+  family: 'delivery',
+  goalText: 'Two machines, one team — deliver 2 gifts with a signal!',
+  emoji: '🤝',
+  brief: {
+    title: 'Two-Machine Teamwork!',
+    text: 'Two machines run at the SAME TIME! The Packer fills a crate and SENDS a signal. The Mailer must WAIT FOR that signal before it ships — ship too soon and the crate is empty! Hand off 2 gifts together.',
+    emoji: '🤝',
+  },
+  lanes: {
+    packer: { name: 'Packer', icon: '🎁', commands: ['sgFetch', 'sgPack', 'sgSendSignal', 'sgRepeat'], maxSlots: 8 },
+    mailer: { name: 'Mailer', icon: '📮', commands: ['sgWaitSignal', 'sgSendCrate', 'sgRepeat'], maxSlots: 6 },
+  },
+  target: 2,
+  coachHint: 'Packer: FETCH, PACK, SEND SIGNAL. Mailer: WAIT SIGNAL, SHIP. Do it twice — or loop both lanes!',
+};
+
+export const GEARWORKS_SIGNAL_LEVELS: readonly GearworksSignalLevel[] = [GW_TWO_MACHINE];
+
+export function signalFullSolution(): { packer: SignalStep[]; mailer: SignalStep[] } {
+  return {
+    packer: [gFetch, gPack, gSend, gFetch, gPack, gSend],
+    mailer: [gWait, gShip, gWait, gShip],
+  };
+}
+export function signalLoopSolution(level: GearworksSignalLevel): { packer: SignalStep[]; mailer: SignalStep[] } {
+  return {
+    packer: [gFetch, gPack, gSend, { cmd: 'sgRepeat', arg: level.target }],
+    mailer: [gWait, gShip, { cmd: 'sgRepeat', arg: level.target }],
+  };
+}
+export function signalOneSolution(): { packer: SignalStep[]; mailer: SignalStep[] } {
+  return { packer: [gFetch, gPack, gSend], mailer: [gWait, gShip] };
+}
+
+/** works (≥1 gift) / clever (all gifts) / creative (looped both lanes). */
+export function signalStars(level: GearworksSignalLevel, programs: { packer: SignalStep[]; mailer: SignalStep[] }): number {
+  const r = runParallel(programs, { target: level.target });
+  const goal: SignalGoal = { target: level.target };
+  void goal;
+  if (r.finalState.delivered < 1) return 0;
+  return 1 + (r.finalState.delivered >= level.target ? 1 : 0) + (r.usedLoop && r.finalState.delivered >= level.target ? 1 : 0);
+}
+
+export function validateSignalLevel(level: GearworksSignalLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  const goal: SignalGoal = { target: level.target };
+  const full = signalFullSolution();
+  const loop = signalLoopSolution(level);
+  const one = signalOneSolution();
+  if (full.packer.length > level.lanes.packer.maxSlots) errors.push('Packer full solution exceeds its lane.');
+  if (full.mailer.length > level.lanes.mailer.maxSlots) errors.push('Mailer full solution exceeds its lane.');
+  if (!runParallel(full, goal).success) errors.push('Full solution must deliver the target.');
+  if (signalStars(level, full) !== 2) errors.push('Full (no-loop) solution should earn 2 stars.');
+  if (signalStars(level, loop) !== 3) errors.push('Loop solution should earn all 3 stars.');
+  if (signalStars(level, one) !== 1) errors.push('One-handoff solution should earn 1 star.');
+  // shipping immediately (before any pack) ships an empty crate — the
+  // signal is what makes the hand-off reliable rather than a timing gamble
+  const shipEarly = runParallel({ packer: full.packer, mailer: [gShip] }, goal);
+  if (shipEarly.finalState.delivered > 0) errors.push('An immediate ship (before a pack) must not deliver a gift.');
+  // no-send must deadlock
+  const noSend = runParallel({ packer: [gFetch, gPack], mailer: [gWait, gShip] }, goal);
+  if (!noSend.deadlocked) errors.push('A missing SEND SIGNAL must deadlock the Mailer.');
+  return errors;
+}
+
+export function assertSignalLevelValid(level: GearworksSignalLevel): void {
+  const errors = validateSignalLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Signal level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

@@ -85,6 +85,14 @@ import {
   GW_SAVE_A_JOB, validateJobLevel, jobStars,
   jobRawSolution, jobCallSolution, jobLoopSolution,
 } from '../src/data/gearworks/levels';
+import {
+  runParallel, signalMisses, flattenLane, SG_MAX_TICKS,
+} from '../src/gameplay/gearworks/signalMachine';
+import type { SignalStep } from '../src/gameplay/gearworks/signalMachine';
+import {
+  GW_TWO_MACHINE, validateSignalLevel, signalStars,
+  signalFullSolution, signalLoopSolution, signalOneSolution,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -779,6 +787,52 @@ const MAIN = (...cmds: Array<JobStep['cmd'] | [JobStep['cmd'], number]>): JobSte
     && badOrder.events.some((e) => e.type === 'pressMiss'));
   const rawMiss = jobMisses(BODY, MAIN('jbFetch', 'jbFetch'), { target: 3 });
   check('short raw plan coaches making/looping the job', rawMiss.some((m) => m.includes('jar') || m.includes('DO')));
+}
+
+// --- Gearworks signals and parallelism (Phase 10) ---
+const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): SignalStep[] =>
+  cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
+
+{
+  check('signal level validates', validateSignalLevel(GW_TWO_MACHINE).length === 0);
+  check('one hand-off delivers 1 gift (1 star)', signalStars(GW_TWO_MACHINE, signalOneSolution()) === 1);
+  check('two hand-offs deliver both (2 stars)', signalStars(GW_TWO_MACHINE, signalFullSolution()) === 2);
+  check('looping both lanes earns 3 stars', signalStars(GW_TWO_MACHINE, signalLoopSolution(GW_TWO_MACHINE)) === 3);
+}
+{
+  // the signal is NECESSARY: waiting synchronizes the hand-off
+  const good = runParallel(signalOneSolution(), { target: 1 });
+  check('wait-then-ship delivers the packed gift', good.finalState.delivered === 1 && !good.deadlocked);
+  const early = runParallel({ packer: SGP('sgFetch', 'sgPack', 'sgSendSignal'), mailer: SGP('sgSendCrate') }, { target: 1 });
+  check('shipping without waiting sends an empty crate', early.finalState.delivered === 0
+    && early.finalState.emptySends === 1);
+  check('empty-ship miss coaches WAIT FOR SIGNAL', signalMisses({ packer: SGP('sgFetch', 'sgPack', 'sgSendSignal'), mailer: SGP('sgSendCrate') }, { target: 1 }).some((m) => m.includes('WAIT')));
+}
+{
+  // determinism + lockstep: same-tick send is seen by a same-tick wait
+  const r = runParallel(signalOneSolution(), { target: 1 });
+  const sentTick = (r.events.find((e) => e.type === 'signalSent') as { tick: number }).tick;
+  const gotTick = (r.events.find((e) => e.type === 'signalReceived') as { tick: number }).tick;
+  check('a signal is received on the same tick it is sent (packer first)', sentTick === gotTick);
+  const again = runParallel(signalOneSolution(), { target: 1 });
+  check('the scheduler is deterministic', JSON.stringify(again.events) === JSON.stringify(r.events));
+}
+{
+  // deadlock: the Mailer waits forever if the Packer never signals
+  const stuck = runParallel({ packer: SGP('sgFetch', 'sgPack'), mailer: SGP('sgWaitSignal', 'sgSendCrate') }, { target: 1 });
+  check('a missing signal deadlocks the Mailer', stuck.deadlocked && stuck.finalState.delivered === 0);
+  check('deadlock miss says the signal never came', signalMisses({ packer: SGP('sgFetch', 'sgPack'), mailer: SGP('sgWaitSignal', 'sgSendCrate') }, { target: 1 }).some((m) => m.includes('never sent') || m.includes('SEND SIGNAL')));
+  check('deadlocked runs are bounded by the tick cap', stuck.events.filter((e) => e.type === 'tick').length <= SG_MAX_TICKS);
+}
+{
+  // per-lane loops flatten to the same steps as writing them out
+  const flat = flattenLane(SGP('sgFetch', 'sgPack', 'sgSendSignal', ['sgRepeat', 2]));
+  check('a lane loop flattens block-before x count',
+    flat.join(',') === 'sgFetch,sgPack,sgSendSignal,sgFetch,sgPack,sgSendSignal');
+  const loop = runParallel(signalLoopSolution(GW_TWO_MACHINE), { target: 2 });
+  check('looped lanes deliver both gifts', loop.finalState.delivered === 2 && loop.usedLoop);
+  const signalsBalanced = runParallel(signalFullSolution(), { target: 2 }).finalState.signals;
+  check('every signal sent is consumed by a wait', signalsBalanced === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
