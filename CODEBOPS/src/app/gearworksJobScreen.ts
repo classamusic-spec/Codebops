@@ -120,6 +120,7 @@ export class GearworksJobScreen {
       tiles: GW_JOB_TILES,
       badges: { jbRepeat: { min: JOB_REPEAT_MIN, max: JOB_REPEAT_MAX, def: 3, aria: 'How many times the loop repeats: 2, 3, or 4' } },
       loopCmds: ['jbRepeat'],
+      initial: this.level.prefill?.map((s) => ({ ...s })),
     });
 
     // --- animation loop ---

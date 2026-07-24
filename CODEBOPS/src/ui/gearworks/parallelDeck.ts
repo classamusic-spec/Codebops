@@ -56,6 +56,13 @@ class Lane {
     this.renderSlots();
   }
 
+  setProgram(steps: readonly SignalStep[]): void {
+    this.program.length = 0;
+    for (const st of steps.slice(0, this.spec.maxSlots)) this.program.push({ ...st });
+    this.lastPlaced = -1; // a prefilled lane does not pop in
+    this.renderSlots();
+  }
+
   getProgram(): SignalStep[] {
     return this.program.map((s) => ({ ...s }));
   }
@@ -226,6 +233,14 @@ export class ParallelDeck {
     });
 
     this.refreshBop();
+  }
+
+  /** Preload both lanes (a debug/guide level ships part of the plan). */
+  setPrograms(programs: { packer?: readonly SignalStep[]; mailer?: readonly SignalStep[] }): void {
+    if (programs.packer) this.lanes.packer.setProgram(programs.packer);
+    if (programs.mailer) this.lanes.mailer.setProgram(programs.mailer);
+    this.refreshBop();
+    this.onChange();
   }
 
   private changed(): void {

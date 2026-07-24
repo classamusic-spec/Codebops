@@ -386,7 +386,7 @@ export function assertLoopLevelValid(level: GearworksLoopLevel): void {
 // Phase 5 — sensor levels: Wait for the Berry + Sensor Workshop
 // ==================================================================
 
-export type GwSensorBonusKind = 'secondBerry' | 'bothInputs';
+export type GwSensorBonusKind = 'secondBerry' | 'bothInputs' | 'noWaste';
 
 export interface GearworksSensorLevel {
   readonly id: string;
@@ -407,8 +407,15 @@ export interface GearworksSensorLevel {
    *  'secondBerry' — the belt keeps bringing berries; grab a second one
    *  'bothInputs'  — run correctly with the gear TURNING and STILL
    *                  (test both branches — boolean coverage for age 5!)
+   *  'noWaste'     — catch every berry: no snaps on air, none ridden by
    */
   readonly bonus: { readonly kind: GwSensorBonusKind; readonly text: string };
+  /**
+   * A debug-phase level ships with this program already in the slots.
+   * It must NOT already win — the child's job is to find what is wrong
+   * and repair it (validated below).
+   */
+  readonly prefill?: readonly GwSensorStep[];
   readonly coachHint: string;
 }
 
@@ -453,15 +460,68 @@ export const GW_SENSOR_WORKSHOP: GearworksSensorLevel = {
   coachHint: 'An IF tile guards the very next tile — pair each action with the right IF!',
 };
 
+/** Events, debug phase: the claw grabs before the eye ever sees anything. */
+export const GW_JUMPY_CLAW: GearworksSensorLevel = {
+  id: 'gw-jumpy-claw',
+  title: 'Gearworks Garage',
+  shortTitle: 'The Jumpy Claw',
+  family: 'bench',
+  goalText: 'This claw grabs too soon — repair it so it catches the berry!',
+  emoji: '🔧',
+  brief: {
+    title: 'The Jumpy Claw!',
+    text: 'Somebody already wrote a plan for this claw, but it snaps on empty air every time. WAIT counts ticks and hopes. WAIT UNTIL listens to the eye sensor. Change ONE tile and watch the claw catch the berry.',
+    emoji: '🔧',
+  },
+  machine: 'berry',
+  commands: ['gsStartBelt', 'gsWait', 'gsWaitUntil', 'gsGrab'],
+  maxSlots: 8,
+  par: 3,
+  berryGoal: { needBerries: 1 },
+  prefill: [{ cmd: 'gsStartBelt' }, { cmd: 'gsWait' }, { cmd: 'gsGrab' }],
+  bonus: { kind: 'secondBerry', text: 'The belt keeps going — catch a SECOND berry' },
+  coachHint: 'Counting ticks is a guess. Swap WAIT for WAIT UNTIL and let the eye say when!',
+};
+
+/** Events, create phase: your own catcher, and not one berry wasted. */
+export const GW_BERRY_PARADE: GearworksSensorLevel = {
+  id: 'gw-berry-parade',
+  title: 'Gearworks Garage',
+  shortTitle: 'Berry Parade',
+  family: 'bench',
+  goalText: 'Build your own catcher — bring in THREE berries!',
+  emoji: '🍓',
+  brief: {
+    title: 'The Berry Parade!',
+    text: 'The belt will keep bringing berries all day. This time the plan is yours: catch THREE. Anything that works, works — but a really good machine never snaps on air and never lets a berry ride away.',
+    emoji: '🍓',
+  },
+  machine: 'berry',
+  commands: ['gsStartBelt', 'gsWait', 'gsWaitUntil', 'gsGrab'],
+  maxSlots: 12,
+  par: 7,
+  berryGoal: { needBerries: 3 },
+  bonus: { kind: 'noWaste', text: 'Catch all three with no snaps and none missed' },
+  coachHint: 'Each berry needs its own WAIT UNTIL and GRAB. Start the belt once, then repeat the pair!',
+};
+
 export const GEARWORKS_SENSOR_LEVELS: readonly GearworksSensorLevel[] = [
   GW_WAIT_BERRY,
+  GW_JUMPY_CLAW,
   GW_SENSOR_WORKSHOP,
+  GW_BERRY_PARADE,
 ];
 
 export function canonicalSensorSolution(level: GearworksSensorLevel): GwSensorStep[] {
-  return level.machine === 'berry'
-    ? [{ cmd: 'gsStartBelt' }, { cmd: 'gsWaitUntil' }, { cmd: 'gsGrab' }]
-    : [{ cmd: 'gsIfTurning' }, { cmd: 'gsOpenGate' }, { cmd: 'gsIfStill' }, { cmd: 'gsWarnLight' }];
+  if (level.machine !== 'berry') {
+    return [{ cmd: 'gsIfTurning' }, { cmd: 'gsOpenGate' }, { cmd: 'gsIfStill' }, { cmd: 'gsWarnLight' }];
+  }
+  // One WAIT UNTIL + GRAB per berry the goal asks for — the belt keeps
+  // bringing them, so catching more is the same idea repeated.
+  const need = level.berryGoal?.needBerries ?? 1;
+  const steps: GwSensorStep[] = [{ cmd: 'gsStartBelt' }];
+  for (let i = 0; i < need; i++) steps.push({ cmd: 'gsWaitUntil' }, { cmd: 'gsGrab' });
+  return steps;
 }
 
 export function validateSensorLevel(level: GearworksSensorLevel): string[] {
@@ -481,6 +541,17 @@ export function validateSensorLevel(level: GearworksSensorLevel): string[] {
     const still = runSensorMachine(canon, 'workshop', { gearTurning: false });
     if (!workshopRunCorrect(spin.finalState, true)) errors.push('Canonical must be correct while turning.');
     if (!workshopRunCorrect(still.finalState, false)) errors.push('Canonical must be correct while still.');
+  }
+  if (level.prefill) {
+    if (!level.prefill.every((st) => level.commands.includes(st.cmd))) {
+      errors.push('The prefilled program uses tiles this level does not offer.');
+    }
+    if (level.prefill.length > level.maxSlots) errors.push('The prefilled program does not fit the deck.');
+    const buggyWins = level.machine === 'berry'
+      ? berryGoalMet(level.berryGoal ?? { needBerries: 1 }, runSensorMachine(level.prefill.map((x) => ({ ...x })), 'berry').finalState)
+      : workshopRunCorrect(runSensorMachine(level.prefill.map((x) => ({ ...x })), 'workshop', { gearTurning: true }).finalState, true)
+        && workshopRunCorrect(runSensorMachine(level.prefill.map((x) => ({ ...x })), 'workshop', { gearTurning: false }).finalState, false);
+    if (buggyWins) errors.push('A debug level\'s prefilled program must NOT already work.');
   }
   return errors;
 }
@@ -522,6 +593,12 @@ export interface GearworksSorterLevel {
    *                with the same kind of rule.
    */
   readonly bonus: { readonly kind: GwSorterBonusKind; readonly text: string };
+  /**
+   * A debug-phase level ships with this program already in the slots.
+   * It must NOT already win — the child's job is to find what is wrong
+   * and repair it (validated below).
+   */
+  readonly prefill?: readonly GtStep[];
   readonly coachHint: string;
   readonly binLabels: { readonly left: string; readonly right: string; readonly pass: string; readonly up?: string };
   /** Explicit answer key when the heuristic canonical does not fit (3-bin levels). */
@@ -585,8 +662,97 @@ export const GW_CONVEYOR_FACTORY: GearworksSorterLevel = {
   binLabels: { left: 'Jam', right: 'Pie', pass: 'Parts' },
 };
 
+/** If–Else, discover phase: one check, two doors — the very first branch. */
+export const GW_FIRST_CHOICE: GearworksSorterLevel = {
+  id: 'gw-first-choice',
+  title: 'Gearworks Garage',
+  shortTitle: 'This Way or That',
+  family: 'factory',
+  goalText: 'Red goes LEFT. Everything else goes RIGHT. Two items, two doors!',
+  emoji: '↔️',
+  brief: {
+    title: 'This Way or That Way!',
+    text: 'Two doors, and the paddle can only pick one. IF RED does the very next tile — so RED goes left. Anything that is not red just carries on to the tile after, and that one sends it right. One check, two different endings!',
+    emoji: '↔️',
+  },
+  commands: ['gtIfRed', 'gtSendLeft', 'gtSendRight'],
+  maxSlots: 5,
+  par: 3,
+  stream: [R('red', 'round'), R('blue', 'round')],
+  rules: [
+    { match: { color: 'red' }, dest: 'left' },
+    { match: {}, dest: 'right' },
+  ],
+  canonical: [{ cmd: 'gtIfRed' }, { cmd: 'gtSendLeft' }, { cmd: 'gtSendRight' }],
+  bonus: { kind: 'elseTrick', text: 'One IF, two endings — the last send catches the rest' },
+  coachHint: 'IF RED, SEND LEFT, SEND RIGHT. The last send is the "or else"!',
+  binLabels: { left: 'Jam', right: 'Pie', pass: 'Lost' },
+};
+
+/** Data, discover phase: grouping by SHAPE — colour is not the only thing. */
+export const GW_SHAPE_SHELF: GearworksSorterLevel = {
+  id: 'gw-shape-shelf',
+  title: 'Gearworks Garage',
+  shortTitle: 'Shape Shelf',
+  family: 'factory',
+  goalText: 'Round things LEFT, everything else RIGHT — sort by SHAPE this time!',
+  emoji: '⬜',
+  brief: {
+    title: 'The Shape Shelf!',
+    text: 'Same belt, brand new question. Forget the colours — today the machine only cares whether a thing is ROUND. IF ROUND asks that one question, and everything that is not round rolls on to the next tile. Things can be grouped by whatever you choose to look at!',
+    emoji: '⬜',
+  },
+  commands: ['gtIfRound', 'gtSendLeft', 'gtSendRight'],
+  maxSlots: 5,
+  par: 3,
+  stream: [R('red', 'round'), R('blue', 'square')],
+  megaStream: [
+    R('red', 'round'), R('blue', 'square'), R('blue', 'round'),
+    R('red', 'square'), R('red', 'round'),
+  ],
+  rules: [
+    { match: { shape: 'round' }, dest: 'left' },
+    { match: {}, dest: 'right' },
+  ],
+  canonical: [{ cmd: 'gtIfRound' }, { cmd: 'gtSendLeft' }, { cmd: 'gtSendRight' }],
+  bonus: { kind: 'megaBatch', text: 'Sort the MEGA batch of 5 with the same rule' },
+  coachHint: 'IF ROUND, SEND LEFT, SEND RIGHT — one question, and the shape decides!',
+  binLabels: { left: 'Balls', right: 'Blocks', pass: 'Lost' },
+};
+
+/** Data, debug phase: the rules are right, the doors are swapped. */
+export const GW_MIXED_UP_BELT: GearworksSorterLevel = {
+  id: 'gw-mixed-up-belt',
+  title: 'Gearworks Garage',
+  shortTitle: 'Mixed-Up Belt',
+  family: 'factory',
+  goalText: 'Every berry lands in the wrong basket — find the mix-up and fix it!',
+  emoji: '🧺',
+  brief: {
+    title: 'The Mixed-Up Belt!',
+    text: 'This sorter was working yesterday. Today the jam basket is full of blue berries and the pie basket is full of red ones. The IF tiles are asking the right questions — it is the SENDS that got shuffled. Put each send back with its own IF.',
+    emoji: '🧺',
+  },
+  commands: ['gtIfRed', 'gtIfBlue', 'gtSendLeft', 'gtSendRight'],
+  maxSlots: 6,
+  par: 4,
+  stream: [R('red', 'round'), R('blue', 'round'), R('blue', 'round'), R('red', 'round')],
+  rules: [
+    { match: { color: 'red' }, dest: 'left' },
+    { match: { color: 'blue' }, dest: 'right' },
+  ],
+  prefill: [{ cmd: 'gtIfRed' }, { cmd: 'gtSendRight' }, { cmd: 'gtIfBlue' }, { cmd: 'gtSendLeft' }],
+  canonical: [{ cmd: 'gtIfRed' }, { cmd: 'gtSendLeft' }, { cmd: 'gtIfBlue' }, { cmd: 'gtSendRight' }],
+  bonus: { kind: 'elseTrick', text: 'Repair it AND shrink it to 3 tiles' },
+  coachHint: 'Red belongs in the jam basket on the LEFT. Follow each IF to the send right after it.',
+  binLabels: { left: 'Jam', right: 'Pie', pass: 'Lost' },
+};
+
 export const GEARWORKS_SORTER_LEVELS: readonly GearworksSorterLevel[] = [
+  GW_FIRST_CHOICE,
   GW_SENSOR_SORTER,
+  GW_SHAPE_SHELF,
+  GW_MIXED_UP_BELT,
   GW_CONVEYOR_FACTORY,
 ];
 
@@ -626,6 +792,15 @@ export function validateSorterLevel(level: GearworksSorterLevel): string[] {
   // every item must have a reachable destination
   for (const item of [...level.stream, ...(level.megaStream ?? [])]) {
     void correctDest(level.rules, item);
+  }
+  if (level.prefill) {
+    if (!level.prefill.every((st) => level.commands.includes(st.cmd))) {
+      errors.push('The prefilled program uses tiles this level does not offer.');
+    }
+    if (level.prefill.length > level.maxSlots) errors.push('The prefilled program does not fit the deck.');
+    if (runSorter(level.prefill.map((x) => ({ ...x })), level.stream, level.rules).allCorrect) {
+      errors.push('A debug level\'s prefilled program must NOT already sort the batch.');
+    }
   }
   return errors;
 }
@@ -742,6 +917,12 @@ export interface GearworksCounterLevel {
    *                it with REPEAT UNTIL FULL in the same sitting
    */
   readonly bonus: { readonly kind: GwCounterBonusKind; readonly text: string };
+  /**
+   * A debug-phase level ships with this program already in the slots.
+   * It must NOT already win — the child's job is to find what is wrong
+   * and repair it (validated below).
+   */
+  readonly prefill?: readonly GcStep[];
   readonly coachHint: string;
 }
 
@@ -788,8 +969,57 @@ export const GW_SAFE_STOP: GearworksCounterLevel = {
   coachHint: 'Put PRESS before REPEAT UNTIL FULL — the loop stamps until the jar is full, then stops!',
 };
 
+/** Variables, debug phase: the dial is being pushed the wrong way. */
+export const GW_COUNTER_MIXUP: GearworksCounterLevel = {
+  id: 'gw-counter-mixup',
+  title: 'Gearworks Garage',
+  shortTitle: 'Counter Mix-Up',
+  family: 'factory',
+  goalText: 'This plan takes berries OUT when it should be putting them in — fix it!',
+  emoji: '🔻',
+  brief: {
+    title: 'The Counter Mix-Up!',
+    text: 'The wheel starts at 2 and the jar needs to read 5. Whoever wrote this plan reached for SUBTRACT every time, so the wheel keeps going down. Change the plan so the number climbs to 5 instead.',
+    emoji: '🔻',
+  },
+  machine: 'counter',
+  commands: ['gcSet', 'gcAdd', 'gcSub'],
+  maxSlots: 6,
+  par: 2,
+  start: 2,
+  target: 5,
+  prefill: [{ cmd: 'gcSub' }, { cmd: 'gcSub' }],
+  bonus: { kind: 'bothWays', text: 'Fix it by counting up AND by SETTING it' },
+  coachHint: 'SUBTRACT takes one out. ADD 1 puts one in — or SET VALUE jumps the dial straight to 5.',
+};
+
+/** Variables, create phase: pick your own number and reach it your own way. */
+export const GW_MY_NUMBER: GearworksCounterLevel = {
+  id: 'gw-my-number',
+  title: 'Gearworks Garage',
+  shortTitle: 'My Own Number',
+  family: 'factory',
+  goalText: 'The jar wants SEVEN — reach it whichever way you like!',
+  emoji: '7️⃣',
+  brief: {
+    title: 'My Own Number!',
+    text: 'A big empty jar, a wheel on zero, and no instructions. Get the wheel to 7 however you want — jump straight there, climb one berry at a time, or overshoot and come back. A number the machine remembers does not care how it got there.',
+    emoji: '7️⃣',
+  },
+  machine: 'counter',
+  commands: ['gcSet', 'gcAdd', 'gcSub'],
+  maxSlots: 10,
+  par: 2,
+  start: 0,
+  target: 7,
+  bonus: { kind: 'bothWays', text: 'Reach 7 by SETTING it and by counting up' },
+  coachHint: 'There is no wrong road here — SET VALUE is the quick one, ADD 1 is the scenic one!',
+};
+
 export const GEARWORKS_COUNTER_LEVELS: readonly GearworksCounterLevel[] = [
   GW_BERRY_COUNTER,
+  GW_COUNTER_MIXUP,
+  GW_MY_NUMBER,
   GW_SAFE_STOP,
 ];
 
@@ -831,6 +1061,16 @@ export function validateCounterLevel(level: GearworksCounterLevel): string[] {
     if (!runSafeStop(canon, goal).success) errors.push('Canonical safe-stop plan must win.');
     if (!runSafeStop(foreverFredSolution(), goal).ranaway) errors.push('The plain-repeat plan must run away (meet Fred).');
     if (runSafeStop(foreverFredSolution(), goal).success) errors.push('The plain-repeat plan must NOT win.');
+  }
+  if (level.prefill) {
+    if (!level.prefill.every((st) => level.commands.includes(st.cmd))) {
+      errors.push('The prefilled program uses tiles this level does not offer.');
+    }
+    if (level.prefill.length > level.maxSlots) errors.push('The prefilled program does not fit the deck.');
+    const buggyWins = level.machine === 'counter'
+      ? runCounter(level.prefill.map((x) => ({ ...x })), { target: level.target }, level.start).success
+      : runSafeStop(level.prefill.map((x) => ({ ...x })), { target: level.target }).success;
+    if (buggyWins) errors.push('A debug level\'s prefilled program must NOT already work.');
   }
   return errors;
 }
@@ -995,6 +1235,12 @@ export interface GearworksJobLevel {
   readonly mainCommands: readonly JobMainId[];
   readonly maxSlots: number;
   readonly target: number;
+  /**
+   * A debug-phase level ships with this program already in the slots.
+   * It must NOT already win — the child's job is to find what is wrong
+   * and repair it (validated below).
+   */
+  readonly prefill?: readonly JobStep[];
   readonly coachHint: string;
   /** The intended job body (validated; the child rebuilds it). */
   readonly jobSolution: readonly JobStep[];
@@ -1027,7 +1273,39 @@ export const GW_SAVE_A_JOB: GearworksJobLevel = {
   jobSolution: [F, P],
 };
 
-export const GEARWORKS_JOB_LEVELS: readonly GearworksJobLevel[] = [GW_SAVE_A_JOB];
+/**
+ * Functions (and decomposition), debug phase: the job card is fine, but
+ * the plan calls it the wrong number of times — a bug in HOW a saved job
+ * is used rather than in the job itself.
+ */
+export const GW_JOB_MIXUP: GearworksJobLevel = {
+  id: 'gw-job-mixup',
+  title: 'Gearworks Garage',
+  shortTitle: 'Job Card Mix-Up',
+  family: 'maker',
+  goalText: 'The Make Jam job works — the plan that uses it does not. Repair it!',
+  emoji: '🗂️',
+  brief: {
+    title: 'The Job Card Mix-Up!',
+    text: 'Somebody saved the Make Jam job and then wrote a plan that only makes ONE jar. The job card is not the problem — the plan is. Fill in the card, look at how many jars the order wants, and make the plan call the job enough times.',
+    emoji: '🗂️',
+  },
+  jobName: 'Make Jam',
+  jobIcon: '🍯',
+  jobPrims: ['jbFetch', 'jbPress'],
+  jobSlots: 3,
+  mainCommands: ['jbFetch', 'jbPress', 'jbDoJob', 'jbRepeat'],
+  maxSlots: 6,
+  target: 3,
+  prefill: [{ ...DO }],
+  coachHint: 'One DO makes one jar. The order wants three — call the job three times, or DO it with REPEAT ×3.',
+  jobSolution: [F, P],
+};
+
+export const GEARWORKS_JOB_LEVELS: readonly GearworksJobLevel[] = [
+  GW_SAVE_A_JOB,
+  GW_JOB_MIXUP,
+];
 
 export function jobRawSolution(level: GearworksJobLevel): JobStep[] {
   const out: JobStep[] = [];
@@ -1063,6 +1341,12 @@ export function validateJobLevel(level: GearworksJobLevel): string[] {
   if (jobStars(level, level.jobSolution, call) !== 2) errors.push('Call solution should earn 2 stars.');
   if (jobStars(level, level.jobSolution, loop) !== 3) errors.push('Loop solution should earn all 3 stars.');
   if (call.length >= raw.length) errors.push('Calling the job must be shorter than the raw steps.');
+  if (level.prefill) {
+    if (level.prefill.length > level.maxSlots) errors.push('The prefilled program does not fit the deck.');
+    if (runJobProgram(level.jobSolution, level.prefill.map((x) => ({ ...x })), goal).success) {
+      errors.push('A debug level\'s prefilled program must NOT already make the jam.');
+    }
+  }
   return errors;
 }
 
@@ -1090,6 +1374,14 @@ export interface GearworksSignalLevel {
     readonly mailer: { readonly name: string; readonly icon: string; readonly commands: readonly SignalCommandId[]; readonly maxSlots: number };
   };
   readonly target: number;
+  /**
+   * A guide/debug level can ship one lane already written, so the child
+   * only has to build the other side of the hand-off.
+   */
+  readonly prefill?: {
+    readonly packer?: readonly SignalStep[];
+    readonly mailer?: readonly SignalStep[];
+  };
   readonly coachHint: string;
 }
 
@@ -1119,13 +1411,70 @@ export const GW_TWO_MACHINE: GearworksSignalLevel = {
   coachHint: 'Packer: FETCH, PACK, SEND SIGNAL. Mailer: WAIT SIGNAL, SHIP. Do it twice — or loop both lanes!',
 };
 
-export const GEARWORKS_SIGNAL_LEVELS: readonly GearworksSignalLevel[] = [GW_TWO_MACHINE];
+/**
+ * Messages, discover phase: the smallest possible hand-off. One gift,
+ * one signal, both lanes short enough to see the whole idea at once.
+ */
+export const GW_FIRST_SIGNAL: GearworksSignalLevel = {
+  id: 'gw-first-signal',
+  title: 'Gearworks Garage',
+  shortTitle: 'The First Signal',
+  family: 'delivery',
+  goalText: 'One machine tells the other it is ready — send ONE gift together!',
+  emoji: '📣',
+  brief: {
+    title: 'The First Signal!',
+    text: 'Two machines cannot see each other. The Packer fills a crate and SENDS A SIGNAL — a little message that says "ready!". The Mailer WAITS FOR that signal, and only then ships. Watch the message fly across and deliver one gift.',
+    emoji: '📣',
+  },
+  lanes: {
+    packer: { name: 'Packer', icon: '🎁', commands: ['sgFetch', 'sgPack', 'sgSendSignal'], maxSlots: 7 },
+    mailer: { name: 'Mailer', icon: '📮', commands: ['sgWaitSignal', 'sgSendCrate'], maxSlots: 5 },
+  },
+  target: 1,
+  coachHint: 'Packer: FETCH, PACK, SEND SIGNAL. Mailer: WAIT SIGNAL, SHIP. That is the whole message — then try it twice!',
+};
 
-export function signalFullSolution(): { packer: SignalStep[]; mailer: SignalStep[] } {
-  return {
-    packer: [gFetch, gPack, gSend, gFetch, gPack, gSend],
-    mailer: [gWait, gShip, gWait, gShip],
-  };
+/**
+ * Parallelism, guide phase: the Mailer's side is already written, so the
+ * child builds one lane and feels the two timelines line up.
+ */
+export const GW_RELAY_RACE: GearworksSignalLevel = {
+  id: 'gw-relay-race',
+  title: 'Gearworks Garage',
+  shortTitle: 'Relay Race',
+  family: 'delivery',
+  goalText: 'The Mailer is ready and waiting — write the Packer\'s half!',
+  emoji: '🏃',
+  brief: {
+    title: 'The Relay Race!',
+    text: 'The Mailer already knows its job: wait for a signal, ship, wait again, ship again. It is sitting there doing nothing because nobody has told it anything! Both lanes run at the same time — write the Packer\'s side so the two of them pass 2 gifts between them.',
+    emoji: '🏃',
+  },
+  lanes: {
+    packer: { name: 'Packer', icon: '🎁', commands: ['sgFetch', 'sgPack', 'sgSendSignal', 'sgRepeat'], maxSlots: 8 },
+    mailer: { name: 'Mailer', icon: '📮', commands: ['sgWaitSignal', 'sgSendCrate', 'sgRepeat'], maxSlots: 6 },
+  },
+  target: 2,
+  prefill: { mailer: [gWait, gShip, gWait, gShip] },
+  coachHint: 'The Mailer waits twice, so the Packer must SEND SIGNAL twice: FETCH, PACK, SEND — again!',
+};
+
+export const GEARWORKS_SIGNAL_LEVELS: readonly GearworksSignalLevel[] = [
+  GW_FIRST_SIGNAL,
+  GW_RELAY_RACE,
+  GW_TWO_MACHINE,
+];
+
+export function signalFullSolution(level?: GearworksSignalLevel): { packer: SignalStep[]; mailer: SignalStep[] } {
+  const reps = level?.target ?? 2;
+  const packer: SignalStep[] = [];
+  const mailer: SignalStep[] = [];
+  for (let i = 0; i < reps; i++) {
+    packer.push(gFetch, gPack, gSend);
+    mailer.push(gWait, gShip);
+  }
+  return { packer, mailer };
 }
 export function signalLoopSolution(level: GearworksSignalLevel): { packer: SignalStep[]; mailer: SignalStep[] } {
   return {
@@ -1137,28 +1486,65 @@ export function signalOneSolution(): { packer: SignalStep[]; mailer: SignalStep[
   return { packer: [gFetch, gPack, gSend], mailer: [gWait, gShip] };
 }
 
-/** works (≥1 gift) / clever (all gifts) / creative (looped both lanes). */
+/**
+ * works (≥1 gift) / clever (all gifts) / creative.
+ *
+ * The creative star is "shorten it with a loop" — except on a one-gift
+ * level, where a loop has nothing to repeat. There the creative move is
+ * to keep the hand-off going and deliver a second gift, so the star is
+ * always reachable with the tiles the level actually offers.
+ */
 export function signalStars(level: GearworksSignalLevel, programs: { packer: SignalStep[]; mailer: SignalStep[] }): number {
   const r = runParallel(programs, { target: level.target });
-  const goal: SignalGoal = { target: level.target };
-  void goal;
   if (r.finalState.delivered < 1) return 0;
-  return 1 + (r.finalState.delivered >= level.target ? 1 : 0) + (r.usedLoop && r.finalState.delivered >= level.target ? 1 : 0);
+  const allDelivered = r.finalState.delivered >= level.target;
+  const creative = level.target > 1
+    ? r.usedLoop && allDelivered
+    : r.finalState.delivered >= 2;
+  return 1 + (allDelivered ? 1 : 0) + (creative ? 1 : 0);
+}
+
+/** The "keep going" plan a one-gift level's creative star asks for. */
+export function signalEncoreSolution(): { packer: SignalStep[]; mailer: SignalStep[] } {
+  return { packer: [gFetch, gPack, gSend, gFetch, gPack, gSend], mailer: [gWait, gShip, gWait, gShip] };
 }
 
 export function validateSignalLevel(level: GearworksSignalLevel): string[] {
   const errors: string[] = [];
   if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
   const goal: SignalGoal = { target: level.target };
-  const full = signalFullSolution();
+  const full = signalFullSolution(level);
   const loop = signalLoopSolution(level);
   const one = signalOneSolution();
   if (full.packer.length > level.lanes.packer.maxSlots) errors.push('Packer full solution exceeds its lane.');
   if (full.mailer.length > level.lanes.mailer.maxSlots) errors.push('Mailer full solution exceeds its lane.');
   if (!runParallel(full, goal).success) errors.push('Full solution must deliver the target.');
   if (signalStars(level, full) !== 2) errors.push('Full (no-loop) solution should earn 2 stars.');
-  if (signalStars(level, loop) !== 3) errors.push('Loop solution should earn all 3 stars.');
-  if (signalStars(level, one) !== 1) errors.push('One-handoff solution should earn 1 star.');
+  if (level.target > 1) {
+    if (signalStars(level, loop) !== 3) errors.push('Loop solution should earn all 3 stars.');
+    if (!level.lanes.packer.commands.includes('sgRepeat') || !level.lanes.mailer.commands.includes('sgRepeat')) {
+      errors.push('A loop-star level must offer the Repeat tile in both lanes.');
+    }
+  } else {
+    // one-gift level: the encore must be buildable AND must earn the star
+    const encore = signalEncoreSolution();
+    if (encore.packer.length > level.lanes.packer.maxSlots) errors.push('The encore must fit the Packer lane.');
+    if (encore.mailer.length > level.lanes.mailer.maxSlots) errors.push('The encore must fit the Mailer lane.');
+    if (signalStars(level, encore) !== 3) errors.push('A second hand-off should earn all 3 stars.');
+  }
+  // On a one-gift level the single hand-off IS the full solution, so
+  // there is no shorter run to score lower — that rung only exists when
+  // the level asks for more than one gift.
+  if (level.target > 1 && signalStars(level, one) !== 1) {
+    errors.push('One-handoff solution should earn 1 star.');
+  }
+  if (level.prefill) {
+    const lanes = level.lanes;
+    if ((level.prefill.packer?.length ?? 0) > lanes.packer.maxSlots) errors.push('Prefilled Packer lane does not fit.');
+    if ((level.prefill.mailer?.length ?? 0) > lanes.mailer.maxSlots) errors.push('Prefilled Mailer lane does not fit.');
+    const asRun = { packer: [...(level.prefill.packer ?? [])], mailer: [...(level.prefill.mailer ?? [])] };
+    if (runParallel(asRun, goal).success) errors.push('A prefilled level must still leave work for the child.');
+  }
   // shipping immediately (before any pack) ships an empty crate — the
   // signal is what makes the hand-off reliable rather than a timing gamble
   const shipEarly = runParallel({ packer: full.packer, mailer: [gShip] }, goal);
@@ -1257,7 +1643,120 @@ export const GW_BROKEN_MACHINE: GearworksDebugLevel = {
   ],
 };
 
-export const GEARWORKS_DEBUG_LEVELS: readonly GearworksDebugLevel[] = [GW_BROKEN_MACHINE];
+/**
+ * Debugging, discover phase: the child's first meeting with the ACTIVITY
+ * of debugging. One machine, one wrong tile, and a hint that says exactly
+ * what to look for — nothing here is a test.
+ */
+export const GW_ONE_WRONG_TILE: GearworksDebugLevel = {
+  id: 'gw-one-wrong-tile',
+  title: 'Gearworks Garage',
+  shortTitle: 'One Wrong Tile',
+  family: 'bench',
+  goalText: 'One tile is in the wrong place. Run it, watch, and put it right!',
+  emoji: '🔍',
+  brief: {
+    title: 'One Wrong Tile!',
+    text: 'Here is a secret about machines: when one goes wrong, it is almost never ALL wrong. Usually it is one tile. Press BOP, watch the Think Trail to see the exact moment it goes wrong, and fix just that tile. That is what debugging is.',
+    emoji: '🔍',
+  },
+  puzzles: [
+    {
+      n: 1, title: 'The Early Belt-Stop',
+      brief: 'This machine makes no jam at all. The belt starts — and then somebody turns it straight back off, so the berry never arrives. Run it, watch the Think Trail, and take that tile out.',
+      program: [dSM, dSC, dXC, dWS, dLP, dRP, dXM],
+      commands: ALL_JAM, maxSlots: 8,
+      goal: { minJam: 1 },
+      coachHint: 'Look at tile 3: BELT OFF, right after BELT ON. Remove it and the berry can ride in!',
+      fixed: [dSM, dSC, dWS, dLP, dRP, dXC, dXM],
+    },
+  ],
+};
+
+/**
+ * Debugging, build phase: no tile is named for them. Two machines, two
+ * different faults, and hints that describe the SYMPTOM rather than the
+ * cure — the child builds the repair.
+ */
+export const GW_MACHINE_CLINIC: GearworksDebugLevel = {
+  id: 'gw-machine-clinic',
+  title: 'Gearworks Garage',
+  shortTitle: 'Machine Clinic',
+  family: 'bench',
+  goalText: 'Two poorly machines, no clues given — diagnose them yourself!',
+  emoji: '🩺',
+  brief: {
+    title: 'The Machine Clinic!',
+    text: 'You know the drill now, so this time nobody is going to tell you which tile is wrong. Run the machine, read the Think Trail, decide where the story stops making sense, change ONE thing, and run it again. Change one thing at a time and the machine will tell you if you were right.',
+    emoji: '🩺',
+  },
+  puzzles: [
+    {
+      n: 1, title: 'The Belt That Never Starts',
+      brief: 'This machine has power but makes no jam at all. Something never gets going.',
+      program: [dSM, dWS, dLP, dRP, dXC, dXM],
+      commands: ALL_JAM, maxSlots: 8,
+      goal: { minJam: 1 },
+      coachHint: 'Follow the Think Trail from the top and find the first line that cannot possibly happen yet.',
+      fixed: [dSM, dSC, dWS, dLP, dRP, dXC, dXM],
+    },
+    {
+      n: 2, title: 'The Impatient Press',
+      brief: 'The order is for two jars. This one presses thin air, then manages a single jar.',
+      program: [dSM, dSC, dLP, dRP, dWS, dLP, dRP, dXC, dXM],
+      commands: ALL_JAM, maxSlots: 12,
+      goal: { minJam: 2 },
+      coachHint: 'Read the Think Trail from the top and ask: had anything actually arrived yet when the press came down?',
+      fixed: [dSM, dSC, dWS, dLP, dRP, dWS, dLP, dRP, dXC, dXM],
+    },
+  ],
+};
+
+/**
+ * Debugging, create phase: repair the machine AND take it further than it
+ * was ever built to go. Fixing is not the finish line — it is the start
+ * of making the thing yours.
+ */
+export const GW_FIX_AND_FINISH: GearworksDebugLevel = {
+  id: 'gw-fix-and-finish',
+  title: 'Gearworks Garage',
+  shortTitle: 'Fix It, Then Finish It',
+  family: 'bench',
+  goalText: 'Repair the machine — then make it do MORE than it was built for!',
+  emoji: '✨',
+  brief: {
+    title: 'Fix It, Then Finish It!',
+    text: 'This machine was only ever meant to make two jars, and right now it cannot even manage that. So: repair it first. Then the fun part — the order has grown to THREE jars, and nobody has written that plan. It is yours to finish however you like.',
+    emoji: '✨',
+  },
+  puzzles: [
+    {
+      n: 1, title: 'Repair It',
+      brief: 'Two jars were ordered and the belt gives up after one. Get it back to two.',
+      program: [dSM, dSC, dWS, dLP, dRP, dXC, dWS, dLP, dRP, dXM],
+      commands: ALL_JAM, maxSlots: 12,
+      goal: { minJam: 2 },
+      coachHint: 'Something switches off in the middle, so the second berry never arrives.',
+      fixed: [dSM, dSC, dWS, dLP, dRP, dWS, dLP, dRP, dXC, dXM],
+    },
+    {
+      n: 2, title: 'Now Make It Three',
+      brief: 'The order just grew to three jars — and this machine was only ever dialled for two. Stretch it however you like, as long as three jars come out and it switches off safely at the end.',
+      program: [dSM, dSC, dWS, dLP, dRP, { cmd: 'jmRepeat', arg: 2 }, dXC, dXM],
+      commands: ALL_JAM, maxSlots: 14,
+      goal: { minJam: 3, needSafeStop: true },
+      coachHint: 'The REPEAT dial says how many times the pressing part runs. Turn it up — or throw it away and write all three out yourself.',
+      fixed: [dSM, dSC, dWS, dLP, dRP, { cmd: 'jmRepeat', arg: 3 }, dXC, dXM],
+    },
+  ],
+};
+
+export const GEARWORKS_DEBUG_LEVELS: readonly GearworksDebugLevel[] = [
+  GW_ONE_WRONG_TILE,
+  GW_BROKEN_MACHINE,
+  GW_MACHINE_CLINIC,
+  GW_FIX_AND_FINISH,
+];
 
 /** The tile to spotlight when a puzzle's current program fails. */
 export function debugBugIndex(puzzle: DebugPuzzle, program: readonly GjStep[]): number {
@@ -1346,7 +1845,39 @@ export const GW_ROBOT_ORCHESTRA: GearworksOrchestraLevel = {
   coachHint: 'Tap any square to add a beat — then BOP to hear your robot band!',
 };
 
-export const GEARWORKS_ORCHESTRA_LEVELS: readonly GearworksOrchestraLevel[] = [GW_ROBOT_ORCHESTRA];
+/**
+ * Parallelism, discover phase: two robots, one beat. Nothing here can go
+ * wrong — the point is to hear that both players run at the same time.
+ */
+export const GW_TWO_ROBOTS: GearworksOrchestraLevel = {
+  id: 'gw-two-robots',
+  title: 'Gearworks Garage',
+  shortTitle: 'Two Robots, One Beat',
+  family: 'orchestra',
+  goalText: 'Tap squares for two robots — hear them play at the SAME time!',
+  emoji: '👯',
+  brief: {
+    title: 'Two Robots, One Beat!',
+    text: 'Two robots, four beats each. Tap a square to give a robot something to play. When two squares sit in the SAME column, both robots play together on that beat — not one after the other. Try stacking a drum and a bell and listen!',
+    emoji: '👯',
+  },
+  tracks: [
+    { id: 'drum', label: 'Drum', emoji: '🥁', sound: 'insDrum', color: '#ff5a7a' },
+    { id: 'bell', label: 'Bell', emoji: '🔔', sound: 'insBell', color: '#ffb43e' },
+  ],
+  steps: 4,
+  starter: [
+    { track: 'drum', step: 0 },
+    { track: 'bell', step: 0 },
+  ],
+  bonus: { text: 'Loop it so the two robots keep playing together' },
+  coachHint: 'Squares in the same column play together. Stack them up and BOP!',
+};
+
+export const GEARWORKS_ORCHESTRA_LEVELS: readonly GearworksOrchestraLevel[] = [
+  GW_TWO_ROBOTS,
+  GW_ROBOT_ORCHESTRA,
+];
 
 export function orchestraTrackIds(level: GearworksOrchestraLevel): string[] {
   return level.tracks.map((t) => t.id);
@@ -1846,6 +2377,12 @@ export interface GearworksStoryLevel {
   readonly maxSlots: number;
   readonly par: number;
   readonly bonus: { readonly text: string };
+  /**
+   * A debug-phase level ships with this program already in the slots.
+   * It must NOT already win — the child's job is to find what is wrong
+   * and repair it (validated below).
+   */
+  readonly prefill?: readonly StoryStep[];
   readonly coachHint: string;
 }
 
@@ -1931,7 +2468,46 @@ export const GW_BEDTIME_STORY: GearworksStoryLevel = {
   coachHint: 'PLAY or EAT first, then YAWN to get sleepy, then SLEEP — sleep only works when sleepy!',
 };
 
+/**
+ * State, guide phase: two moods, two doors. The game names the move in
+ * the hint; the child feels that WHERE you are decides WHAT can happen.
+ */
+export const GW_WAKE_UP_BLOOP: GearworksStoryLevel = {
+  id: 'gw-wake-up-bloop',
+  title: 'Gearworks Garage',
+  shortTitle: 'Wake Up, Bloop',
+  family: 'story',
+  goalText: 'Bloop is asleep. Wake it, then cheer it up — one mood at a time!',
+  emoji: '🌅',
+  brief: {
+    title: 'Wake Up, Bloop!',
+    text: 'Bloop is always in exactly one MOOD, and the mood decides which tiles do anything at all. HUG a sleeping robot and nothing happens — you have to WAKE it first. Follow the arrows on the mood map: sleepy, then curious, then happy.',
+    emoji: '🌅',
+  },
+  actorName: 'Bloop',
+  states: [
+    { id: 'sleepy', label: 'sleepy', emoji: '😴', color: '#6f7bd6' },
+    { id: 'curious', label: 'curious', emoji: '🤔', color: '#ffb43e' },
+    { id: 'giggly', label: 'giggly', emoji: '🤪', color: '#ff7ad0' },
+    { id: 'happy', label: 'happy', emoji: '😄', color: '#8be04a' },
+  ],
+  transitions: [
+    { from: 'sleepy', event: 'stWake', to: 'curious' },
+    { from: 'curious', event: 'stHug', to: 'happy' },
+    { from: 'curious', event: 'stTickle', to: 'giggly' },
+    { from: 'giggly', event: 'stCalm', to: 'happy' },
+  ],
+  start: 'sleepy',
+  target: 'happy',
+  commands: ['stWake', 'stHug', 'stTickle', 'stCalm'],
+  maxSlots: 6,
+  par: 2,
+  bonus: { text: 'Find the giggly way round to happy' },
+  coachHint: 'WAKE the sleepy robot first — only then does HUG work. WAKE, then HUG!',
+};
+
 export const GEARWORKS_STORY_LEVELS: readonly GearworksStoryLevel[] = [
+  GW_WAKE_UP_BLOOP,
   GW_ROBOT_FEELINGS, GW_BEDTIME_STORY,
 ];
 
@@ -1974,6 +2550,15 @@ export function validateStoryLevel(level: GearworksStoryLevel): string[] {
   if (longer) {
     if (runStory(longer, def).finalState !== level.target) errors.push('A longer path should still reach the target.');
     if (storyStars(level, longer, false) !== 1) errors.push('A longer path should earn just 1 star.');
+  }
+  if (level.prefill) {
+    if (!level.prefill.every((st) => level.commands.includes(st.cmd))) {
+      errors.push('The prefilled program uses tiles this level does not offer.');
+    }
+    if (level.prefill.length > level.maxSlots) errors.push('The prefilled program does not fit the deck.');
+    if (runStory(level.prefill.map((x) => ({ ...x })), def).finalState === level.target) {
+      errors.push('A debug level\'s prefilled program must NOT already reach the target.');
+    }
   }
   return errors;
 }
@@ -2054,8 +2639,58 @@ export const GW_SKYLINE: GearworksMakerLevel = {
   coachHint: 'Make the gadget PLACE then REPEAT (input). Then MAKE 3, MAKE 1, MAKE 2 — one for each tower!',
 };
 
+/**
+ * Decomposition, discover phase: one tower, one gadget. The smallest
+ * possible version of "give the small job a name, then use the name".
+ */
+export const GW_ONE_TOWER: GearworksMakerLevel = {
+  id: 'gw-one-tower',
+  title: 'Gearworks Garage',
+  shortTitle: 'Two Little Towers',
+  family: 'maker',
+  goalText: 'Teach the gadget to stack blocks — then build two little towers!',
+  emoji: '🧱',
+  brief: {
+    title: 'Two Little Towers!',
+    text: 'Big jobs are just small jobs with a name. Put PLACE and REPEAT (input) on the gadget card and you have taught the machine what "stack a tower" means. Now call MAKE twice, dial on 2 — and watch your little job do all the work.',
+    emoji: '🧱',
+  },
+  gadgetName: 'MAKE',
+  gadgetSlots: 4,
+  bodyPrims: ['mkPlace', 'mkRepeatParam'],
+  maxSlots: 4,
+  target: [2, 2],
+  bonus: { text: 'A gadget that reads its input dial' },
+  coachHint: 'Gadget: PLACE, then REPEAT (input). Then MAKE 2, MAKE 2 — that is the whole thing!',
+};
+
+/**
+ * Decomposition, guide phase: the same small job, used twice. The game
+ * spells out the move; the child feels the saving for the first time.
+ */
+export const GW_TWIN_TOWERS: GearworksMakerLevel = {
+  id: 'gw-twin-towers',
+  title: 'Gearworks Garage',
+  shortTitle: 'Twin Towers',
+  family: 'maker',
+  goalText: 'Two towers, both 3 high — one gadget, called twice!',
+  emoji: '🏗️',
+  brief: {
+    title: 'Twin Towers!',
+    text: 'Two towers this time, and they are the same height. You already know how to teach the gadget one tower — so do not write the whole thing twice! Teach it once, then call MAKE 3 and MAKE 3 again. That is what breaking a big job into small jobs buys you.',
+    emoji: '🏗️',
+  },
+  gadgetName: 'MAKE',
+  gadgetSlots: 4,
+  bodyPrims: ['mkPlace', 'mkRepeatParam'],
+  maxSlots: 5,
+  target: [3, 3],
+  bonus: { text: 'One gadget builds both towers' },
+  coachHint: 'Gadget: PLACE, then REPEAT (input). Then MAKE 3, MAKE 3 — the same little job, twice!',
+};
+
 export const GEARWORKS_MAKER_LEVELS: readonly GearworksMakerLevel[] = [
-  GW_BLOCK_BOT, GW_SKYLINE,
+  GW_ONE_TOWER, GW_TWIN_TOWERS, GW_BLOCK_BOT, GW_SKYLINE,
 ];
 
 export function makerGoalOf(level: GearworksMakerLevel): MakerGoal {

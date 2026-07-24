@@ -121,6 +121,7 @@ export class GearworksStoryScreen {
       onClear: () => this.resetStory(),
     }, {
       tiles: GW_STORY_TILES,
+      initial: this.level.prefill?.map((s) => ({ ...s })),
     });
 
     // --- animation loop ---

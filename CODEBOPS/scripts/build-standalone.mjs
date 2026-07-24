@@ -15,10 +15,18 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 
+// Take the entry names from the built index.html, never by scanning the
+// directory: a stale bundle left over from an earlier build sorts first
+// just as easily as the current one, and silently ships old game code.
+const indexHtml = readFileSync(join(dist, 'index.html'), 'utf8');
+const jsName = indexHtml.match(/assets\/([^"']+\.js)/)?.[1];
+const cssName = indexHtml.match(/assets\/([^"']+\.css)/)?.[1];
+if (!jsName || !cssName) throw new Error('Build first: dist/index.html names no bundle.');
 const assets = readdirSync(join(dist, 'assets'));
-const jsName = assets.find((f) => f.endsWith('.js'));
-const cssName = assets.find((f) => f.endsWith('.css'));
-if (!jsName || !cssName) throw new Error('Build first: missing dist/assets bundle.');
+const stale = assets.filter((f) => f !== jsName && f !== cssName);
+if (stale.length > 0) {
+  console.warn(`[standalone] ignoring ${stale.length} stale asset(s) in dist/assets: ${stale.join(', ')}`);
+}
 
 const js = readFileSync(join(dist, 'assets', jsName), 'utf8');
 const css = readFileSync(join(dist, 'assets', cssName), 'utf8');

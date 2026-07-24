@@ -121,7 +121,7 @@ export class GearworksSorterScreen {
       onChange: () => { /* live rule */ },
       onBop: () => void this.onBop(),
       onClear: () => this.resetMachine(),
-    }, { tiles: GW_SORTER_TILES });
+    }, { tiles: GW_SORTER_TILES, initial: this.level.prefill?.map((s) => ({ ...s })) });
 
     // --- animation loop ---
     this.applySettings();

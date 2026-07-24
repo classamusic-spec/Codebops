@@ -109,6 +109,8 @@ export class GearworksSignalScreen {
       onBop: () => void this.onBop(),
       onClear: () => { this.rig.reset(); this.trail.setEmpty(); this.trail.setMachineLine(`Delivered: 0 of ${this.level.target} 🎁`); },
     }, () => { /* live plans */ });
+    // A guide level ships one lane already written (§ curriculum ladder).
+    if (this.level.prefill) this.deck.setPrograms(this.level.prefill);
 
     // --- animation loop ---
     this.applySettings();
@@ -209,7 +211,9 @@ export class GearworksSignalScreen {
       this.everStars = Math.max(this.everStars, stars);
       const starNames = ['A gift delivered!'];
       if (this.everStars >= 2) starNames.push('Both gifts — great teamwork!');
-      if (this.everStars >= 3) starNames.push('Looped both lanes!');
+      if (this.everStars >= 3) {
+        starNames.push(this.level.target > 1 ? 'Looped both lanes!' : 'You sent it again — the signal always works!');
+      }
       const prev = this.events.store.stars[this.level.id] ?? 0;
       this.events.store.setStars(this.level.id, Math.max(prev, this.everStars));
     this.events.store.recordRun(this.level.id, Math.max(prev, this.everStars), this.level.shortTitle);
@@ -221,9 +225,11 @@ export class GearworksSignalScreen {
         onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),
       });
       if (this.everStars < 3) {
-        this.toast(this.everStars < 2
-          ? '🎁 Now deliver the SECOND gift — do the hand-off twice!'
-          : '🔁 Compact it: end each lane with a REPEAT ×2 loop!');
+        this.toast(this.level.target === 1
+          ? '📣 One message, one gift! Now do the whole hand-off AGAIN for a second one.'
+          : this.everStars < 2
+            ? '🎁 Now deliver the SECOND gift — do the hand-off twice!'
+            : '🔁 Compact it: end each lane with a REPEAT ×2 loop!');
       }
     } else {
       void this.mixy.glitchWobble(0.8);

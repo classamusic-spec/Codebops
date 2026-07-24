@@ -133,6 +133,7 @@ export class GearworksCounterScreen {
         gcSet: { min: 0, max: CN_MAX, def: 0, prefix: '=', aria: 'Set the counter value: tap to pick 0 up to 9' },
       },
       loopCmds: ['ssRepeat', 'ssRepeatUntilFull'],
+      initial: this.level.prefill?.map((s) => ({ ...s })),
     });
 
     // --- animation loop ---

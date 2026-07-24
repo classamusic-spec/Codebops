@@ -50,7 +50,7 @@ import {
 } from '../src/gameplay/gearworks/sensorMachine';
 import type { GwSensorStep } from '../src/gameplay/gearworks/sensorMachine';
 import {
-  GEARWORKS_SENSOR_LEVELS, GW_WAIT_BERRY, GW_SENSOR_WORKSHOP,
+  GEARWORKS_SENSOR_LEVELS, GW_WAIT_BERRY, GW_SENSOR_WORKSHOP, GW_JUMPY_CLAW, GW_BERRY_PARADE,
   validateSensorLevel, canonicalSensorSolution,
 } from '../src/data/gearworks/levels';
 import {
@@ -58,7 +58,7 @@ import {
 } from '../src/gameplay/gearworks/sorterMachine';
 import type { GtStep, SortItem } from '../src/gameplay/gearworks/sorterMachine';
 import {
-  GEARWORKS_SORTER_LEVELS, GW_SENSOR_SORTER, GW_CONVEYOR_FACTORY,
+  GEARWORKS_SORTER_LEVELS, GW_SENSOR_SORTER, GW_CONVEYOR_FACTORY, GW_MIXED_UP_BELT,
   validateSorterLevel, canonicalSorterSolution, elseTrickSolution,
 } from '../src/data/gearworks/levels';
 import {
@@ -67,7 +67,7 @@ import {
 } from '../src/gameplay/gearworks/counterMachine';
 import type { GcStep } from '../src/gameplay/gearworks/counterMachine';
 import {
-  GEARWORKS_COUNTER_LEVELS, GW_BERRY_COUNTER, GW_SAFE_STOP,
+  GEARWORKS_COUNTER_LEVELS, GW_BERRY_COUNTER, GW_SAFE_STOP, GW_COUNTER_MIXUP, GW_MY_NUMBER,
   validateCounterLevel, canonicalCounterSolution, countUpSolution, foreverFredSolution,
 } from '../src/data/gearworks/levels';
 import {
@@ -82,7 +82,7 @@ import {
 } from '../src/gameplay/gearworks/jobMachine';
 import type { JobStep } from '../src/gameplay/gearworks/jobMachine';
 import {
-  GW_SAVE_A_JOB, validateJobLevel, jobStars,
+  GW_SAVE_A_JOB, GW_JOB_MIXUP, GEARWORKS_JOB_LEVELS, validateJobLevel, jobStars,
   jobRawSolution, jobCallSolution, jobLoopSolution,
 } from '../src/data/gearworks/levels';
 import {
@@ -90,12 +90,12 @@ import {
 } from '../src/gameplay/gearworks/signalMachine';
 import type { SignalStep } from '../src/gameplay/gearworks/signalMachine';
 import {
-  GW_TWO_MACHINE, validateSignalLevel, signalStars,
-  signalFullSolution, signalLoopSolution, signalOneSolution,
+  GW_TWO_MACHINE, GW_FIRST_SIGNAL, GW_RELAY_RACE, GEARWORKS_SIGNAL_LEVELS, validateSignalLevel, signalStars,
+  signalFullSolution, signalLoopSolution, signalOneSolution, signalEncoreSolution,
 } from '../src/data/gearworks/levels';
 import { runJam, jamGoalMet, jamBugIndex } from '../src/gameplay/gearworks/jamMachine';
 import {
-  GW_BROKEN_MACHINE, validateDebugLevel, debugBugIndex,
+  GW_BROKEN_MACHINE, GEARWORKS_DEBUG_LEVELS, validateDebugLevel, debugBugIndex,
 } from '../src/data/gearworks/levels';
 import {
   GEARWORKS_FACTORY_LEVELS, GW_THREE_WAY, GW_FACTORY_RUSH,
@@ -156,8 +156,8 @@ import { GEARWORKS_SEQUENCE } from '../src/data/gearworks/world';
 import {
   CURRICULUM_STAGES, stage, allPrerequisites,
 } from '../src/data/curriculum/stages';
-import { LEVEL_CURRICULUM, levelsForStage } from '../src/data/curriculum/levelMeta';
-import { validateCurriculum } from '../src/data/curriculum/validate';
+import { LEVEL_CURRICULUM, levelsForStage, phasesForStage } from '../src/data/curriculum/levelMeta';
+import { validateCurriculum, incompleteLadders } from '../src/data/curriculum/validate';
 import {
   allMastery, stageMastery, childTier, isStageAvailable, nextStage,
 } from '../src/data/curriculum/mastery';
@@ -831,7 +831,7 @@ const MAIN = (...cmds: Array<JobStep['cmd'] | [JobStep['cmd'], number]>): JobSte
   cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
 
 {
-  check('job level validates', validateJobLevel(GW_SAVE_A_JOB).length === 0);
+  for (const l of GEARWORKS_JOB_LEVELS) check(`${l.id} validates`, validateJobLevel(l).length === 0);
   // the abstraction ladder: raw = 1 star, call = 2, loop = 3
   check('raw fetch/press ×3 works but earns 1 star',
     jobStars(GW_SAVE_A_JOB, BODY, jobRawSolution(GW_SAVE_A_JOB)) === 1);
@@ -869,7 +869,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
 
 {
-  check('signal level validates', validateSignalLevel(GW_TWO_MACHINE).length === 0);
+  for (const l of GEARWORKS_SIGNAL_LEVELS) check(`${l.id} validates`, validateSignalLevel(l).length === 0);
   check('one hand-off delivers 1 gift (1 star)', signalStars(GW_TWO_MACHINE, signalOneSolution()) === 1);
   check('two hand-offs deliver both (2 stars)', signalStars(GW_TWO_MACHINE, signalFullSolution()) === 2);
   check('looping both lanes earns 3 stars', signalStars(GW_TWO_MACHINE, signalLoopSolution(GW_TWO_MACHINE)) === 3);
@@ -912,7 +912,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
 
 // --- Gearworks advanced debugging (Phase 11) ---
 {
-  check('broken-machine level validates', validateDebugLevel(GW_BROKEN_MACHINE).length === 0);
+  for (const l of GEARWORKS_DEBUG_LEVELS) check(`${l.id} validates`, validateDebugLevel(l).length === 0);
   GW_BROKEN_MACHINE.puzzles.forEach((p) => {
     check(`bug ${p.n} is actually broken`, !jamGoalMet(p.goal, runJam(p.program)));
     check(`bug ${p.n}'s fix works`, jamGoalMet(p.goal, runJam(p.fixed)));
@@ -1519,6 +1519,71 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('Code Peek is skipped where there is no program or no metadata',
     peekForLevel('bb-3', 'Bubble Loop', []) === null
     && peekForLevel('not-a-level', 'Nowhere', peek) === null);
+}
+
+// ---------------------------------------------------------------
+// Curriculum ladder: every stage now has all five phases, and the
+// levels that close them behave the way their phase claims.
+// ---------------------------------------------------------------
+{
+  console.log('\n-- curriculum ladder --');
+  const gaps = incompleteLadders();
+  check('every stage has a full Discover->Guide->Build->Debug->Create ladder',
+    gaps.length === 0);
+  if (gaps.length > 0) console.log('   gaps:', JSON.stringify(gaps));
+
+  // A debug-phase level must actually ship something broken to repair.
+  const debugPhase = LEVEL_CURRICULUM.filter((l) => l.difficulty === 'debug');
+  check('every concept has at least one debug-phase level',
+    CURRICULUM_STAGES.every((s) => phasesForStage(s.id).includes('debug')));
+  check('debug-phase levels all practise debugging itself',
+    debugPhase.every((l) => l.practicedConcepts.includes('debugging')
+      || l.assessedConcepts.includes('debugging')
+      || l.introducedConcepts.includes('debugging')));
+
+  // Prefilled programs are the mechanism; check each really is broken.
+  const prefilled: Array<[string, boolean]> = [
+    ['gw-jumpy-claw', validateSensorLevel(GW_JUMPY_CLAW).length === 0],
+    ['gw-mixed-up-belt', validateSorterLevel(GW_MIXED_UP_BELT).length === 0],
+    ['gw-counter-mixup', validateCounterLevel(GW_COUNTER_MIXUP).length === 0],
+    ['gw-job-mixup', validateJobLevel(GW_JOB_MIXUP).length === 0],
+  ];
+  for (const [id, ok] of prefilled) check(`${id} ships a genuinely broken program`, ok);
+  check('the jumpy claw really does snap on air',
+    runSensorMachine(GW_JUMPY_CLAW.prefill!.map((s) => ({ ...s })), 'berry').finalState.snaps > 0);
+  check('the mixed-up belt really does mis-sort every berry',
+    !runSorter(GW_MIXED_UP_BELT.prefill!.map((s) => ({ ...s })), GW_MIXED_UP_BELT.stream, GW_MIXED_UP_BELT.rules).allCorrect);
+
+  // A create-phase level must leave room for more than one answer.
+  check('My Own Number can be reached two different ways',
+    countUpSolution(GW_MY_NUMBER).length > canonicalCounterSolution(GW_MY_NUMBER).length
+    && countUpSolution(GW_MY_NUMBER).length <= GW_MY_NUMBER.maxSlots);
+  check('Berry Parade asks for more berries than one wait-and-grab',
+    (GW_BERRY_PARADE.berryGoal?.needBerries ?? 0) >= 3
+    && canonicalSensorSolution(GW_BERRY_PARADE).length <= GW_BERRY_PARADE.maxSlots);
+
+  // Discover levels must be gentle: the hint spells the answer out and
+  // the canonical plan fits par exactly.
+  check('The First Signal is winnable with one hand-off',
+    signalStars(GW_FIRST_SIGNAL, signalOneSolution()) >= 2);
+  check('The First Signal still has a third star to reach for',
+    signalStars(GW_FIRST_SIGNAL, signalEncoreSolution()) === 3);
+  check('Relay Race hands the child a Mailer lane that cannot win alone',
+    !!GW_RELAY_RACE.prefill?.mailer
+    && !runParallel({ packer: [], mailer: [...GW_RELAY_RACE.prefill!.mailer!] },
+      { target: GW_RELAY_RACE.target }).success);
+
+  // Every new level is reachable from the picker.
+  const seqIds = new Set(GEARWORKS_SEQUENCE.map((e) => e.level.id));
+  const ladderIds = [
+    'gw-jumpy-claw', 'gw-berry-parade', 'gw-first-choice', 'gw-shape-shelf', 'gw-mixed-up-belt',
+    'gw-counter-mixup', 'gw-my-number', 'gw-two-robots', 'gw-first-signal', 'gw-relay-race',
+    'gw-job-mixup', 'gw-one-tower', 'gw-twin-towers', 'gw-wake-up-bloop',
+    'gw-one-wrong-tile', 'gw-machine-clinic', 'gw-fix-and-finish',
+  ];
+  check('every ladder level is in the Gearworks picker', ladderIds.every((id) => seqIds.has(id)));
+  check('every ladder level carries curriculum metadata',
+    ladderIds.every((id) => LEVEL_CURRICULUM.some((l) => l.levelId === id)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

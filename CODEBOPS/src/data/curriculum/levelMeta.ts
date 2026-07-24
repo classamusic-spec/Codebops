@@ -169,6 +169,64 @@ export const LEVEL_CURRICULUM: readonly M[] = [
     ['fn-create', 'fn-reuse'], 'Save this job.'),
   m('gw-skyline', 'gearworks-garage', 'build', [], ['functions', 'variables', 'decomposition'], ['functions', 'variables'], ['sequence', 'loops'],
     ['fn-reuse', 'fn-edit', 'var-decide'], 'One job, many different answers.'),
+  // ================================================================
+  // Ladder levels — each closes a Discover→Guide→Build→Debug→Create
+  // rung that the curriculum asks for but no level was filling.
+  // ================================================================
+  // Events: debug + create
+  m('gw-jumpy-claw', 'gearworks-garage', 'debug', [], ['events', 'debugging', 'conditions'],
+    ['events', 'debugging'], ['sequence', 'events'],
+    ['evt-connect', 'evt-distinguish', 'dbg-identify', 'dbg-change'], 'Wait for the right moment.'),
+  m('gw-berry-parade', 'gearworks-garage', 'create', [], ['events', 'sequence'], ['events'], ['events'],
+    ['evt-trigger', 'evt-connect'], 'Make your own waiting machine.'),
+  // If–Else: discover
+  m('gw-first-choice', 'gearworks-garage', 'discover', [], ['if-else', 'conditions'], ['if-else'], ['conditions'],
+    ['ifelse-two'], 'This way or that way.'),
+  // Data: discover + debug
+  m('gw-shape-shelf', 'gearworks-garage', 'discover', [], ['data', 'conditions'], ['data'], ['conditions'],
+    ['data-property'], 'Sort what you noticed.'),
+  m('gw-mixed-up-belt', 'gearworks-garage', 'debug', [], ['data', 'debugging', 'if-else'],
+    ['data', 'debugging'], ['conditions'],
+    ['data-sort', 'dbg-inspect', 'dbg-identify', 'dbg-retest'], 'Find the mixed-up step.'),
+  // Variables: debug + create
+  m('gw-counter-mixup', 'gearworks-garage', 'debug', [], ['variables', 'debugging'],
+    ['variables', 'debugging'], ['variables'],
+    ['var-update', 'dbg-identify', 'dbg-change', 'dbg-retest'], 'Remember a number.'),
+  m('gw-my-number', 'gearworks-garage', 'create', [], ['variables'], ['variables'], ['variables'],
+    ['var-container', 'var-decide'], 'Reach your number your own way.'),
+  // Parallelism: discover (two robots playing together)
+  // Parallelism sits behind events + messages (§7), so this first
+  // meeting comes after the signal levels rather than before them.
+  m('gw-two-robots', 'gearworks-garage', 'discover', [], ['parallelism', 'sequence'], ['parallelism'],
+    ['sequence', 'events', 'messages'],
+    ['par-timing'], 'Work at the same time.'),
+  // Messages: discover
+  m('gw-first-signal', 'gearworks-garage', 'discover', [], ['messages', 'parallelism', 'events'],
+    ['messages'], ['events'],
+    ['msg-send', 'msg-wait'], 'Tell another Bop.'),
+  // Parallelism: guide (one lane written for them)
+  m('gw-relay-race', 'gearworks-garage', 'guide', [], ['parallelism', 'messages'], ['parallelism'], ['events', 'messages'],
+    ['par-coordinate', 'par-dependency'], 'Work at the same time.'),
+  // Functions + decomposition: debug
+  m('gw-job-mixup', 'gearworks-garage', 'debug', [], ['functions', 'decomposition', 'debugging'],
+    ['functions', 'decomposition', 'debugging'], ['sequence', 'functions'],
+    ['fn-reuse', 'fn-edit', 'dec-combine', 'dbg-identify', 'dbg-change'], 'Save this job.'),
+  // Decomposition: discover + guide
+  m('gw-one-tower', 'gearworks-garage', 'discover', [], ['decomposition', 'functions'], ['decomposition'], ['sequence'],
+    ['dec-split'], 'Split a big job into smaller jobs.'),
+  m('gw-twin-towers', 'gearworks-garage', 'guide', [], ['decomposition', 'functions'], ['decomposition'], ['sequence'],
+    ['dec-split', 'dec-assign'], 'Split a big job into smaller jobs.'),
+  // State: guide
+  m('gw-wake-up-bloop', 'gearworks-garage', 'guide', [], ['state', 'conditions'], ['state'], ['variables', 'conditions'],
+    ['state-identify', 'state-mismatch'], 'What is happening now?'),
+  // Debugging: discover, build, create
+  m('gw-one-wrong-tile', 'gearworks-garage', 'discover', [], ['debugging', 'sequence'], ['debugging'], ['sequence'],
+    ['dbg-inspect'], 'Find the mixed-up step.'),
+  m('gw-machine-clinic', 'gearworks-garage', 'build', [], ['debugging', 'sequence', 'events'], ['debugging'], ['sequence'],
+    ['dbg-inspect', 'dbg-identify', 'dbg-change', 'dbg-retest'], 'Find the mixed-up step.'),
+  m('gw-fix-and-finish', 'gearworks-garage', 'create', [], ['debugging', 'loops', 'sequence'],
+    ['debugging', 'loops'], ['sequence', 'loops'],
+    ['dbg-change', 'dbg-retest', 'loop-count'], 'Fix it, then make it yours.'),
 ];
 
 const BY_LEVEL = new Map(LEVEL_CURRICULUM.map((x) => [x.levelId, x]));

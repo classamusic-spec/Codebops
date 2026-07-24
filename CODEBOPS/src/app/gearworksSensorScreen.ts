@@ -147,7 +147,7 @@ export class GearworksSensorScreen {
       onChange: () => { /* live program */ },
       onBop: () => void this.onBop(),
       onClear: () => this.resetMachine(),
-    }, { tiles: GW_SENSOR_TILES });
+    }, { tiles: GW_SENSOR_TILES, initial: this.level.prefill?.map((s) => ({ ...s })) });
 
     // --- animation loop ---
     this.applySettings();
@@ -247,7 +247,10 @@ export class GearworksSensorScreen {
 
     if (success) {
       if (program.length <= this.level.par) this.everPar = true;
-      if (this.level.bonus.kind === 'secondBerry') {
+      if (this.level.bonus.kind === 'noWaste') {
+        // Every berry accounted for: none snapped at, none ridden by.
+        if (result.finalState.snaps === 0 && result.finalState.missed === 0) this.everBonus = true;
+      } else if (this.level.bonus.kind === 'secondBerry') {
         if (result.finalState.berriesGrabbed >= 2) this.everBonus = true;
       } else {
         if (turning) this.okTurning = true;
@@ -276,9 +279,12 @@ export class GearworksSensorScreen {
         onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),
       });
       if (!this.everBonus) {
-        this.toast(this.level.bonus.kind === 'secondBerry'
-          ? '🍓 The belt keeps rolling — can you grab TWO berries in one plan?'
-          : `🚦 Now tap the gear ${turning ? 'STILL' : 'TURNING'} and BOP again — test the other branch!`);
+        this.toast(
+          this.level.bonus.kind === 'secondBerry'
+            ? '🍓 The belt keeps rolling — can you grab TWO berries in one plan?'
+            : this.level.bonus.kind === 'noWaste'
+              ? '🍓 It works! Now catch all three with no snaps and none ridden by.'
+              : `🚦 Now tap the gear ${turning ? 'STILL' : 'TURNING'} and BOP again — test the other branch!`);
       }
     } else {
       const misses = this.level.machine === 'berry'
