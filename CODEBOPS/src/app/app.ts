@@ -10,7 +10,8 @@ import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
-import { GEARWORKS_WORLD, GEARWORKS_LEVELS } from '../data/gearworks/world';
+import { GEARWORKS_WORLD, GEARWORKS_PICKER } from '../data/gearworks/world';
+import { GEARWORKS_MACHINE_LEVELS } from '../data/gearworks/levels';
 import { createCampfireGate, showCampfire } from './campfire';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
@@ -256,28 +257,40 @@ export class App {
       el('span', undefined, title, GEARWORKS_WORLD.name);
       el('span', 'gw-new-badge', title, 'NEW!');
       const list = el('div', 'level-list', section);
-      GEARWORKS_LEVELS.forEach((lv, i) => {
-        const row = el('button', `level-item${lv.playable ? '' : ' locked'}`, list) as HTMLButtonElement;
+      let machineIdx = 0;
+      GEARWORKS_PICKER.forEach((entry, i) => {
+        const isMachine = entry.kind === 'machine';
+        const thisMachineIdx = machineIdx;
+        // Machine levels unlock in order (first is always open).
+        const unlocked = isMachine && (thisMachineIdx === 0 ||
+          (this.store.stars[GEARWORKS_MACHINE_LEVELS[thisMachineIdx - 1].id] ?? 0) >= 1);
+        if (isMachine) machineIdx++;
+        const label = isMachine ? entry.level.shortTitle : entry.shortTitle;
+        const emoji = isMachine ? entry.level.emoji : entry.emoji;
+        const row = el('button', `level-item${unlocked ? '' : ' locked'}`, list) as HTMLButtonElement;
         row.type = 'button';
-        row.setAttribute('aria-label', lv.playable ? `Play ${lv.shortTitle}` : `${lv.shortTitle} — coming soon`);
+        row.setAttribute('aria-label', unlocked ? `Play ${label}` : `${label} — locked`);
         const num = el('span', 'li-num gw-num', row);
         el('span', 'li-num-text', num, String(i + 1));
         el('span', 'li-leaf', num, '⚙️');
-        el('span', 'li-emoji', row, lv.emoji);
-        el('span', 'li-name', row, lv.shortTitle);
+        el('span', 'li-emoji', row, emoji);
+        el('span', 'li-name', row, label);
         const right = el('span', 'li-right', row);
-        if (!lv.playable) el('span', 'li-lock', right, '🔒');
+        if (!unlocked) el('span', 'li-lock', right, '🔒');
+        const stars = isMachine ? (this.store.stars[entry.level.id] ?? 0) : 0;
         const starRow = el('span', 'li-stars', right);
-        for (let s = 0; s < 3; s++) el('span', '', starRow, '★');
-        if (lv.playable) {
-          row.addEventListener('click', () => this.showGearworks(i));
+        for (let s = 0; s < 3; s++) el('span', s < stars ? 'on' : '', starRow, '★');
+        if (unlocked) {
+          row.addEventListener('click', () => this.showGearworks(thisMachineIdx));
         } else {
           row.addEventListener('click', () => {
             sharedSfx.play('bump');
             row.classList.remove('shake');
             void row.offsetWidth;
             row.classList.add('shake');
-            this.hintToast('🔧 Zip is still building this machine!');
+            this.hintToast(isMachine
+              ? '⭐ Win the machine before this one to unlock it!'
+              : '🔧 Zip is still building this machine!');
           });
         }
       });
@@ -362,8 +375,11 @@ export class App {
     this.clearHost();
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-gearworks';
-    this.gearworks = new GearworksScreen(screen, GEARWORKS_LEVELS[index], {
+    const hasNext = index < GEARWORKS_MACHINE_LEVELS.length - 1;
+    this.gearworks = new GearworksScreen(screen, GEARWORKS_MACHINE_LEVELS[index], {
       onExit: () => this.showSelect(),
+      onNext: hasNext ? () => this.showGearworks(index + 1) : undefined,
+      hasNext,
       store: this.store,
     });
     this.gearworks.enter();

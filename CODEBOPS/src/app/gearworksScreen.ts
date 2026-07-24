@@ -1,41 +1,64 @@
 /**
- * Gearworks Garage screen — Phase 1 world shell.
+ * Gearworks Garage screen — Phase 2: playable motor levels.
  *
- * Mounts the toy-diorama workshop (bench camera preset, indoor lighting),
- * the shared top bar, the mission card, the Think Trail shell, a command-
- * area shell with the first Gearworks tiles, and Zip + Mixy flanking the
- * bench at floor level with name chips — matching the reference art.
+ * The child builds a machine program on the deck, presses BOP!, and the
+ * deterministic machine interpreter runs it. Playback then animates the
+ * typed event stream on the MotorRig (lamp, gauge needle, direction
+ * arrow, spinning gear) while the Think Trail narrates every step and a
+ * live state line shows ON/OFF · direction · speed. Success awards the
+ * three stars (works / clever / creative) through the shared save store.
  *
- * No machine simulation yet: BOP! is parked until Phase 2's machine
- * interpreter, and tapping a tile explains that honestly and playfully.
+ * DISCOVER beat: tapping the machine before programming nudges it — the
+ * child sees cause and effect before writing a single instruction.
  */
+import * as THREE from 'three';
 import { Stage } from '../engine/stage';
 import { CAMERA_PRESETS } from '../rendering/gearworks/cameraPresets';
 import { GarageScene } from '../rendering/gearworks/garageScene';
+import { MotorRig } from '../rendering/gearworks/motorRig';
 import { SpriteCharacter } from '../rendering/spriteCharacter';
 import { TopBar } from '../ui/topBar';
 import { GoalCard } from '../ui/goalCard';
-import { ThinkTrailPanel } from '../ui/gearworks/statePanel';
-import { showBrief, showSettings } from '../ui/dialogs';
+import { ThinkTrailPanel, ThinkTrailStep } from '../ui/gearworks/statePanel';
+import { MachineDeck } from '../ui/gearworks/machineDeck';
+import { showBrief, showCelebration, showSettings } from '../ui/dialogs';
 import { sharedSfx } from '../audio/sfx';
 import { SaveStore } from '../storage/saveStore';
 import { el } from '../ui/dom';
-import type { GearworksLevelShell } from '../data/gearworks/world';
-import { GEARWORKS_TRAY_SHELL } from '../data/gearworks/world';
+import type { GearworksMachineLevel } from '../data/gearworks/levels';
+import { bonusMet } from '../data/gearworks/levels';
+import { GW_SPEED_NAMES } from '../data/gearworks/world';
+import {
+  runMachine, GearworksEvent, MachineState, initialMachine,
+} from '../gameplay/gearworks/machine';
+import { goalMisses } from '../gameplay/gearworks/machine';
+
+const STEP_MS = 620;
 
 export class GearworksScreen {
   private stage!: Stage;
   private scene!: GarageScene;
+  private rig!: MotorRig;
   private zip!: SpriteCharacter;
   private mixy!: SpriteCharacter;
   private trail!: ThinkTrailPanel;
+  private deck!: MachineDeck;
+  private topBar!: TopBar;
   private charLayer!: HTMLElement;
+  private ui!: HTMLElement;
   private disposers: Array<() => void> = [];
+  private running = false;
+  private calm = false;
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly level: GearworksLevelShell,
-    private readonly events: { onExit: () => void; store: SaveStore },
+    private readonly level: GearworksMachineLevel,
+    private readonly events: {
+      onExit: () => void;
+      onNext?: () => void;
+      hasNext: boolean;
+      store: SaveStore;
+    },
   ) {}
 
   enter(): void {
@@ -43,17 +66,41 @@ export class GearworksScreen {
     wrap.id = 'world-canvas-wrap';
     this.charLayer = el('div', '', this.root);
     this.charLayer.id = 'char-layer';
-    const ui = el('div', 'ui-layer', this.root);
+    this.ui = el('div', 'ui-layer', this.root);
 
-    // --- stage with the bench diorama camera + indoor light rig ---
+    // --- stage: bench diorama + indoor light rig ---
     const preset = CAMERA_PRESETS.bench;
     this.stage = new Stage(wrap, { viewDir: preset.viewDir, fovFor: preset.fovFor, indoor: true });
     this.stage.setSky('#141c4a', 40, 90);
-    this.scene = new GarageScene();
+    this.scene = new GarageScene('motorLab');
     this.stage.scene.add(this.scene.group);
     this.stage.frameArea(this.scene.frameCenter(), this.scene.frameCorners());
 
-    // --- mascots flanking the bench, with name chips ---
+    // --- the machine ---
+    this.rig = new MotorRig();
+    this.rig.group.position.copy(this.scene.benchAnchor());
+    this.stage.scene.add(this.rig.group);
+
+    // Discover beat: tap the machine → friendly nudge
+    const ray = new THREE.Raycaster();
+    const tap = (e: PointerEvent): void => {
+      if (this.running) return;
+      const r = wrap.getBoundingClientRect();
+      const p = new THREE.Vector2(
+        ((e.clientX - r.left) / r.width) * 2 - 1,
+        -((e.clientY - r.top) / r.height) * 2 + 1,
+      );
+      ray.setFromCamera(p, this.stage.camera);
+      if (ray.intersectObject(this.rig.group, true).length > 0) {
+        this.rig.tapNudge();
+        sharedSfx.play('loop');
+        this.zip.flashMood('excited', 900);
+      }
+    };
+    wrap.addEventListener('pointerdown', tap);
+    this.disposers.push(() => wrap.removeEventListener('pointerdown', tap));
+
+    // --- mascots ---
     this.zip = new SpriteCharacter(
       { svgUrl: './art/characters/zip/zip.svg', height: 2.35, name: 'zip' },
       this.charLayer, this.stage.camera, wrap,
@@ -72,89 +119,185 @@ export class GearworksScreen {
     this.mixy.look('left');
     this.addNameChip(this.mixy, 'GlitchBop');
 
-    // --- UI chrome (same muscle memory as every other world) ---
-    const topBar = new TopBar(ui, `${this.level.title} · ${this.level.shortTitle}`, {
+    // --- UI chrome ---
+    this.topBar = new TopBar(this.ui, `${this.level.title} · ${this.level.shortTitle}`, {
       onBack: this.events.onExit,
-      onSettings: () => showSettings(ui, this.events.store, sharedSfx, () => { /* live */ }),
+      onSettings: () => showSettings(this.ui, this.events.store, sharedSfx, () => this.applySettings()),
     });
-    topBar.setStars(0);
+    this.topBar.setStars(this.events.store.stars[this.level.id] ?? 0);
+    new GoalCard(this.ui, this.level.goalText, this.level.emoji);
+    this.trail = new ThinkTrailPanel(this.ui);
+    this.trail.setMachineLine(this.stateLine(initialMachine()));
 
-    new GoalCard(ui, this.level.goalText, this.level.emoji);
-    this.trail = new ThinkTrailPanel(ui);
+    this.deck = new MachineDeck(this.ui, this.level.commands, this.level.maxSlots, {
+      onChange: () => { /* live program */ },
+      onBop: () => void this.onBop(),
+      onClear: () => this.resetMachine(),
+    });
 
-    // --- command-area shell ---
-    this.buildDeckShell(ui);
-
-    // --- animation ---
-    const calm = this.events.store.settings.calmMode;
-    this.zip.setCalm(calm);
-    this.mixy.setCalm(calm);
+    // --- animation loop ---
+    this.applySettings();
     this.disposers.push(this.stage.onTick((dt, elapsed) => {
-      if (!calm) this.scene.update(dt, elapsed);
+      if (!this.calm) this.scene.update(dt, elapsed);
+      this.rig.update(dt);
       this.zip.update(dt, elapsed);
       this.mixy.update(dt, elapsed);
     }));
     this.stage.startLoop();
 
-    // --- welcome brief ---
-    void showBrief(ui, this.level, sharedSfx).then(() => {
+    void showBrief(this.ui, this.level, sharedSfx).then(() => {
       this.zip.setMood('happy');
-      window.setTimeout(() => this.zip.setMood('idle'), 1800);
+      window.setTimeout(() => this.zip.setMood('idle'), 1600);
     });
   }
 
+  private applySettings(): void {
+    this.calm = this.events.store.settings.calmMode;
+    sharedSfx.enabled = this.events.store.settings.sound;
+    this.zip.setCalm(this.calm);
+    this.mixy.setCalm(this.calm);
+    document.body.classList.toggle('calm-mode', this.calm);
+    document.body.classList.toggle('high-contrast', this.events.store.settings.highContrast);
+    document.body.classList.toggle('left-handed', this.events.store.settings.leftHanded);
+  }
+
   private addNameChip(sprite: SpriteCharacter, name: string): void {
-    // Wait for the SVG inline (it replaces the sprite element's innerHTML).
     void sprite.whenReady().then(() => {
       const chip = el('span', 'gw-name-chip', sprite.el, name);
       chip.setAttribute('aria-hidden', 'true');
     });
   }
 
-  private buildDeckShell(ui: HTMLElement): void {
-    const deck = el('div', 'bottom-deck', ui);
-    const panel = el('div', 'deck-panel', deck);
+  private resetMachine(): void {
+    this.rig.reset();
+    this.trail.setEmpty();
+    this.trail.setMachineLine(this.stateLine(initialMachine()));
+  }
 
-    const tray = el('div', 'deck-tray', panel);
-    for (const tile of GEARWORKS_TRAY_SHELL) {
-      const btn = el('button', 'tile gw-tile') as HTMLButtonElement;
-      btn.type = 'button';
-      btn.dataset.gwTone = tile.tone;
-      btn.setAttribute('aria-label', `${tile.label} — this machine wakes up soon`);
-      el('span', 'sheen', btn);
-      const ico = el('span', 'ico', btn);
-      ico.innerHTML = `<svg class="cmd-ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${tile.icon}</svg>`;
-      el('span', 'lbl', btn, tile.label);
-      btn.addEventListener('click', () => {
-        sharedSfx.play('tap');
-        this.mixy.flashMood('excited', 1200);
-        this.toast('🔧 Zip is still wiring this machine — next update!');
-      });
-      tray.appendChild(btn);
+  private stateLine(s: MachineState): string {
+    const m = s.motor;
+    return `Motor: ${m.on ? 'ON' : 'OFF'} · ${m.dir === 'cw' ? '⟳' : '⟲'} · ${GW_SPEED_NAMES[m.speed]}`;
+  }
+
+  // ---------- run + playback ----------
+
+  private async onBop(): Promise<void> {
+    if (this.running) return;
+    this.running = true;
+    this.deck.setRunning(true);
+    this.resetMachine();
+    this.zip.setMood('thinking');
+
+    const program = this.deck.getProgram();
+    const result = runMachine(program, this.level.goal);
+
+    // Play the event stream step by step
+    const stepMs = this.calm ? 380 : STEP_MS;
+    const steps: ThinkTrailStep[] = [];
+    this.narrated = steps;
+    let stepIndex = -1;
+    for (const ev of result.events) {
+      if (ev.type === 'commandStart') {
+        stepIndex = ev.index;
+        this.deck.highlightSlot(ev.index);
+        await this.delay(stepMs * 0.35);
+        continue;
+      }
+      if (ev.type === 'done' || ev.type === 'overflow') continue;
+      this.applyEventVisual(ev);
+      const trailStep = this.trailStepFor(ev, stepIndex);
+      if (trailStep) {
+        steps.push(trailStep);
+        this.trail.setSteps(steps);
+      }
+      if (stepIndex >= 0 && result.trail[stepIndex]) {
+        this.trail.setMachineLine(this.stateLine(result.trail[stepIndex]));
+      }
+      await this.delay(stepMs * 0.65);
     }
 
-    el('div', 'deck-divider', panel);
-    const seq = el('div', 'deck-sequence', panel);
-    seq.setAttribute('aria-label', 'Your machine program (coming soon)');
-    for (let i = 0; i < 5; i++) el('div', 'slot', seq);
+    this.deck.setRunning(false);
+    this.running = false;
 
-    const bopWrap = el('div', 'bop-wrap', deck);
-    const bop = el('button', 'bop-btn empty', bopWrap) as HTMLButtonElement;
-    bop.type = 'button';
-    bop.setAttribute('aria-label', 'BOP! The machines arrive in the next update.');
-    bop.append('BOP!');
-    el('span', 'tri', bop);
-    bop.addEventListener('click', () => {
+    if (result.success) {
+      const runTicks = result.finalState.motor.ranDir.cw + result.finalState.motor.ranDir.ccw;
+      const stars =
+        1 +
+        (program.length <= this.level.par ? 1 : 0) +
+        (bonusMet(this.level.bonus, result.finalState.motor.ranAt, runTicks) ? 1 : 0);
+      this.events.store.setStars(this.level.id, stars);
+      this.topBar.setStars(stars);
+      void this.zip.celebrate();
+      sharedSfx.play('celebrate');
+      showCelebration(this.ui, {
+        stars,
+        starNames: ['It works!', 'It is clever!', `Creative: ${this.level.bonus.text}!`],
+        predictedCorrectly: null,
+      }, sharedSfx, {
+        onReplay: () => this.resetMachine(),
+        onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),
+      });
+    } else {
+      // Friendly near-miss coaching — never punitive
+      const misses = goalMisses(this.level.goal, result.finalState);
+      void this.mixy.glitchWobble(0.8);
+      this.mixy.flashMood('surprised', 1600);
       sharedSfx.play('glitch');
-      void this.mixy.glitchWobble(0.7);
-      this.toast('⚙️ The Great Bop Machine wakes up in the next update!');
-    });
+      this.trail.setSteps(
+        [...this.narrated.slice(-6), ...misses.map((m, i) => ({ n: i + 1, icon: '🔍', text: m, verdict: 'no' as const }))],
+        this.level.coachHint,
+      );
+      this.toast('🛠️ Almost! Check the Think Trail, fix your plan, and BOP again!');
+    }
+  }
+
+  /** Steps narrated during the last run (miss report appends to them). */
+  private narrated: ThinkTrailStep[] = [];
+
+  private trailStepFor(ev: GearworksEvent, index: number): ThinkTrailStep | null {
+    const n = index + 1;
+    let step: ThinkTrailStep | null = null;
+    switch (ev.type) {
+      case 'motorOn': step = { n, icon: '⚡', text: 'Motor ON!', verdict: 'ok' }; break;
+      case 'motorOff': step = { n, icon: '🛑', text: 'Motor OFF — safe stop!', verdict: 'ok' }; break;
+      case 'motorDir': step = { n, icon: ev.dir === 'cw' ? '⟳' : '⟲', text: ev.dir === 'cw' ? 'Now spinning forward' : 'Now spinning BACK', verdict: 'ok' }; break;
+      case 'motorSpeed': step = { n, icon: '🎛️', text: `Speed set to ${GW_SPEED_NAMES[ev.speed]}`, verdict: 'ok' }; break;
+      case 'spin': step = { n, icon: ev.dir === 'cw' ? '⚙️' : '🔄', text: `The gear turned (${GW_SPEED_NAMES[ev.speed]})`, verdict: 'ok' }; break;
+      case 'waitIdle': step = { n, icon: '😴', text: 'Waited… but the motor was OFF', verdict: 'no' }; break;
+      case 'noop': {
+        const text = ev.reason === 'alreadyOn' ? 'It was already on!'
+          : ev.reason === 'alreadyOff' ? 'It was already off!'
+          : ev.reason === 'sameDir' ? 'Already spinning that way!'
+          : 'Speed stayed the same.';
+        step = { n, icon: '💭', text };
+        break;
+      }
+      default: return null;
+    }
+    return step;
+  }
+
+  private applyEventVisual(ev: GearworksEvent): void {
+    switch (ev.type) {
+      case 'motorOn': this.rig.setOn(true); sharedSfx.play('bop'); break;
+      case 'motorOff': this.rig.setOn(false); sharedSfx.play('drop'); break;
+      case 'motorDir': this.rig.setDir(ev.dir); sharedSfx.play('tap'); break;
+      case 'motorSpeed': this.rig.setSpeed(ev.speed); sharedSfx.play('place'); break;
+      case 'spin': this.rig.workPulse(); sharedSfx.play('loop'); break;
+      case 'waitIdle': sharedSfx.play('remove'); break;
+      case 'noop': break;
+      default: break;
+    }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((r) => window.setTimeout(r, ms));
   }
 
   private toast(text: string): void {
     this.root.querySelector('.gw-toast')?.remove();
     const t = el('div', 'toast gw-toast', this.root, text);
-    window.setTimeout(() => t.remove(), 2400);
+    window.setTimeout(() => t.remove(), 2600);
   }
 
   dispose(): void {

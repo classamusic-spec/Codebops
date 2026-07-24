@@ -17,6 +17,7 @@ export class ThinkTrailPanel {
   readonly root: HTMLElement;
   private readonly list: HTMLElement;
   private readonly hint: HTMLElement;
+  private readonly machineLine: HTMLElement;
 
   constructor(parent: HTMLElement) {
     this.root = el('aside', 'gw-trail', parent);
@@ -32,6 +33,8 @@ export class ThinkTrailPanel {
       toggle.textContent = collapsed ? '▸' : '▾';
     });
 
+    this.machineLine = el('div', 'gw-machine-line', this.root);
+    this.machineLine.hidden = true;
     this.list = el('div', 'gw-trail-list', this.root);
     this.hint = el('div', 'gw-trail-hint', this.root);
     this.setEmpty();
@@ -41,6 +44,12 @@ export class ThinkTrailPanel {
       this.root.classList.add('collapsed');
       toggle.textContent = '▸';
     }
+  }
+
+  /** Live machine-state readout, e.g. "Motor: ON · ⟳ · Fast". */
+  setMachineLine(text: string): void {
+    this.machineLine.textContent = text;
+    this.machineLine.hidden = false;
   }
 
   setEmpty(): void {

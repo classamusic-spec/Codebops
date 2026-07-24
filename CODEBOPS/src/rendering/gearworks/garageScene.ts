@@ -113,12 +113,14 @@ function blueprintTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+export type GarageLayout = 'showcase' | 'motorLab';
+
 export class GarageScene {
   readonly group = new THREE.Group();
   private readonly spinners: Array<{ node: THREE.Object3D; speed: number }> = [];
   private readonly lampGlows: THREE.Mesh[] = [];
 
-  constructor() {
+  constructor(private readonly layout: GarageLayout = 'showcase') {
     this.group.name = 'gearworks-garage';
 
     // ---- floor ----
@@ -197,9 +199,30 @@ export class GarageScene {
     bench.position.set(0, 0, -1.5);
     this.group.add(bench);
 
-    // ---- placeholder machines on the bench (scenery until Phase 2) ----
+    // ---- bench contents depend on the layout ----
     const benchTop = 1.9;
+    if (this.layout === 'showcase') this.buildShowcase(benchTop);
 
+    // loose gears on the floor (storytelling clutter, matches key art)
+    for (const [gx, gz, r] of [[-8.2, 2.8, 0.5], [7.6, 3.4, 0.42]] as const) {
+      const loose = createGear({ color: '#8a94ad', radius: r, teeth: 9, hubColor: '#c3c9d4' });
+      loose.rotation.x = -Math.PI / 2;
+      loose.position.set(gx, 0.14, gz);
+      this.group.add(loose);
+    }
+
+    // toy crate
+    const crate = new THREE.Group();
+    crate.add(mesh(new RoundedBoxGeometry(1.4, 0.9, 1.0, 2, 0.08), toonMat('#c9843c'), 0, 0.45, 0));
+    crate.add(mesh(new RoundedBoxGeometry(1.5, 0.16, 1.1, 1, 0.05), toonMat('#a86a2c'), 0, 0.9, 0));
+    crate.position.set(9.6, 0, 0.4);
+    crate.rotation.y = -0.3;
+    this.group.add(crate);
+  }
+
+
+  /** Showcase bench (Phase 1 shell): motor, gear train, strawberry press. */
+  private buildShowcase(benchTop: number): void {
     // Motor: blue rounded body + snout + lightning badge
     const motor = new THREE.Group();
     motor.add(mesh(new RoundedBoxGeometry(1.7, 1.3, 1.2, 3, 0.22), toonMat('#2f6fe0'), 0, 0.75, 0));
@@ -261,22 +284,11 @@ export class GarageScene {
     this.spinners.push({ node: wheel, speed: 0.35 });
     press.position.set(3.6, benchTop, -1.5);
     this.group.add(press);
+  }
 
-    // loose gears on the floor (storytelling clutter, matches key art)
-    for (const [gx, gz, r] of [[-8.2, 2.8, 0.5], [7.6, 3.4, 0.42]] as const) {
-      const loose = createGear({ color: '#8a94ad', radius: r, teeth: 9, hubColor: '#c3c9d4' });
-      loose.rotation.x = -Math.PI / 2;
-      loose.position.set(gx, 0.14, gz);
-      this.group.add(loose);
-    }
-
-    // toy crate
-    const crate = new THREE.Group();
-    crate.add(mesh(new RoundedBoxGeometry(1.4, 0.9, 1.0, 2, 0.08), toonMat('#c9843c'), 0, 0.45, 0));
-    crate.add(mesh(new RoundedBoxGeometry(1.5, 0.16, 1.1, 1, 0.05), toonMat('#a86a2c'), 0, 0.9, 0));
-    crate.position.set(9.6, 0, 0.4);
-    crate.rotation.y = -0.3;
-    this.group.add(crate);
+  /** Where a playable machine rig sits on the bench. */
+  benchAnchor(): THREE.Vector3 {
+    return new THREE.Vector3(-0.4, 1.9, -1.5);
   }
 
   /** World-space anchor points the camera must keep framed. */

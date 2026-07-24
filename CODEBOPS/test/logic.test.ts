@@ -19,8 +19,16 @@ import {
 } from '../src/data/levels/agentAcademy';
 import { assertLevelValid } from '../src/data/schemas/level';
 import { ALL_LEVELS } from '../src/data/levels/index';
-import { GEARWORKS_WORLD, GEARWORKS_LEVELS, GEARWORKS_TRAY_SHELL } from '../src/data/gearworks/world';
+import { GEARWORKS_WORLD, GEARWORKS_PICKER, GW_TILES } from '../src/data/gearworks/world';
 import { CAMERA_PRESETS, presetIsNormalized } from '../src/rendering/gearworks/cameraPresets';
+import {
+  runMachine, stepMachine, initialMachine, goalMet, goalMisses, GW_MAX_TICKS,
+} from '../src/gameplay/gearworks/machine';
+import type { GearworksStep } from '../src/gameplay/gearworks/machine';
+import {
+  GEARWORKS_MACHINE_LEVELS, GW_MOTOR_START, GW_MOTOR_PROGRAMMER,
+  validateMachineLevel, canonicalSolution, bonusMet,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -232,15 +240,14 @@ const MUSH_RULE = { trigger: 'mushroom', action: 'grab' } as const;
   check('back-to-back repeats stay bounded', r.events.length < MAX_STEPS * 3);
 }
 
-// --- Gearworks Garage (Phase 1 shell) ---
+// --- Gearworks Garage: world + camera ---
 {
   check('gearworks world id registered', GEARWORKS_WORLD.id === 'gearworks-garage');
-  const ids = new Set(GEARWORKS_LEVELS.map((l) => l.id));
-  check('gearworks level ids unique', ids.size === GEARWORKS_LEVELS.length);
-  check('gearworks first level is playable', GEARWORKS_LEVELS[0].playable === true);
-  check('gearworks later levels locked in phase 1', GEARWORKS_LEVELS.slice(1).every((l) => !l.playable));
-  const tray = new Set(GEARWORKS_TRAY_SHELL.map((t) => t.id));
-  check('gearworks tray ids unique', tray.size === GEARWORKS_TRAY_SHELL.length);
+  const ids = new Set(GEARWORKS_PICKER.map((e) => (e.kind === 'machine' ? e.level.id : e.id)));
+  check('gearworks picker ids unique', ids.size === GEARWORKS_PICKER.length);
+  check('gearworks picker leads with machine levels', GEARWORKS_PICKER[0].kind === 'machine');
+  check('every gearworks command has a tile', GEARWORKS_MACHINE_LEVELS
+    .every((l) => l.commands.every((c) => !!GW_TILES[c])));
   check('camera presets normalized', Object.values(CAMERA_PRESETS).every(presetIsNormalized));
   check('bench pitch is diorama-flat (gears face camera)', CAMERA_PRESETS.bench.pitchDeg <= 18);
   check('factory pitch higher than bench (lane separation)',
@@ -248,6 +255,68 @@ const MUSH_RULE = { trigger: 'mushroom', action: 'grab' } as const;
     && CAMERA_PRESETS.workshop.pitchDeg > CAMERA_PRESETS.bench.pitchDeg);
   check('preset fov widens on portrait aspect', Object.values(CAMERA_PRESETS)
     .every((p) => p.fovFor(0.6) > p.fovFor(1.8)));
+}
+
+// --- Gearworks machine core (Phase 2) ---
+const GP = (...cmds: Array<GearworksStep['cmd'] | [GearworksStep['cmd'], number]>): GearworksStep[] =>
+  cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
+
+for (const l of GEARWORKS_MACHINE_LEVELS) {
+  const errs = validateMachineLevel(l);
+  check(`${l.id} validates`, errs.length === 0);
+  const r = runMachine(canonicalSolution(l), l.goal);
+  check(`${l.id} canonical solution wins`, r.success);
+  check(`${l.id} canonical fits par (clever star)`, canonicalSolution(l).length <= l.par);
+}
+
+{
+  // reducer basics: start/stop + purity
+  const s0 = initialMachine();
+  const r1 = stepMachine(s0, { cmd: 'gwStart' }, 0);
+  check('start turns motor on', r1.state.motor.on && r1.events.some((e) => e.type === 'motorOn'));
+  check('reducer is pure (input untouched)', s0.motor.on === false && s0.ticks === 0);
+  const r2 = stepMachine(r1.state, { cmd: 'gwStop' }, 1);
+  check('stop turns motor off', !r2.state.motor.on && r2.events.some((e) => e.type === 'motorOff'));
+  const r3 = stepMachine(r2.state, { cmd: 'gwStop' }, 2);
+  check('stop when off is a gentle noop', r3.events.some((e) => e.type === 'noop' && e.reason === 'alreadyOff'));
+}
+{
+  // wait only works while on; spin sign follows direction
+  const idle = runMachine(GP('gwWait', 'gwWait'), { minRunTicks: 1, endStopped: true });
+  check('waiting with motor off does no work', !idle.success
+    && idle.events.filter((e) => e.type === 'waitIdle').length === 2);
+  const cw = runMachine(GP('gwStart', 'gwWait', 'gwStop'), { minRunTicks: 1, endStopped: true });
+  check('start-wait-stop wins motor-start goal', cw.success && cw.finalState.motor.spun > 0);
+  const ccw = runMachine(GP('gwStart', 'gwSpinCcw', 'gwWait', 'gwStop'), { minRunTicks: 1, endStopped: true });
+  check('ccw wait spins negative', ccw.finalState.motor.spun < 0 && ccw.finalState.motor.ranDir.ccw === 1);
+}
+{
+  // speed parameter + fast/ccw goal checks
+  const fast = runMachine(GP('gwStart', ['gwSetSpeed', 3], 'gwWait', 'gwSpinCcw', 'gwWait', 'gwStop'), GW_MOTOR_PROGRAMMER.goal);
+  check('motor-programmer canonical-style program wins', fast.success);
+  check('fast run recorded at speed 3', fast.finalState.motor.ranAt[3] >= 1);
+  const noStop = runMachine(GP('gwStart', ['gwSetSpeed', 3], 'gwWait', 'gwSpinCcw', 'gwWait'), GW_MOTOR_PROGRAMMER.goal);
+  check('missing safe stop fails + explains', !noStop.success
+    && goalMisses(GW_MOTOR_PROGRAMMER.goal, noStop.finalState).some((m) => m.includes('STOP')));
+  const slowOnly = runMachine(GP('gwStart', ['gwSetSpeed', 1], 'gwWait', 'gwStop'), GW_MOTOR_PROGRAMMER.goal);
+  check('never-fast fails needFastRun', !slowOnly.success);
+  check('speed arg clamps to 1..3', stepMachine(initialMachine(), { cmd: 'gwSetSpeed', arg: 9 }, 0).state.motor.speed === 3);
+}
+{
+  // bonus rules + safety cap
+  const twoWaits = runMachine(GP('gwStart', 'gwWait', 'gwWait', 'gwStop'), GW_MOTOR_START.goal);
+  const rt = twoWaits.finalState.motor.ranDir.cw + twoWaits.finalState.motor.ranDir.ccw;
+  check('waitTwice bonus met with two waits', bonusMet(GW_MOTOR_START.bonus, twoWaits.finalState.motor.ranAt, rt));
+  const dial = runMachine(
+    GP('gwStart', ['gwSetSpeed', 1], 'gwWait', ['gwSetSpeed', 3], 'gwWait', 'gwSpinCcw', 'gwWait', 'gwStop'),
+    GW_MOTOR_PROGRAMMER.goal,
+  );
+  const rt2 = dial.finalState.motor.ranDir.cw + dial.finalState.motor.ranDir.ccw;
+  check('triedSlowAndFast bonus met across the dial', dial.success
+    && bonusMet(GW_MOTOR_PROGRAMMER.bonus, dial.finalState.motor.ranAt, rt2));
+  const huge = runMachine(Array.from({ length: 100 }, () => ({ cmd: 'gwWait' as const })), GW_MOTOR_START.goal);
+  check('tick cap bounds runaway programs', huge.overflowed && huge.finalState.ticks <= GW_MAX_TICKS);
+  check('goalMet direct: fresh machine fails motor-start', !goalMet(GW_MOTOR_START.goal, initialMachine()));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

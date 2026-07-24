@@ -32,6 +32,11 @@ const CONCEPTS: readonly Concept[] = [
     levelIds: ['pf-1', 'pf-2', 'pf-3', 'pf-debug', 'pf-creative'],
   },
   {
+    name: 'Machines', emoji: '⚙️',
+    blurb: 'Events, state and safe stopping — programming real machines.',
+    levelIds: ['gw-motor-start', 'gw-motor-programmer'],
+  },
+  {
     name: 'Teamwork', emoji: '🤖',
     blurb: 'Coordinating two bots with a shared plan (task switching).',
     levelIds: ['rt-1', 'rt-2', 'rt-3', 'rt-debug', 'rt-creative'],

@@ -1669,3 +1669,12 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-trail-title { font-size: 11px; padding: 3px 12px; top: -12px; }
   .gw-name-chip { font-size: 11px; padding: 3px 10px; }
 }
+
+/* Gearworks live machine-state readout (top of the Think Trail) */
+.gw-machine-line {
+  background: linear-gradient(180deg, #33418f, #1d2864); color: #fff;
+  border-radius: 12px; padding: 7px 10px; text-align: center;
+  font-family: var(--font-display); font-weight: 600; font-size: 13.5px;
+  letter-spacing: .4px; box-shadow: inset 0 2px 0 rgba(255,255,255,.2), 0 2px 0 rgba(42,24,69,.2);
+}
+.gw-trail.collapsed .gw-machine-line { display: none; }
