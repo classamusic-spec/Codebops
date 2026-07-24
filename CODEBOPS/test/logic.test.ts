@@ -117,6 +117,15 @@ import {
   GW_NIGHT_LIGHT, GW_STORM_WATCH, GEARWORKS_LIGHTHOUSE_LEVELS,
   validateLighthouseLevel, altOrderSolution, lighthouseStars,
 } from '../src/data/gearworks/levels';
+import {
+  runDelivery, deliveryMisses, deliveryBugIndex,
+} from '../src/gameplay/gearworks/deliveryMachine';
+import type { DvStep } from '../src/gameplay/gearworks/deliveryMachine';
+import {
+  GW_MORNING_ROUND, GW_RUSH_HOUR, GEARWORKS_DELIVERY_LEVELS,
+  validateDeliveryLevel, deliveryGoalOf, deliveryManualSolution,
+  deliveryLoopSolution, deliveryStars,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1043,6 +1052,60 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('solved over par earns just works', lighthouseStars(GW_NIGHT_LIGHT, GW_NIGHT_LIGHT.canonical, false, false) === 1);
   check('solved at par earns works + clever', lighthouseStars(GW_NIGHT_LIGHT, GW_NIGHT_LIGHT.canonical, true, false) === 2);
   check('solved both ways earns all three', lighthouseStars(GW_NIGHT_LIGHT, GW_NIGHT_LIGHT.canonical, true, true) === 3);
+}
+
+// --- Gearworks Delivery Depot (Phase 15) ---
+{
+  const P = (...steps: Array<DvStep['cmd'] | [DvStep['cmd'], number]>): DvStep[] =>
+    steps.map((s) => (Array.isArray(s) ? { cmd: s[0], arg: s[1] } : { cmd: s }));
+  const goal = deliveryGoalOf(GW_MORNING_ROUND);
+
+  // FIFO: LOAD always takes the FRONT parcel
+  const oneLoad = runDelivery(P('dvLoad'), goal);
+  const firstLoad = oneLoad.events.find((e) => e.type === 'load');
+  check('LOAD takes the parcel at the FRONT of the queue', firstLoad?.type === 'load' && firstLoad.pkg.id === 'p1');
+
+  // manual drain delivers all in order
+  const manual = deliveryManualSolution(GW_MORNING_ROUND);
+  const rm = runDelivery(manual, goal);
+  check('manual round delivers every parcel correctly', rm.allCorrect && rm.deliveredCount === 3 && rm.wrongCount === 0);
+  check('manual round does not use a loop', !rm.usedLoop);
+
+  // loop drain: LOAD, DELIVER, DRIVE, REPEAT xN
+  const loop = deliveryLoopSolution(GW_MORNING_ROUND);
+  const rl = runDelivery(loop, goal);
+  check('the loop drains the whole queue', rl.allCorrect && rl.deliveredCount === 3);
+  check('the loop run reports usedLoop', rl.usedLoop);
+  check('the loop body runs count times', rl.events.filter((e) => e.type === 'loopIter').length === 3);
+
+  // a truck can only hold one parcel (LOAD twice without deliver = full)
+  const full = runDelivery(P('dvLoad', 'dvLoad'), goal);
+  check('a second LOAD with a full truck is a no-op', full.events.some((e) => e.type === 'loadNoop' && e.reason === 'full'));
+
+  // too-small a loop leaves parcels waiting
+  const short = runDelivery(P('dvLoad', 'dvDeliver', 'dvDrive', ['dvRepeat', 2]), goal);
+  check('a x2 loop on a 3-queue leaves one waiting', !short.allCorrect && short.deliveredCount === 2);
+  check('the miss report mentions parcels still in line', deliveryMisses(P('dvLoad', 'dvDeliver', 'dvDrive', ['dvRepeat', 2]), goal).some((m) => m.includes('waiting')));
+  check('the bug finder points at the repeat tile when undercounting', deliveryBugIndex(P('dvLoad', 'dvDeliver', 'dvDrive', ['dvRepeat', 2]), goal) === 3);
+
+  // delivering to the wrong house is caught (drive too far first)
+  const wrong = runDelivery(P('dvDrive', 'dvLoad', 'dvDeliver'), goal);
+  check('a parcel dropped at the wrong house is marked wrong', wrong.wrongCount === 1 && !wrong.allCorrect);
+
+  // determinism
+  check('runDelivery is deterministic', JSON.stringify(runDelivery(loop, goal)) === JSON.stringify(rl));
+
+  // stars
+  check('an unfinished round earns no stars', deliveryStars(GW_MORNING_ROUND, P('dvLoad', 'dvDeliver')) === 0);
+  check('the manual round earns exactly 1 star', deliveryStars(GW_MORNING_ROUND, manual) === 1);
+  check('the tidy loop earns all 3 stars', deliveryStars(GW_MORNING_ROUND, loop) === 3);
+
+  // levels validate + Rush Hour scales the same loop to 4
+  for (const l of GEARWORKS_DELIVERY_LEVELS) {
+    check(`${l.id} validates`, validateDeliveryLevel(l).length === 0);
+    check(`${l.id} loop solution wins`, runDelivery(deliveryLoopSolution(l), deliveryGoalOf(l)).allCorrect);
+  }
+  check('Rush Hour needs a x4 loop', runDelivery(deliveryLoopSolution(GW_RUSH_HOUR), deliveryGoalOf(GW_RUSH_HOUR)).deliveredCount === 4);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

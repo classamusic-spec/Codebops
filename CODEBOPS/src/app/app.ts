@@ -21,6 +21,7 @@ import { GearworksSignalScreen } from './gearworksSignalScreen';
 import { GearworksDebugScreen } from './gearworksDebugScreen';
 import { GearworksOrchestraScreen } from './gearworksOrchestraScreen';
 import { GearworksLighthouseScreen } from './gearworksLighthouseScreen';
+import { GearworksDeliveryScreen } from './gearworksDeliveryScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
@@ -50,7 +51,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
-  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | null = null;
+  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -415,7 +416,9 @@ export class App {
                         ? new GearworksDebugScreen(screen, entry.level, events)
                         : entry.kind === 'orchestra'
                           ? new GearworksOrchestraScreen(screen, entry.level, events)
-                          : new GearworksLighthouseScreen(screen, entry.level, events);
+                          : entry.kind === 'lighthouse'
+                            ? new GearworksLighthouseScreen(screen, entry.level, events)
+                            : new GearworksDeliveryScreen(screen, entry.level, events);
     this.gearworks.enter();
   }
 

@@ -11,16 +11,18 @@ import type { GjCommandId } from '../../gameplay/gearworks/jamMachine';
 import type { JobMainId } from '../../gameplay/gearworks/jobMachine';
 import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
 import type { LlCommandId } from '../../gameplay/gearworks/logicMachine';
+import type { DvCommandId } from '../../gameplay/gearworks/deliveryMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
   GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS, GEARWORKS_ORCHESTRA_LEVELS,
-  GEARWORKS_LIGHTHOUSE_LEVELS,
+  GEARWORKS_LIGHTHOUSE_LEVELS, GEARWORKS_DELIVERY_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
   GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel, GearworksLighthouseLevel,
+  GearworksDeliveryLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -216,6 +218,19 @@ export const GW_LIGHTHOUSE_TILES: Readonly<Record<LlCommandId, GwTileDef>> = {
   llOr:      { label: 'Or', spoken: 'Either one can be true', tone: 'loop', icon: ICON_OR },
 };
 
+// ---------- Phase 15 Delivery Depot tiles ----------
+
+const ICON_LOAD = '<path d="M2.6 13 H13 V18 H2.6 Z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M13 14.4 H16.4 L19 17 V18 H13 Z"/><circle cx="6" cy="19.4" r="1.5"/><circle cx="16.2" cy="19.4" r="1.5"/><path d="M8 3 V9 M5 6.2 L8 9.4 L11 6.2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+const ICON_DELIVER = '<path d="M5 10 L12 4.4 L19 10 V20 H5 Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><rect x="10" y="13.5" width="4" height="6.5"/><path d="M12 6.6 V12 M9.4 9.6 L12 12.2 L14.6 9.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+const ICON_DRIVE = '<path d="M2.6 12 H12.5 V18 H2.6 Z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12.5 13.6 H16.4 L19.4 16.6 V18 H12.5 Z"/><circle cx="6" cy="19.4" r="1.6"/><circle cx="16.4" cy="19.4" r="1.6"/><path d="M17.6 7.2 H22 M17.6 10 H21 M17.6 4.4 H20.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>';
+
+export const GW_DELIVERY_TILES: Readonly<Record<DvCommandId, GwTileDef>> = {
+  dvLoad:    { label: 'Load', spoken: 'Load the parcel at the front of the line onto the truck', tone: 'move', icon: ICON_LOAD },
+  dvDeliver: { label: 'Deliver', spoken: 'Deliver the parcel to the house in front of you', tone: 'start', icon: ICON_DELIVER },
+  dvDrive:   { label: 'Drive', spoken: 'Drive to the next house', tone: 'rotate', icon: ICON_DRIVE },
+  dvRepeat:  { label: 'Repeat', spoken: 'Repeat the tiles before this — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -231,7 +246,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'signal'; readonly level: GearworksSignalLevel }
   | { readonly kind: 'debug'; readonly level: GearworksDebugLevel }
   | { readonly kind: 'orchestra'; readonly level: GearworksOrchestraLevel }
-  | { readonly kind: 'lighthouse'; readonly level: GearworksLighthouseLevel };
+  | { readonly kind: 'lighthouse'; readonly level: GearworksLighthouseLevel }
+  | { readonly kind: 'delivery'; readonly level: GearworksDeliveryLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -247,6 +263,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_FACTORY_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
   ...GEARWORKS_ORCHESTRA_LEVELS.map((level) => ({ kind: 'orchestra' as const, level })),
   ...GEARWORKS_LIGHTHOUSE_LEVELS.map((level) => ({ kind: 'lighthouse' as const, level })),
+  ...GEARWORKS_DELIVERY_LEVELS.map((level) => ({ kind: 'delivery' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -260,5 +277,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-delivery-depot', shortTitle: 'Delivery Depot', emoji: '📦' },
+  { kind: 'soon', id: 'gw-paint-parade', shortTitle: 'Paint Parade', emoji: '🎨' },
 ];

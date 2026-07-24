@@ -2001,3 +2001,45 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-sky-board { left: max(8px, var(--sal)); transform: none; }
   .sky-label { display: none; }
 }
+
+/* ============================================================
+   Phase 15 — Delivery Depot queue strip (first in, first out)
+   ============================================================ */
+.gw-queue-strip {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: calc(max(8px, var(--sat)) + 118px);
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(180deg, rgba(20,28,74,.92), rgba(13,20,55,.92));
+  border: 3px solid rgba(255,255,255,.14); border-radius: var(--r-lg);
+  padding: 8px 14px; box-shadow: var(--shadow-card); z-index: 20;
+}
+.queue-front {
+  font-family: var(--font-display); font-weight: 800; font-size: 11px;
+  letter-spacing: 1px; color: #9fb0ff; white-space: nowrap;
+}
+.queue-row { display: flex; gap: 8px; }
+.queue-chip {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  width: clamp(52px, 7vw, 74px); padding: 7px 6px 5px;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.16);
+  border-radius: 13px; transition: transform .18s var(--ease-bounce), opacity .2s, border-color .16s, background .16s;
+}
+.queue-chip .q-emoji { font-size: clamp(20px, 2.4vw, 28px); line-height: 1; }
+.queue-chip .q-house { font-family: var(--font-display); font-weight: 800; font-size: 11px; color: #dfe6ff; }
+.queue-chip.on-truck { border-color: var(--yellow); background: rgba(255,210,62,.16); transform: translateY(-5px) scale(1.06); }
+.queue-chip.gone { opacity: .45; }
+.queue-chip.ok { border-color: var(--green); }
+.queue-chip.bad { border-color: #ff5a6a; }
+.queue-chip .q-mark {
+  position: absolute; top: -8px; right: -6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 900; font-size: 13px; color: #fff;
+  opacity: 0; transform: scale(.4); transition: opacity .2s, transform .2s var(--ease-bounce);
+}
+.queue-chip.ok .q-mark { opacity: 1; transform: scale(1); background: var(--green); box-shadow: 0 2px 0 var(--green-deep); }
+.queue-chip.bad .q-mark { opacity: 1; transform: scale(1); background: #ff5a6a; box-shadow: 0 2px 0 #b32d3d; }
+
+@media (max-width: 700px) {
+  .gw-queue-strip { left: max(8px, var(--sal)); transform: none; padding: 6px 10px; gap: 6px; }
+  .queue-front { display: none; }
+}

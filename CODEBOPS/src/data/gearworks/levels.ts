@@ -26,6 +26,8 @@ import type { BeatPattern } from '../../gameplay/gearworks/beatMachine';
 import { emptyPattern, toggleCell, beatStars, beatStats, BEAT_LOOP_MAX } from '../../gameplay/gearworks/beatMachine';
 import type { LlCommandId, LlStep, LlSignal, LighthouseScenario } from '../../gameplay/gearworks/logicMachine';
 import { runLighthouse, evalRule, condOrder, isCond } from '../../gameplay/gearworks/logicMachine';
+import type { DvCommandId, DvStep, DeliveryPackage, DeliveryGoal } from '../../gameplay/gearworks/deliveryMachine';
+import { runDelivery, DV_REPEAT_MAX } from '../../gameplay/gearworks/deliveryMachine';
 import type { SfxName } from '../../audio/sfx';
 import type { GearworksFamilyId } from './world';
 
@@ -1528,5 +1530,142 @@ export function assertLighthouseLevelValid(level: GearworksLighthouseLevel): voi
   const errors = validateLighthouseLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Lighthouse level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 15 — Delivery Depot: queues (first in, first out)
+//
+// The depot has a LINE of parcels. LOAD always takes the one at the
+// FRONT; the truck drives the houses in order and drops each parcel at
+// its address. Because the queue is a line and the houses are a row,
+// one small loop drains the whole round.
+// ==================================================================
+
+export interface GearworksDeliveryLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly commands: readonly DvCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  readonly houses: number;
+  /** Parcels in arrival (queue) order; dests run 0..houses-1 so the
+   *  first-in-first-out drain lands each one at the matching house. */
+  readonly queue: readonly DeliveryPackage[];
+  readonly bonus: { readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_MORNING_ROUND: GearworksDeliveryLevel = {
+  id: 'gw-morning-round',
+  title: 'Gearworks Garage',
+  shortTitle: 'Morning Round',
+  family: 'delivery',
+  goalText: 'Deliver every parcel from the front of the line to its house!',
+  emoji: '📦',
+  brief: {
+    title: 'Delivery Depot!',
+    text: 'The parcels wait in a LINE — first in, first out! LOAD always grabs the one at the FRONT and puts it on the truck. DELIVER drops it at the house in front of you, then DRIVE moves to the next house. Deliver all three… and a REPEAT loop can do the whole line for you!',
+    emoji: '📦',
+  },
+  commands: ['dvLoad', 'dvDeliver', 'dvDrive', 'dvRepeat'],
+  maxSlots: 9,
+  par: 4,
+  houses: 3,
+  queue: [
+    { id: 'p1', dest: 0, emoji: '🎁' },
+    { id: 'p2', dest: 1, emoji: '📮' },
+    { id: 'p3', dest: 2, emoji: '📚' },
+  ],
+  bonus: { text: 'One tidy loop — no wasted tiles' },
+  coachHint: 'LOAD, DELIVER, DRIVE — then a REPEAT ×3 runs those three tiles for the whole line!',
+};
+
+export const GW_RUSH_HOUR: GearworksDeliveryLevel = {
+  id: 'gw-rush-hour',
+  title: 'Gearworks Garage',
+  shortTitle: 'Rush Hour',
+  family: 'delivery',
+  goalText: 'A longer line! Deliver all four parcels — the same loop still works!',
+  emoji: '🚚',
+  brief: {
+    title: 'Rush Hour!',
+    text: 'A bigger round today — four parcels in the queue! The same LOAD, DELIVER, DRIVE loop still drains the whole line: just tap the REPEAT badge up to ×4. One little loop, one big round!',
+    emoji: '🚚',
+  },
+  commands: ['dvLoad', 'dvDeliver', 'dvDrive', 'dvRepeat'],
+  maxSlots: 12,
+  par: 4,
+  houses: 4,
+  queue: [
+    { id: 'p1', dest: 0, emoji: '🎁' },
+    { id: 'p2', dest: 1, emoji: '📮' },
+    { id: 'p3', dest: 2, emoji: '📚' },
+    { id: 'p4', dest: 3, emoji: '🧁' },
+  ],
+  bonus: { text: 'Drain the whole queue with one loop' },
+  coachHint: 'Same three tiles — LOAD, DELIVER, DRIVE — then REPEAT ×4 for the four parcels!',
+};
+
+export const GEARWORKS_DELIVERY_LEVELS: readonly GearworksDeliveryLevel[] = [
+  GW_MORNING_ROUND, GW_RUSH_HOUR,
+];
+
+export function deliveryGoalOf(level: GearworksDeliveryLevel): DeliveryGoal {
+  return { houses: level.houses, queue: level.queue };
+}
+
+/** The one-by-one solution: LOAD, DELIVER, DRIVE per parcel (no trailing drive). */
+export function deliveryManualSolution(level: GearworksDeliveryLevel): DvStep[] {
+  const out: DvStep[] = [];
+  for (let i = 0; i < level.queue.length; i++) {
+    out.push({ cmd: 'dvLoad' }, { cmd: 'dvDeliver' });
+    if (i < level.queue.length - 1) out.push({ cmd: 'dvDrive' });
+  }
+  return out;
+}
+
+/** The tidy loop: LOAD, DELIVER, DRIVE, REPEAT ×queue-length. */
+export function deliveryLoopSolution(level: GearworksDeliveryLevel): DvStep[] {
+  return [{ cmd: 'dvLoad' }, { cmd: 'dvDeliver' }, { cmd: 'dvDrive' }, { cmd: 'dvRepeat', arg: level.queue.length }];
+}
+
+/** works (all delivered right) / clever (used a loop) / creative (par — no waste). */
+export function deliveryStars(level: GearworksDeliveryLevel, program: readonly DvStep[]): number {
+  const r = runDelivery(program, deliveryGoalOf(level));
+  if (!r.allCorrect) return 0;
+  return 1 + (r.usedLoop ? 1 : 0) + (program.length <= level.par ? 1 : 0);
+}
+
+export function validateDeliveryLevel(level: GearworksDeliveryLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.houses !== level.queue.length) errors.push('Each parcel needs its own house (houses === queue length).');
+  if (level.queue.length > DV_REPEAT_MAX) errors.push('Queue is longer than the loop can repeat (max 4).');
+  const goal = deliveryGoalOf(level);
+  const manual = deliveryManualSolution(level);
+  const loop = deliveryLoopSolution(level);
+  if (manual.length > level.maxSlots) errors.push('Manual solution must fit the deck.');
+  if (!runDelivery(manual, goal).allCorrect) errors.push('Manual solution must deliver every parcel correctly.');
+  if (!runDelivery(loop, goal).allCorrect) errors.push('Loop solution must deliver every parcel correctly (FIFO drain).');
+  if (loop.length > level.par) errors.push('Loop solution must fit par.');
+  if (loop.length > level.maxSlots) errors.push('Loop solution must fit the deck.');
+  if (deliveryStars(level, manual) !== 1) errors.push('Manual solution should earn exactly 1 star.');
+  if (deliveryStars(level, loop) !== 3) errors.push('Loop solution should earn all 3 stars.');
+  if (manual.length <= loop.length) errors.push('The loop must be shorter than doing it by hand.');
+  // The queue must be a real ordered line: dests in arrival order.
+  level.queue.forEach((p, i) => { if (p.dest !== i) errors.push(`Parcel ${i + 1} must be addressed to house ${i + 1} (FIFO order).`); });
+  return errors;
+}
+
+export function assertDeliveryLevelValid(level: GearworksDeliveryLevel): void {
+  const errors = validateDeliveryLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Delivery level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }
