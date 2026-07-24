@@ -31,6 +31,7 @@ import {
   runCounter, counterMisses, runSafeStop, safeStopMisses, CN_MAX,
   GcCounterEvent, GcSafeEvent, GcStep,
 } from '../gameplay/gearworks/counterMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 600;
 
@@ -342,6 +343,7 @@ export class GearworksCounterScreen {
     const stars = starNames.length;
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
     this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     sharedSfx.play('celebrate');
@@ -349,6 +351,7 @@ export class GearworksCounterScreen {
       stars,
       starNames,
       predictedCorrectly: null,
+      peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()),
     }, sharedSfx, {
       onReplay: () => this.resetMachine(),
       onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),

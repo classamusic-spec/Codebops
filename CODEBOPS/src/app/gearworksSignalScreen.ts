@@ -212,6 +212,7 @@ export class GearworksSignalScreen {
       if (this.everStars >= 3) starNames.push('Looped both lanes!');
       const prev = this.events.store.stars[this.level.id] ?? 0;
       this.events.store.setStars(this.level.id, Math.max(prev, this.everStars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, this.everStars), this.level.shortTitle);
       this.topBar.setStars(Math.max(prev, this.everStars));
       void this.zip.celebrate();
       sharedSfx.play('celebrate');

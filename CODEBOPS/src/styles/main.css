@@ -2391,6 +2391,225 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 }
 
 /* ============================================================
+   Curriculum §9 — My Learning Garden (the child-facing map)
+   Growing plants, never grades: seed -> sprout -> bloom -> shining.
+   ============================================================ */
+.journey-screen {
+  overflow-y: auto;
+  padding: max(14px, var(--sat)) max(14px, var(--sar)) 40px max(14px, var(--sal));
+  background: radial-gradient(120% 80% at 50% 0%, #14401f 0%, #0b2415 70%);
+}
+.jr-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.jr-titles { flex: 1; min-width: 180px; }
+.jr-titles h1 {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: clamp(22px, 3vw, 34px); margin: 0;
+}
+.jr-titles p { color: #a9e6bd; font-weight: 700; margin: 2px 0 0; font-size: clamp(13px, 1.5vw, 16px); }
+
+.jr-path { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+
+.jr-badge {
+  position: relative; text-align: center; padding: 14px 12px 12px;
+  background: rgba(255,255,255,.06);
+  border: 2px solid rgba(255,255,255,.12); border-radius: var(--r-lg);
+  animation: jrIn .4s var(--ease-bounce) backwards;
+  animation-delay: calc(var(--i) * 0.03s);
+}
+@keyframes jrIn { from { opacity: 0; transform: translateY(10px) scale(.94); } }
+.jr-badge.tier-seed { opacity: .72; }
+.jr-badge.tier-sprout { border-color: rgba(126,231,155,.4); }
+.jr-badge.tier-bloom {
+  border-color: #7ee79b;
+  background: linear-gradient(180deg, rgba(126,231,155,.18), rgba(126,231,155,.05));
+}
+.jr-badge.tier-shining {
+  border-color: #ffcf3e;
+  background: linear-gradient(180deg, rgba(255,207,62,.2), rgba(255,207,62,.06));
+  box-shadow: 0 0 16px rgba(255,207,62,.35);
+}
+
+.jr-medal {
+  position: relative; width: 62px; height: 62px; margin: 0 auto 8px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.2), rgba(6,30,16,.4));
+  border: 2px solid rgba(255,255,255,.18);
+}
+.jr-badge.tier-shining .jr-medal {
+  border-color: #ffcf3e;
+  background: radial-gradient(circle at 50% 35%, #fff2c4, #f0a81e);
+}
+.jr-icon { font-size: 30px; line-height: 1; }
+.jr-tier { position: absolute; bottom: -6px; right: -4px; font-size: 20px; }
+
+.jr-phrase {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: 14px; line-height: 1.2;
+}
+.jr-tierlabel {
+  display: inline-block; margin: 5px 0 6px;
+  font-family: var(--font-display); font-weight: 800; font-size: 10px; letter-spacing: 1.4px;
+  color: #0b2415; background: #7ee79b; border-radius: 999px; padding: 2px 10px;
+}
+.jr-badge.tier-seed .jr-tierlabel { background: rgba(255,255,255,.25); color: #eafff1; }
+.jr-badge.tier-shining .jr-tierlabel { background: #ffcf3e; color: #5a3d00; }
+
+.jr-pips { display: flex; justify-content: center; gap: 3px; flex-wrap: wrap; }
+.jr-pips span { color: rgba(255,255,255,.2); font-size: 13px; }
+.jr-pips span.on { color: #7ee79b; }
+
+.jr-worlds { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 8px; }
+.jr-worlds-label { color: #86c79b; font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; }
+.jr-world-chip {
+  background: rgba(255,255,255,.08); border-radius: 999px; padding: 2px 8px;
+  color: #d8ffe6; font-size: 10px; font-weight: 700;
+}
+
+.journey-btn { background: linear-gradient(180deg, #4fd07a, #27a758); }
+
+/* Narrow phones: two compact columns beat one very tall one. */
+@media (max-width: 560px) {
+  .journey-screen { padding-left: max(10px, var(--sal)); padding-right: max(10px, var(--sar)); }
+  .jr-path { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .jr-badge { padding: 10px 8px 9px; }
+  .jr-medal { width: 46px; height: 46px; margin-bottom: 6px; }
+  .jr-icon { font-size: 22px; }
+  .jr-tier { font-size: 15px; }
+  .jr-phrase { font-size: 12px; }
+  .jr-tierlabel { font-size: 9px; padding: 2px 8px; margin: 4px 0 5px; }
+  .jr-worlds { gap: 3px; margin-top: 6px; }
+  .jr-worlds-label { display: none; }
+  .jr-world-chip { font-size: 9px; padding: 2px 6px; }
+}
+
+/* Landscape phones: shorter cards so more of the garden is in view. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .journey-screen { padding-top: max(8px, var(--sat)); }
+  .jr-header { margin-bottom: 10px; }
+  .jr-path { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 8px; }
+  .jr-badge { padding: 9px 8px 8px; }
+  .jr-medal { width: 44px; height: 44px; margin-bottom: 5px; }
+  .jr-icon { font-size: 21px; }
+  .jr-phrase { font-size: 12px; }
+  .jr-tierlabel { font-size: 9px; margin: 4px 0 4px; }
+  .jr-worlds-label { display: none; }
+  .jr-world-chip { font-size: 9px; padding: 1px 6px; }
+}
+
+/* ============================================================
+   Curriculum §11 — Code Peek ("what you just built, in real code")
+   ============================================================ */
+.code-peek {
+  /* The base .dialog centres and shrink-wraps its children; Code Peek is a
+     document, so it stretches and reads left-aligned. */
+  align-items: stretch; text-align: left; gap: 0;
+  width: min(560px, 92vw); max-width: min(560px, 92vw);
+  max-height: 86vh; overflow-y: auto;
+  padding: 18px 20px 20px;
+}
+.code-peek > .mini-btn { align-self: center; margin-top: 4px; }
+.cp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.cp-badge-icon {
+  font-size: 30px; width: 52px; height: 52px; flex: 0 0 auto; border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.22), rgba(13,20,55,.35));
+  border: 2px solid rgba(255,255,255,.18);
+}
+.cp-head-text { min-width: 0; }
+.cp-kicker {
+  font-family: var(--font-display); font-weight: 800; font-size: 10px; letter-spacing: 2px;
+  color: #8fe3ff;
+}
+.cp-concept { font-family: var(--font-display); font-weight: 800; color: #fff; font-size: 18px; line-height: 1.15; }
+.cp-childlang { color: #c7b3ff; font-weight: 700; font-size: 12px; }
+
+.cp-sentence {
+  margin: 0 0 12px; color: #fff; font-weight: 700; font-size: 15px; line-height: 1.35;
+  background: rgba(255,255,255,.07); border-left: 4px solid #8fe3ff;
+  border-radius: 0 var(--r-md) var(--r-md) 0; padding: 9px 12px;
+}
+
+.cp-blocks { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.cp-block {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: linear-gradient(180deg, #4b3f8f, #372e6d);
+  border: 2px solid rgba(255,255,255,.16); border-radius: 12px;
+  padding: 5px 9px; color: #fff; font-weight: 800; font-size: 12px;
+}
+.cp-block.loop { background: linear-gradient(180deg, #b86a1e, #8f4f12); }
+.cp-block-ico { display: inline-flex; width: 18px; height: 18px; }
+.cp-block-ico .cmd-ico { width: 18px; height: 18px; }
+.cp-block-arg { color: #ffcf3e; }
+
+.cp-section { margin-bottom: 12px; }
+.cp-section-title {
+  font-family: var(--font-display); font-weight: 800; font-size: 11px; letter-spacing: 1.4px;
+  color: #9a8fd0; margin-bottom: 5px; text-transform: uppercase;
+}
+.cp-plain, .cp-js {
+  margin: 0; padding: 10px 12px; border-radius: var(--r-md); overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.5; white-space: pre;
+}
+.cp-plain { background: rgba(255,255,255,.07); color: #eafff1; }
+.cp-js { background: #0f0c26; color: #8fe3ff; border: 2px solid rgba(143,227,255,.2); margin-top: 8px; }
+.cp-toggle { font-size: 12px; align-self: flex-start; }
+
+/* Landscape phones: the peek must fit without hiding its own heading. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .code-peek { padding: 12px 14px 14px; max-height: 92vh; }
+  .cp-badge-icon { width: 38px; height: 38px; font-size: 21px; }
+  .cp-concept { font-size: 15px; }
+  .cp-childlang { font-size: 11px; }
+  .cp-sentence { font-size: 13px; padding: 7px 10px; margin-bottom: 8px; }
+  .cp-blocks { margin-bottom: 9px; }
+  .cp-block { font-size: 11px; padding: 4px 7px; }
+  .cp-plain, .cp-js { font-size: 11.5px; padding: 8px 10px; }
+  .cp-section { margin-bottom: 8px; }
+}
+
+/* ============================================================
+   Curriculum §10 / §7 — Campfire learning report + world opening
+   ============================================================ */
+.campfire-dialog .camp-summary { color: #fff; font-weight: 700; font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
+.campfire-dialog .camp-note { color: #b9aee6; font-size: 12px; font-weight: 700; line-height: 1.4; margin: 0 0 8px; }
+.campfire-dialog .camp-notyet { color: #9a8fd0; font-size: 12px; font-weight: 700; margin: 8px 0 0; }
+
+.camp-report { display: flex; flex-direction: column; gap: 6px; }
+.cr-row {
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.1);
+  border-radius: var(--r-md); padding: 8px 12px;
+}
+.cr-head {
+  display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
+}
+.cr-head::-webkit-details-marker { display: none; }
+.cr-name { font-family: var(--font-display); font-weight: 800; color: #fff; font-size: 14px; flex: 1; }
+.cr-state {
+  background: rgba(126,231,155,.18); color: #9ff0bb; border-radius: 999px;
+  padding: 2px 9px; font-size: 11px; font-weight: 800; white-space: nowrap;
+}
+.campfire-dialog .cr-desc { color: #c7b3ff; font-size: 12px; font-weight: 700; margin: 7px 0 5px; line-height: 1.35; }
+.cr-obs { margin: 0 0 6px; padding-left: 18px; color: #eafff1; font-size: 12.5px; line-height: 1.5; }
+.campfire-dialog .cr-next { color: #ffcf3e; font-size: 12px; margin: 0; font-weight: 700; line-height: 1.35; }
+
+.camp-worlds { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.camp-world {
+  display: flex; align-items: center; gap: 7px; text-align: left;
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.12);
+  border-radius: var(--r-md); padding: 8px 10px; color: #fff; cursor: pointer;
+  font: inherit;
+}
+.camp-world.on { border-color: #7ee79b; background: rgba(126,231,155,.14); }
+.cw-emoji { font-size: 18px; }
+.cw-name { flex: 1; font-weight: 800; font-size: 12.5px; }
+.cw-state {
+  border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 800;
+  background: rgba(255,255,255,.14); color: #c7b3ff;
+}
+.camp-world.on .cw-state { background: #7ee79b; color: #0b2415; }
+
+/* ============================================================
    Landscape phones — hand the screen back to the toy.
    The camera now frames into the space chrome leaves, so every
    pixel we save here becomes a bigger machine.

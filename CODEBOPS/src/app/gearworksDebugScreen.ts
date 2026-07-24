@@ -23,6 +23,7 @@ import type { GearworksDebugLevel, DebugPuzzle } from '../data/gearworks/levels'
 import { debugBugIndex } from '../data/gearworks/levels';
 import { GW_JAM_TILES } from '../data/gearworks/world';
 import { runJam, jamGoalMet, GjEvent, GjStep } from '../gameplay/gearworks/jamMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 520;
 
@@ -237,6 +238,7 @@ export class GearworksDebugScreen {
       const stars = this.puzzleIdx + 1;
       const prev = this.events.store.stars[this.level.id] ?? 0;
       this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
       this.topBar.setStars(Math.max(prev, stars));
       void this.zip.celebrate();
       if (this.isLast) this.finishLevel();
@@ -262,12 +264,14 @@ export class GearworksDebugScreen {
     const stars = 3;
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
     this.topBar.setStars(stars);
     sharedSfx.play('celebrate');
     showCelebration(this.ui, {
       stars,
       starNames: ['Bug 1 fixed!', 'Bug 2 fixed!', 'Master machine detective!'],
       predictedCorrectly: null,
+      peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck?.peekSteps() ?? []),
     }, sharedSfx, {
       onReplay: () => this.startPuzzle(this.level.puzzles.length - 1),
       onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),

@@ -7,40 +7,16 @@ import { el } from '../ui/dom';
 import { SaveStore } from '../storage/saveStore';
 import { ALL_LEVELS } from '../data/levels';
 import { loadCustomLevels } from '../storage/customLevels';
+import { buildParentReport } from '../data/curriculum/report';
+import { sharedSfx } from '../audio/sfx';
 
-interface Concept {
-  readonly name: string;
-  readonly emoji: string;
-  readonly blurb: string;
-  readonly levelIds: readonly string[];
-}
-
-const CONCEPTS: readonly Concept[] = [
-  {
-    name: 'Sequences', emoji: '➡️',
-    blurb: 'Ordering steps to reach a goal — the foundation of all programs.',
-    levelIds: ['sm-1', 'sm-2'],
-  },
-  {
-    name: 'Loops', emoji: '↻',
-    blurb: 'Repeating a pattern with counted and stop-conditioned loops.',
-    levelIds: ['bb-1', 'bb-2', 'bb-3', 'bb-debug', 'bb-creative'],
-  },
-  {
-    name: 'Conditions', emoji: '🌸',
-    blurb: '“If you see a flower, grab it” — decisions inside a program.',
-    levelIds: ['pf-1', 'pf-2', 'pf-3', 'pf-debug', 'pf-creative'],
-  },
-  {
-    name: 'Machines', emoji: '⚙️',
-    blurb: 'Events, state and safe stopping — programming real machines.',
-    levelIds: ['gw-motor-start', 'gw-motor-programmer'],
-  },
-  {
-    name: 'Teamwork', emoji: '🤖',
-    blurb: 'Coordinating two bots with a shared plan (task switching).',
-    levelIds: ['rt-1', 'rt-2', 'rt-3', 'rt-debug', 'rt-creative'],
-  },
+/** Worlds a grown-up may open by hand (§7). Ids match the level data. */
+const UNLOCKABLE_WORLDS: ReadonlyArray<{ id: string; emoji: string; name: string }> = [
+  { id: 'bubble-bay', emoji: '🐚', name: 'Bubble Bay' },
+  { id: 'pattern-forest', emoji: '🌸', name: 'Pattern Forest' },
+  { id: 'robot-town', emoji: '🤖', name: 'Robot Town' },
+  { id: 'gearworks-garage', emoji: '⚙️', name: 'Gearworks Garage' },
+  { id: 'agent-academy', emoji: '🎓', name: 'Agent Academy' },
 ];
 
 function formatPlaytime(seconds: number): string {
@@ -97,26 +73,58 @@ export function showCampfire(parent: HTMLElement, store: SaveStore, onReset: () 
   stat('📅', String(store.daily.streak), 'day streak');
   stat('⏱️', formatPlaytime(store.playSeconds), 'total play time');
 
-  // Concepts
-  el('h3', undefined, dlg, 'Concepts practiced');
-  const concepts = el('div', 'camp-concepts', dlg);
-  for (const c of CONCEPTS) {
-    const done = c.levelIds.filter((id) => (store.stars[id] ?? 0) > 0).length;
-    const row = el('div', 'camp-concept', concepts);
-    el('span', 'cc-emoji', row, c.emoji);
-    const mid = el('div', 'cc-mid', row);
-    el('div', 'cc-name', mid, c.name);
-    el('div', 'cc-blurb', mid, c.blurb);
-    el('span', `cc-progress${done === c.levelIds.length ? ' full' : ''}`, row, `${done}/${c.levelIds.length}`);
-  }
   const customs = loadCustomLevels().length;
+
+  // ---- Learning report (addendum §10) — evidence, never scores ----
+  el('h3', undefined, dlg, 'What we have seen');
   if (customs > 0) {
-    const row = el('div', 'camp-concept', concepts);
-    el('span', 'cc-emoji', row, '🏝️');
-    const mid = el('div', 'cc-mid', row);
-    el('div', 'cc-name', mid, 'Creation');
-    el('div', 'cc-blurb', mid, 'Designing original puzzles on Imagination Island.');
-    el('span', 'cc-progress full', row, `${customs} built`);
+    el('p', 'camp-note', dlg,
+      `${customs} original puzzle${customs === 1 ? '' : 's'} designed on Imagination Island.`);
+  }
+  const report = buildParentReport(store.evidence);
+  el('p', 'camp-summary', dlg, report.summary);
+  if (report.active.length > 0) {
+    const list = el('div', 'camp-report', dlg);
+    for (const r of report.active) {
+      const row = el('details', 'cr-row', list);
+      const sum = el('summary', 'cr-head', row);
+      el('span', 'cr-name', sum, r.codingName);
+      el('span', 'cr-state', sum, r.label);
+      el('p', 'cr-desc', row, r.description);
+      const obs = el('ul', 'cr-obs', row);
+      // Every line here is something the child actually did, in a named level.
+      for (const note of r.observations.slice(0, 4)) el('li', undefined, obs, note);
+      el('p', 'cr-next', row, `→ ${r.nextStep}`);
+    }
+    const notYet = report.stages.filter((s) => s.state === 'not-introduced');
+    if (notYet.length > 0) {
+      el('p', 'camp-notyet', dlg,
+        `Still to come: ${notYet.map((s) => s.codingName).join(', ')}.`);
+    }
+  }
+
+  // ---- Open a world by hand (addendum §7) ----
+  el('h3', undefined, dlg, 'Open a world');
+  el('p', 'camp-note', dlg,
+    'Worlds normally open as your builder earns stars. You can also open one by hand — this only ever adds access, and never removes anything they have earned.');
+  const worlds = el('div', 'camp-worlds', dlg);
+  for (const w of UNLOCKABLE_WORLDS) {
+    const on = store.isWorldUnlocked(w.id);
+    const btn = el('button', `camp-world${on ? ' on' : ''}`, worlds) as HTMLButtonElement;
+    btn.type = 'button';
+    btn.setAttribute('role', 'switch');
+    btn.setAttribute('aria-checked', String(on));
+    el('span', 'cw-emoji', btn, w.emoji);
+    el('span', 'cw-name', btn, w.name);
+    const pill = el('span', 'cw-state', btn, on ? 'Open' : 'By stars');
+    btn.addEventListener('click', () => {
+      const next = !store.isWorldUnlocked(w.id);
+      store.setWorldUnlocked(w.id, next);
+      btn.classList.toggle('on', next);
+      btn.setAttribute('aria-checked', String(next));
+      pill.textContent = next ? 'Open' : 'By stars';
+      sharedSfx.play('tap');
+    });
   }
 
   // Footer actions

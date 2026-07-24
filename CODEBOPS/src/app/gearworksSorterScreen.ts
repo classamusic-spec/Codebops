@@ -30,6 +30,7 @@ import { GW_SORTER_TILES } from '../data/gearworks/world';
 import {
   runSorter, sorterMisses, itemName, GtStep, SortItem,
 } from '../gameplay/gearworks/sorterMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 560;
 
@@ -292,6 +293,7 @@ export class GearworksSorterScreen {
       const stars = starNames.length;
       const prev = this.events.store.stars[this.level.id] ?? 0;
       this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
       this.topBar.setStars(Math.max(prev, stars));
       void this.zip.celebrate();
       sharedSfx.play('celebrate');
@@ -299,6 +301,7 @@ export class GearworksSorterScreen {
         stars,
         starNames,
         predictedCorrectly: null,
+        peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()),
       }, sharedSfx, {
         onReplay: () => this.resetMachine(),
         onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),

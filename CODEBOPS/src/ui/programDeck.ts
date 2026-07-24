@@ -7,9 +7,10 @@
  */
 import { el } from './dom';
 import { COMMAND_DEFS } from '../data/commands/commandDefs';
-import { renderCommandIcon } from '../data/commands/commandIcons';
+import { renderCommandIcon, iconMarkup } from '../data/commands/commandIcons';
 import type { CommandId, ProgramStep } from '../gameplay/commands/interpreter';
 import type { Sfx } from '../audio/sfx';
+import type { PeekStep } from './codePeek';
 
 export interface ProgramDeckEvents {
   onProgramChange: (program: ProgramStep[]) => void;
@@ -109,6 +110,16 @@ export class ProgramDeck {
 
   getProgram(): ProgramStep[] {
     return this.program.map((s) => ({ ...s }));
+  }
+
+  /** The placed program described for Code Peek (§11) — labels, not ids. */
+  peekSteps(): PeekStep[] {
+    return this.program.map((s) => ({
+      label: COMMAND_DEFS[s.cmd]?.label ?? String(s.cmd),
+      iconHtml: iconMarkup(s.cmd),
+      arg: s.arg,
+      isLoop: s.cmd === 'repeat' || s.cmd === 'repeatUntil',
+    }));
   }
 
   setProgram(steps: readonly ProgramStep[]): void {

@@ -329,6 +329,7 @@ export class GearworksChainScreen {
     const stars = starNames.length;
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle);
     this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     showCelebration(this.ui, {

@@ -25,6 +25,7 @@ import { GW_DELIVERY_TILES } from '../data/gearworks/world';
 import {
   runDelivery, deliveryMisses, DvStep, DvEvent, DV_REPEAT_MIN, DV_REPEAT_MAX,
 } from '../gameplay/gearworks/deliveryMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 560;
 
@@ -287,6 +288,7 @@ export class GearworksDeliveryScreen {
     if (program.length <= this.level.par) starNames.push(`Creative: ${this.level.bonus.text}!`);
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
     this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     sharedSfx.play('celebrate');
@@ -294,6 +296,7 @@ export class GearworksDeliveryScreen {
       stars,
       starNames,
       predictedCorrectly: null,
+      peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()),
     }, sharedSfx, {
       onReplay: () => this.resetBoard(),
       onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),

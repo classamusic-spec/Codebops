@@ -165,6 +165,9 @@ import type { EvidenceEvent } from '../src/data/curriculum/mastery';
 import {
   GEARWORKS_CONCEPTS, conceptLevels, conceptProgress, garageTotals, nextConcept, diplomaEarned,
 } from '../src/data/gearworks/progress';
+import { evidenceForRun, programObservation } from '../src/data/curriculum/record';
+import { buildParentReport, latestObservation } from '../src/data/curriculum/report';
+import { plainLanguage, javaScriptPreview, conceptSentence, peekForLevel } from '../src/ui/codePeek';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1424,6 +1427,98 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('loops stay closed until sequence is met', !isStageAvailable('loops', []));
   check('a stage stays closed until prerequisites are met', !isStageAvailable('agents', empty));
   check('nextStage on an empty log is sequence', nextStage(empty) === 'sequence');
+}
+
+// ---------------------------------------------------------------
+// Curriculum runtime: evidence recording, parent report, Code Peek
+// ---------------------------------------------------------------
+{
+  console.log('\n-- curriculum runtime (evidence, report, Code Peek) --');
+
+  // Evidence is earned, not handed out for finishing.
+  check('a failed run records nothing', evidenceForRun('bb-3', 0, 'Bubble Loop').length === 0);
+  check('a level with no metadata records nothing',
+    evidenceForRun('not-a-level', 3, 'Nowhere').length === 0);
+  const oneStar = evidenceForRun('bb-3', 1, 'Bubble Loop');
+  const threeStar = evidenceForRun('bb-3', 3, 'Bubble Loop');
+  check('one star earns less evidence than three', oneStar.length < threeStar.length);
+  check('three stars earn every evidence item the level declares',
+    threeStar.length === (LEVEL_CURRICULUM.find((l) => l.levelId === 'bb-3')?.evidenceEvents.length ?? -1));
+  check('recorded phase always comes from the level design',
+    threeStar.every((e) => e.phase === 'build'));
+  check('only genuinely creative levels can produce create evidence',
+    evidenceForRun('bb-creative', 3, 'Your Own Loop').every((e) => e.phase === 'create')
+    && threeStar.every((e) => e.phase !== 'create'));
+  check('every recorded event names a real stage requirement',
+    threeStar.every((e) => stage(e.stage).evidenceRequirements.some((r) => r.id === e.requirement)));
+  check('every recorded event carries a readable sentence',
+    threeStar.every((e) => e.note.length > 10 && e.note.includes('Bubble Loop')));
+
+  // Concrete observations describe the program the child actually placed.
+  const loopObs = programObservation([{ label: 'Lift' }, { label: 'Repeat', arg: 4, isLoop: true }]);
+  check('a one-step loop is reported concretely',
+    loopObs?.stage === 'loops' && loopObs.text === 'noticed 4 repeated Lift steps could be one Repeat 4');
+  const bodyObs = programObservation([
+    { label: 'Lift' }, { label: 'Drop' }, { label: 'Repeat', arg: 3, isLoop: true },
+  ]);
+  check('a multi-step loop body is reported as a wrapped block',
+    bodyObs?.text === 'wrapped 2 steps in a single Repeat 3');
+  check('a short loop-free program invents no observation',
+    programObservation([{ label: 'Start' }]) === null);
+  check('a concrete observation reaches the recorded note',
+    evidenceForRun('bb-3', 3, 'Bubble Loop', [{ label: 'Lift' }, { label: 'Repeat', arg: 4, isLoop: true }])
+      .some((e) => e.note.includes('could be one Repeat 4')));
+
+  // Parent report (section 10): evidence only, no scores or comparisons.
+  const emptyReport = buildParentReport([]);
+  check('an empty report never claims progress',
+    emptyReport.active.length === 0 && emptyReport.stages.length === CURRICULUM_STAGES.length);
+  check('an empty log has no latest observation', latestObservation([]) === null);
+  const runLog = evidenceForRun('bb-3', 3, 'Bubble Loop');
+  const report = buildParentReport(runLog);
+  const loopRow = report.stages.find((r) => r.stage === 'loops');
+  check('the report reuses the recorded sentences verbatim',
+    !!loopRow && loopRow.observations.every((o) => runLog.some((e) => e.note === o)));
+  check('the report uses grown-up state labels', !!loopRow && loopRow.label.length > 0
+    && loopRow.label !== 'practiced');
+  check('the report suggests a next step without naming a deficit',
+    !!loopRow && loopRow.nextStep.length > 0
+    && !/behind|below|fail|should have/i.test(loopRow.nextStep));
+  check('no report sentence contains a percentage or rank',
+    report.stages.every((r) => !/%|\brank\b|\baverage\b/i.test(
+      [r.label, r.description, r.nextStep, ...r.observations].join(' '))));
+  const skipped = buildParentReport([
+    { stage: 'loops', requirement: 'loop-spot', phase: 'discover', levelId: 'bb-1', note: 'n' },
+    { stage: 'loops', requirement: 'loop-replace', phase: 'build', levelId: 'bb-3', note: 'n' },
+    { stage: 'loops', requirement: 'loop-count', phase: 'debug', levelId: 'bb-debug', note: 'n' },
+  ]).stages.find((r) => r.stage === 'loops');
+  check('the next step always looks forward, never back to a passed phase',
+    skipped?.nextStep.includes('idea of their own') === true);
+  check('duplicate replays never duplicate an observation',
+    buildParentReport([...runLog, ...runLog]).stages
+      .every((r) => new Set(r.observations).size === r.observations.length));
+
+  // Code Peek (section 11): describes the child's ACTUAL program.
+  const peek = [
+    { label: 'Lift' }, { label: 'Drop' }, { label: 'Repeat', arg: 3, isLoop: true },
+  ];
+  check('plain language shows the loop as a block',
+    plainLanguage(peek).join('|') === 'Repeat 3 times:|    Lift|    Drop');
+  check('JavaScript preview mirrors the same program',
+    javaScriptPreview(peek).join('\n') === 'for (let i = 0; i < 3; i++) {\n  lift();\n  drop();\n}');
+  check('a loop-free program stays a flat list',
+    plainLanguage([{ label: 'Start' }, { label: 'Stop' }]).join('|') === 'Start|Stop');
+  check('an empty loop body is reported, not guessed at',
+    plainLanguage([{ label: 'Repeat', arg: 2, isLoop: true }])[0].includes('nothing to repeat yet'));
+  check('the loops sentence names the count the child chose',
+    conceptSentence('loops', peek).includes('3 times'));
+  check('every stage has a Code Peek sentence',
+    CURRICULUM_STAGES.every((s) => conceptSentence(s.id, peek).length > 0));
+  check('Code Peek takes its concept from the curriculum registry',
+    peekForLevel('bb-3', 'Bubble Loop', peek)?.concept === 'loops');
+  check('Code Peek is skipped where there is no program or no metadata',
+    peekForLevel('bb-3', 'Bubble Loop', []) === null
+    && peekForLevel('not-a-level', 'Nowhere', peek) === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

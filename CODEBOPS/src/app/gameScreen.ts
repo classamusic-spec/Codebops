@@ -29,6 +29,7 @@ import { runProgram, ExecEvent, RunResult } from '../gameplay/commands/interpret
 import type { ProgramStep } from '../gameplay/commands/interpreter';
 import { el } from '../ui/dom';
 import { wait } from '../rendering/tween';
+import { peekForLevel } from '../ui/codePeek';
 
 type WorldEnv = SparkleMeadow | BubbleBay | PatternForest | RobotTown | AgentAcademy;
 
@@ -568,11 +569,13 @@ export class GameScreen {
       : this.predictedSuccess === true;
     if (creative) stars.push('It Is Creative!');
     this.store.setStars(this.level.id, stars.length);
+    this.store.recordRun(this.level.id, stars.length, this.level.shortTitle, this.deck?.peekSteps() ?? []);
 
     showCelebration(ui, {
       stars: stars.length,
       starNames: stars,
       predictedCorrectly: this.predictedSuccess,
+      peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()),
     }, this.sfx, {
       onReplay: () => {
         this.topBar.setStars(stars.length);

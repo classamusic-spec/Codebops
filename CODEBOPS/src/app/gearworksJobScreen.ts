@@ -30,6 +30,7 @@ import { GW_JOB_TILES } from '../data/gearworks/world';
 import {
   runJobProgram, jobMisses, GbEvent, JobStep, JOB_REPEAT_MIN, JOB_REPEAT_MAX,
 } from '../gameplay/gearworks/jobMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 560;
 
@@ -225,10 +226,11 @@ export class GearworksJobScreen {
       if (this.everStars >= 3) starNames.push('Refactored with a loop!');
       const prev = this.events.store.stars[this.level.id] ?? 0;
       this.events.store.setStars(this.level.id, Math.max(prev, this.everStars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, this.everStars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
       this.topBar.setStars(Math.max(prev, this.everStars));
       void this.zip.celebrate();
       sharedSfx.play('celebrate');
-      showCelebration(this.ui, { stars: this.everStars, starNames, predictedCorrectly: null }, sharedSfx, {
+      showCelebration(this.ui, { stars: this.everStars, starNames, predictedCorrectly: null, peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()) }, sharedSfx, {
         onReplay: () => { this.rig.reset(); this.trail.setEmpty(); },
         onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),
       });

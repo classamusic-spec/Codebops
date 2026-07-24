@@ -26,6 +26,7 @@ import { GW_JAM_TILES } from '../data/gearworks/world';
 import {
   runJam, jamGoalMet, jamMisses, GjEvent, GjStep, JM_REPEAT_MIN, JM_REPEAT_MAX,
 } from '../gameplay/gearworks/jamMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 540;
 
@@ -281,10 +282,11 @@ export class GearworksJamScreen {
     if (stars >= 3) starNames.push('SAFE — a clean shutdown!');
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
     this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     sharedSfx.play('celebrate');
-    showCelebration(this.ui, { stars, starNames, predictedCorrectly: null }, sharedSfx, {
+    showCelebration(this.ui, { stars, starNames, predictedCorrectly: null, peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck?.peekSteps() ?? []) }, sharedSfx, {
       onReplay: () => this.startMission(this.level.missions.length - 1),
       onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),
     });

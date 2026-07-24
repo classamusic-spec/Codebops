@@ -29,6 +29,7 @@ import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from
 import { garageTotals } from '../data/gearworks/progress';
 import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
+import { JourneyScreen } from './journeyScreen';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
   'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
@@ -56,6 +57,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private trophy: GearworksTrophyScreen | null = null;
+  private journey: JourneyScreen | null = null;
   private editor: EditorScreen | null = null;
   private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | GearworksMakerScreen | null = null;
   private store = new SaveStore();
@@ -88,6 +90,8 @@ export class App {
     this.garden = null;
     this.trophy?.dispose();
     this.trophy = null;
+    this.journey?.dispose();
+    this.journey = null;
     this.editor?.dispose();
     this.editor = null;
     this.gearworks?.dispose();
@@ -172,6 +176,13 @@ export class App {
     el('span', undefined, garden, 'My Garden');
     garden.addEventListener('click', () => this.showGarden());
 
+    // Learning Garden — the child-facing curriculum map (§9)
+    const journey = el('button', 'garden-btn journey-btn', card);
+    journey.type = 'button';
+    el('span', undefined, journey, '🌱');
+    el('span', undefined, journey, 'Big Ideas');
+    journey.addEventListener('click', () => { sharedSfx.play('bop'); this.showJourney(); });
+
     // Grown-Up Campfire (hold-to-open gate, bottom corner)
     createCampfireGate(screen, () => {
       this.store = new SaveStore();
@@ -237,8 +248,11 @@ export class App {
       if (levels.length === 0) continue;
       const meta = WORLD_META[worldId];
       const firstIdx = globalIndex;
-      const worldUnlocked =
-        firstIdx === 0 || (this.store.stars[ALL_LEVELS[firstIdx - 1].id] ?? 0) >= 1;
+      // A grown-up can open a world by hand from the Campfire (§7); that
+      // only ever adds access on top of the normal star-based unlocking.
+      const openedByGrownUp = this.store.isWorldUnlocked(worldId);
+      const worldUnlocked = openedByGrownUp
+        || firstIdx === 0 || (this.store.stars[ALL_LEVELS[firstIdx - 1].id] ?? 0) >= 1;
       const section = el('div', `world-panel wp-${meta.theme}${worldUnlocked ? '' : ' locked'}`, wrap);
       const title = el('div', 'world-title', section);
       el('span', 'wemoji', title, meta.emoji);
@@ -248,7 +262,8 @@ export class App {
 
       for (const level of levels) {
         const idx = globalIndex;
-        const unlocked = idx === 0 || (this.store.stars[ALL_LEVELS[idx - 1].id] ?? 0) >= 1;
+        const unlocked = openedByGrownUp
+          || idx === 0 || (this.store.stars[ALL_LEVELS[idx - 1].id] ?? 0) >= 1;
         const stars = this.store.stars[level.id] ?? 0;
         const row = el('button', `level-item${unlocked ? '' : ' locked'}${level.prefill ? ' debug' : ''}`, list) as HTMLButtonElement;
         row.type = 'button';
@@ -286,6 +301,7 @@ export class App {
       el('span', undefined, title, GEARWORKS_WORLD.name);
       el('span', 'gw-new-badge', title, 'NEW!');
       const list = el('div', 'level-list', section);
+      const garageOpened = this.store.isWorldUnlocked('gearworks-garage');
       let seqIdx = 0;
       GEARWORKS_PICKER.forEach((entry, i) => {
         // The Trophy Room is a special always-open golden capstone row.
@@ -309,7 +325,7 @@ export class App {
         const playable = entry.kind !== 'soon';
         const thisSeqIdx = seqIdx;
         // Playable levels unlock in order (first is always open).
-        const unlocked = playable && (thisSeqIdx === 0 ||
+        const unlocked = playable && (garageOpened || thisSeqIdx === 0 ||
           (this.store.stars[gwEntryId(GEARWORKS_SEQUENCE[thisSeqIdx - 1])] ?? 0) >= 1);
         if (playable) seqIdx++;
         const label = entry.kind === 'soon' ? entry.shortTitle : entry.level.shortTitle;
@@ -478,6 +494,19 @@ export class App {
       onBack: () => this.showSelect(),
     });
     this.trophy.enter();
+  }
+
+  // ---------- learning garden (curriculum map) ----------
+
+  private showJourney(): void {
+    this.clearHost();
+    this.store = new SaveStore(); // read the evidence recorded while playing
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-journey';
+    this.journey = new JourneyScreen(screen, this.store, {
+      onBack: () => this.showTitle(),
+    });
+    this.journey.enter();
   }
 
   // ---------- garden ----------

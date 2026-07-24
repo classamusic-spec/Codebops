@@ -3,6 +3,8 @@ import { el } from './dom';
 import type { ExecEvent } from '../gameplay/commands/interpreter';
 import type { Sfx } from '../audio/sfx';
 import type { SaveStore } from '../storage/saveStore';
+import { showCodePeek } from './codePeek';
+import type { CodePeekInfo } from './codePeek';
 
 function scrim(parent: HTMLElement): HTMLElement {
   return el('div', 'dialog-scrim', parent);
@@ -112,6 +114,8 @@ export interface CelebrationInfo {
   stars: number;
   starNames: string[];
   predictedCorrectly: boolean | null;
+  /** Optional §11 Code Peek for the program the child just ran. */
+  peek?: CodePeekInfo | null;
 }
 
 export function showCelebration(
@@ -136,6 +140,13 @@ export function showCelebration(
     : 'Zip followed YOUR plan perfectly!');
 
   const btns = el('div', 'dialog-actions', d);
+  if (info.peek) {
+    const peekInfo = info.peek;
+    const peek = el('button', 'mini-btn peek-btn', btns, '🔍 Code Peek');
+    (peek as HTMLButtonElement).type = 'button';
+    peek.setAttribute('aria-label', 'Code Peek — see what you just built as real code');
+    peek.addEventListener('click', () => { sfx.play('tap'); showCodePeek(parent, peekInfo); });
+  }
   const again = el('button', 'mini-btn purple', btns, '↩ Play Again');
   const next = el('button', 'mini-btn', btns, '➜ Keep Going');
   again.addEventListener('click', () => { sfx.play('tap'); closeDialog(s, previousFocus); actions.onReplay(); });

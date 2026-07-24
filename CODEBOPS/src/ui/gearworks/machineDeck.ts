@@ -16,6 +16,7 @@ import { sharedSfx } from '../../audio/sfx';
 import type { GearworksCommandId } from '../../gameplay/gearworks/machine';
 import { GW_TILES } from '../../data/gearworks/world';
 import type { GwTileDef } from '../../data/gearworks/world';
+import type { PeekStep } from '../codePeek';
 
 export interface DeckStep<C extends string> {
   cmd: C;
@@ -116,6 +117,16 @@ export class MachineDeck<C extends string = GearworksCommandId> {
 
   getProgram(): Array<DeckStep<C>> {
     return this.program.map((s) => ({ ...s }));
+  }
+
+  /** The placed program described for Code Peek (§11) — labels, not ids. */
+  peekSteps(): PeekStep[] {
+    return this.program.map((s) => ({
+      label: this.cfg.tiles[s.cmd]?.label ?? String(s.cmd),
+      iconHtml: `<svg class="cmd-ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">${this.cfg.tiles[s.cmd]?.icon ?? ''}</svg>`,
+      arg: s.arg,
+      isLoop: this.isLoopCmd(s.cmd),
+    }));
   }
 
   setRunning(running: boolean): void {

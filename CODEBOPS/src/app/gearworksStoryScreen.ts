@@ -25,6 +25,7 @@ import { GW_STORY_TILES } from '../data/gearworks/world';
 import {
   runStory, storyMisses, takenPath, StoryStep, StoryEvent,
 } from '../gameplay/gearworks/storyMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 720;
 
@@ -275,6 +276,7 @@ export class GearworksStoryScreen {
     if (everBoth) starNames.push(`Creative: ${this.level.bonus.text}!`);
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
     this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     sharedSfx.play('celebrate');
@@ -282,6 +284,7 @@ export class GearworksStoryScreen {
       stars,
       starNames,
       predictedCorrectly: null,
+      peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()),
     }, sharedSfx, {
       onReplay: () => this.resetStory(),
       onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),

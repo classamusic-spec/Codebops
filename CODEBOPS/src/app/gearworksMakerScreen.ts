@@ -27,6 +27,7 @@ import { GW_MAKER_TILES } from '../data/gearworks/world';
 import {
   runMaker, makerMisses, MkBodyStep, MkCall, MkEvent, MK_ARG_MIN, MK_ARG_MAX,
 } from '../gameplay/gearworks/makerMachine';
+import { peekForLevel } from '../ui/codePeek';
 
 const STEP_MS = 460;
 
@@ -238,6 +239,7 @@ export class GearworksMakerScreen {
     if (r.usesParam) starNames.push(`Creative: ${this.level.bonus.text}!`);
     const prev = this.events.store.stars[this.level.id] ?? 0;
     this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.events.store.recordRun(this.level.id, Math.max(prev, stars), this.level.shortTitle, this.deck?.peekSteps() ?? []);
     this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     sharedSfx.play('celebrate');
@@ -245,6 +247,7 @@ export class GearworksMakerScreen {
       stars,
       starNames,
       predictedCorrectly: null,
+      peek: peekForLevel(this.level.id, this.level.shortTitle, this.deck.peekSteps()),
     }, sharedSfx, {
       onReplay: () => this.resetBuild(),
       onContinue: () => (this.events.hasNext && this.events.onNext ? this.events.onNext() : this.events.onExit()),
