@@ -176,7 +176,7 @@ button { font-family: inherit; border: 0; cursor: pointer; }
   background: linear-gradient(180deg, #202f77 0%, var(--ink-800) 70%);
   border: 3px solid rgba(255,255,255,.14);
   border-radius: var(--r-xl);
-  padding: 10px 14px 12px;
+  padding: 10px 6px 12px;
   box-shadow: 0 6px 0 var(--ink-line), var(--shadow-card);
   min-height: 0;
   min-width: 0;
@@ -189,7 +189,7 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 .deck-sequence {
   order: 1; display: flex; gap: 8px; min-width: 0;
   justify-content: center; align-items: center;
-  padding: 10px 4px 2px;
+  padding: 10px 2px 2px;
   overflow-x: auto; overflow-y: visible;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
@@ -2434,7 +2434,7 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .pb-cell { width: 15px; height: 15px; }
 
   /* --- deck + actions --- */
-  .deck-panel { padding: 5px 8px; gap: 6px; }
+  .deck-panel { padding: 5px 5px; gap: 6px; }
   .deck-tools { bottom: calc(100% + 4px); gap: 5px; }
   .deck-tools .mini-btn { font-size: 11px; padding: 5px 10px; }
   .bop-btn { height: 54px; font-size: 18px; padding: 0 18px; }
@@ -2484,7 +2484,7 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .deck-panel { flex: 0 0 auto; }
   .bop-wrap { width: 100%; }
   .bop-btn { width: 100%; }
-  .deck-panel { padding: 8px 10px 10px; gap: 5px; }
+  .deck-panel { padding: 8px 5px 10px; gap: 5px; }
   .tile, .slot, .drag-ghost { width: clamp(44px, 11.6vw, 54px); height: clamp(44px, 11.6vw, 54px); }
   .deck-tray { gap: 6px; }
   .deck-sequence { gap: 6px; justify-content: flex-start; }
