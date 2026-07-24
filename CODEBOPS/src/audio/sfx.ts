@@ -4,7 +4,9 @@
  */
 export type SfxName =
   | 'tap' | 'place' | 'remove' | 'bop' | 'hop' | 'bump' | 'grab' | 'drop'
-  | 'predictRight' | 'predictWrong' | 'star' | 'celebrate' | 'glitch' | 'loop';
+  | 'predictRight' | 'predictWrong' | 'star' | 'celebrate' | 'glitch' | 'loop'
+  // Phase 13 — Robot Orchestra instrument voices
+  | 'insDrum' | 'insBell' | 'insXylo' | 'insShaker' | 'insChime';
 
 export class Sfx {
   private ctx: AudioContext | null = null;
@@ -61,6 +63,12 @@ export class Sfx {
         this.tone(220, 0.07, 'square', 0.07); this.tone(180, 0.07, 'square', 0.07, 0.06);
         this.tone(260, 0.09, 'square', 0.07, 0.12);
         break;
+      // --- Phase 13 instrument voices (one clear note per tap) ---
+      case 'insDrum': this.tone(150, 0.16, 'sine', 0.2, 0, 62); break;
+      case 'insBell': this.tone(880, 0.34, 'sine', 0.13); this.tone(1320, 0.3, 'sine', 0.07, 0.02); break;
+      case 'insXylo': this.tone(1046, 0.22, 'triangle', 0.14); this.tone(2093, 0.14, 'sine', 0.05, 0.01); break;
+      case 'insShaker': this.tone(5200, 0.05, 'triangle', 0.06); this.tone(3800, 0.05, 'square', 0.04, 0.02); break;
+      case 'insChime': this.tone(1568, 0.4, 'sine', 0.1); this.tone(2349, 0.36, 'sine', 0.05, 0.03); break;
     }
   }
 }

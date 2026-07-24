@@ -13,12 +13,12 @@ import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
-  GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS,
+  GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS, GEARWORKS_ORCHESTRA_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
-  GearworksSignalLevel, GearworksDebugLevel,
+  GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -207,7 +207,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'jam'; readonly level: GearworksJamLevel }
   | { readonly kind: 'job'; readonly level: GearworksJobLevel }
   | { readonly kind: 'signal'; readonly level: GearworksSignalLevel }
-  | { readonly kind: 'debug'; readonly level: GearworksDebugLevel };
+  | { readonly kind: 'debug'; readonly level: GearworksDebugLevel }
+  | { readonly kind: 'orchestra'; readonly level: GearworksOrchestraLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -221,6 +222,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_SIGNAL_LEVELS.map((level) => ({ kind: 'signal' as const, level })),
   ...GEARWORKS_DEBUG_LEVELS.map((level) => ({ kind: 'debug' as const, level })),
   ...GEARWORKS_FACTORY_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
+  ...GEARWORKS_ORCHESTRA_LEVELS.map((level) => ({ kind: 'orchestra' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -234,5 +236,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-robot-orchestra', shortTitle: 'Robot Orchestra', emoji: '🥁' },
+  { kind: 'soon', id: 'gw-lighthouse-logic', shortTitle: 'Lighthouse Logic', emoji: '🗼' },
 ];

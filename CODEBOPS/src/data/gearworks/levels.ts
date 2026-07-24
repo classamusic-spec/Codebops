@@ -22,6 +22,9 @@ import type { JobPrimId, JobMainId, JobStep, JobGoal } from '../../gameplay/gear
 import { runJobProgram } from '../../gameplay/gearworks/jobMachine';
 import type { SignalCommandId, SignalStep, SignalGoal } from '../../gameplay/gearworks/signalMachine';
 import { runParallel } from '../../gameplay/gearworks/signalMachine';
+import type { BeatPattern } from '../../gameplay/gearworks/beatMachine';
+import { emptyPattern, toggleCell, beatStars, beatStats, BEAT_LOOP_MAX } from '../../gameplay/gearworks/beatMachine';
+import type { SfxName } from '../../audio/sfx';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -1269,5 +1272,113 @@ export function assertDebugLevelValid(level: GearworksDebugLevel): void {
   const errors = validateDebugLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Debug level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 13 — Robot Orchestra: a creative beat sequencer
+//
+// Not a puzzle — there is no single right answer. Tap cells to lay a
+// beat across a grid of instrument robots; every track plays in
+// PARALLEL on each step. Any beat "works"; using two-plus instruments
+// is clever; looping the bar into a real song is creative.
+// ==================================================================
+
+export interface GearworksOrchestraTrack {
+  readonly id: string;
+  readonly label: string;
+  readonly emoji: string;
+  /** Instrument voice (Sfx name) + a colour for the row + robot. */
+  readonly sound: SfxName;
+  readonly color: string;
+}
+
+export interface GearworksOrchestraLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly tracks: readonly GearworksOrchestraTrack[];
+  readonly steps: number;
+  /** A friendly starter groove preloaded so the grid is never blank. */
+  readonly starter?: ReadonlyArray<{ readonly track: string; readonly step: number }>;
+  readonly bonus: { readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_ROBOT_ORCHESTRA: GearworksOrchestraLevel = {
+  id: 'gw-robot-orchestra',
+  title: 'Gearworks Garage',
+  shortTitle: 'Robot Orchestra',
+  family: 'orchestra',
+  goalText: 'Tap the squares to make a beat — the robot band plays your song!',
+  emoji: '🥁',
+  brief: {
+    title: 'The Robot Orchestra!',
+    text: 'Four robots are ready to jam! Tap a square to give a robot a beat — each row is a different sound. When you BOP, the whole band plays your pattern together, left to right. There is no wrong song here — make it yours! Add more instruments, then LOOP it into a real tune.',
+    emoji: '🥁',
+  },
+  tracks: [
+    { id: 'drum', label: 'Drum', emoji: '🥁', sound: 'insDrum', color: '#ff5a7a' },
+    { id: 'bell', label: 'Bell', emoji: '🔔', sound: 'insBell', color: '#ffb43e' },
+    { id: 'xylo', label: 'Xylophone', emoji: '🎵', sound: 'insXylo', color: '#3ec6ff' },
+    { id: 'shaker', label: 'Shaker', emoji: '🪇', sound: 'insShaker', color: '#8be04a' },
+  ],
+  steps: 8,
+  starter: [
+    { track: 'drum', step: 0 },
+    { track: 'drum', step: 4 },
+  ],
+  bonus: { text: 'Loop your beat into a real song' },
+  coachHint: 'Tap any square to add a beat — then BOP to hear your robot band!',
+};
+
+export const GEARWORKS_ORCHESTRA_LEVELS: readonly GearworksOrchestraLevel[] = [GW_ROBOT_ORCHESTRA];
+
+export function orchestraTrackIds(level: GearworksOrchestraLevel): string[] {
+  return level.tracks.map((t) => t.id);
+}
+
+/** Build the preloaded starter pattern (empty grid + the starter cells). */
+export function orchestraStarterPattern(level: GearworksOrchestraLevel): BeatPattern {
+  let pattern = emptyPattern(orchestraTrackIds(level), level.steps);
+  for (const { track, step } of level.starter ?? []) pattern = toggleCell(pattern, track, step);
+  return pattern;
+}
+
+/** works (any beat) / clever (2+ instruments) / creative (looped ≥2). */
+export function orchestraStars(level: GearworksOrchestraLevel, pattern: BeatPattern, loops: number): number {
+  return beatStars(pattern, orchestraTrackIds(level), loops);
+}
+
+export function validateOrchestraLevel(level: GearworksOrchestraLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.tracks.length < 2) errors.push('An orchestra needs at least two instruments (the clever star).');
+  if (level.steps < 4) errors.push('An orchestra needs at least four steps.');
+  const ids = orchestraTrackIds(level);
+  if (new Set(ids).size !== ids.length) errors.push('Track ids must be unique.');
+  for (const c of level.starter ?? []) {
+    if (!ids.includes(c.track)) errors.push(`Starter cell names unknown track "${c.track}".`);
+    if (c.step < 0 || c.step >= level.steps) errors.push(`Starter cell step ${c.step} is off the grid.`);
+  }
+  // The starter groove must already earn the "works" star (never a blank stage).
+  const starter = orchestraStarterPattern(level);
+  if (beatStats(starter, ids).totalBeats < 1) errors.push('Starter groove must have at least one beat.');
+  if (orchestraStars(level, starter, 1) < 1) errors.push('Starter groove must earn the works star.');
+  // A full ensemble looped must reach all three stars (the ceiling is reachable).
+  let full = emptyPattern(ids, level.steps);
+  ids.forEach((id, i) => { full = toggleCell(full, id, i % level.steps); });
+  if (orchestraStars(level, full, BEAT_LOOP_MAX) !== 3) errors.push('A looped full ensemble must earn all three stars.');
+  return errors;
+}
+
+export function assertOrchestraLevelValid(level: GearworksOrchestraLevel): void {
+  const errors = validateOrchestraLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Orchestra level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

@@ -101,6 +101,14 @@ import {
   GEARWORKS_FACTORY_LEVELS, GW_THREE_WAY, GW_FACTORY_RUSH,
   canonicalSorterSolution as sorterCanon,
 } from '../src/data/gearworks/levels';
+import {
+  emptyPattern, toggleCell, runBeats, beatStats, beatStars,
+  serializePattern, deserializePattern, BEAT_LOOP_MAX,
+} from '../src/gameplay/gearworks/beatMachine';
+import {
+  GW_ROBOT_ORCHESTRA, GEARWORKS_ORCHESTRA_LEVELS, validateOrchestraLevel,
+  orchestraTrackIds, orchestraStarterPattern, orchestraStars,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -900,6 +908,69 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   // dropping the catch-all leaves red squares un-sorted (they would pass)
   const noCatch = runSorter(TP('gtIfRed', 'gtIfRound', 'gtSendLeft', 'gtIfBlue', 'gtSendRight'), GW_FACTORY_RUSH.stream, GW_FACTORY_RUSH.rules);
   check('without Send Up a red square rides past (needs the catch-all)', !noCatch.allCorrect);
+}
+
+// --- Gearworks Robot Orchestra (Phase 13) ---
+{
+  const IDS = ['a', 'b', 'c'];
+  // empty pattern is all-off, right shape
+  const e = emptyPattern(IDS, 8);
+  check('empty pattern has a row per track, all off', IDS.every((id) => e.tracks[id].length === 8 && e.tracks[id].every((v) => v === false)));
+  check('empty pattern reports zero beats', beatStats(e, IDS).totalBeats === 0);
+
+  // toggle is a pure add/remove
+  const p1 = toggleCell(e, 'a', 2);
+  check('toggle lights a single cell', p1.tracks.a[2] === true && beatStats(p1, IDS).totalBeats === 1);
+  check('toggle does not mutate the source pattern', e.tracks.a[2] === false);
+  const p1off = toggleCell(p1, 'a', 2);
+  check('toggling twice clears the cell', p1off.tracks.a[2] === false);
+  check('toggle ignores an out-of-range step', toggleCell(e, 'a', 99) === e);
+  check('toggle ignores an unknown track', toggleCell(e, 'zzz', 0) === e);
+
+  // runBeats: all tracks fire in parallel per step, in order
+  let par = toggleCell(e, 'a', 0);
+  par = toggleCell(par, 'b', 0);
+  par = toggleCell(par, 'c', 3);
+  const rb = runBeats(par, IDS, 1);
+  check('runBeats emits a stepStart for every step', rb.events.filter((ev) => ev.type === 'stepStart').length === 8);
+  check('runBeats counts every lit cell as a hit', rb.totalHits === 3);
+  check('runBeats ends with a single done event', rb.events[rb.events.length - 1].type === 'done');
+  // step 0 fires a & b together (parallel), before step 3's hit
+  const hitOrder = rb.events.filter((ev) => ev.type === 'hit').map((ev: any) => `${ev.step}:${ev.track}`);
+  check('step-0 hits are a then b (track order), before step 3', JSON.stringify(hitOrder) === JSON.stringify(['0:a', '0:b', '3:c']));
+
+  // looping multiplies the timeline deterministically
+  const rb2 = runBeats(par, IDS, 3);
+  check('looping x3 triples the hits', rb2.totalHits === 9);
+  check('looping is clamped to the max', runBeats(par, IDS, 99).totalHits === 3 * BEAT_LOOP_MAX);
+  check('runBeats is deterministic', JSON.stringify(runBeats(par, IDS, 2)) === JSON.stringify(runBeats(par, IDS, 2)));
+
+  // stars: works / clever / creative
+  check('no beats earns no stars', beatStars(e, IDS, 1) === 0);
+  check('one instrument, no loop earns just works', beatStars(toggleCell(e, 'a', 0), IDS, 1) === 1);
+  const two = toggleCell(toggleCell(e, 'a', 0), 'b', 1);
+  check('two instruments earn works + clever', beatStars(two, IDS, 1) === 2);
+  check('two instruments looped earn all three', beatStars(two, IDS, 2) === 3);
+  check('one instrument looped earns works + creative only', beatStars(toggleCell(e, 'a', 0), IDS, 2) === 2);
+
+  // song save round-trips through localStorage-shaped JSON
+  const json = serializePattern(two, 3);
+  const back = deserializePattern(json, IDS, 8);
+  check('a saved song round-trips its pattern', back !== null && JSON.stringify(back.pattern.tracks) === JSON.stringify(two.tracks));
+  check('a saved song round-trips its loop count', back?.loops === 3);
+  check('a mismatched step count refuses to load', deserializePattern(serializePattern(two, 1), IDS, 4) === null);
+  check('garbage JSON refuses to load', deserializePattern('not json', IDS, 8) === null);
+
+  // level data + helpers
+  check('robot orchestra level validates', validateOrchestraLevel(GW_ROBOT_ORCHESTRA).length === 0);
+  check('every orchestra level validates', GEARWORKS_ORCHESTRA_LEVELS.every((l) => validateOrchestraLevel(l).length === 0));
+  check('starter groove is never blank (earns works)', orchestraStars(GW_ROBOT_ORCHESTRA, orchestraStarterPattern(GW_ROBOT_ORCHESTRA), 1) >= 1);
+  check('orchestra track ids are unique', new Set(orchestraTrackIds(GW_ROBOT_ORCHESTRA)).size === GW_ROBOT_ORCHESTRA.tracks.length);
+  // a full looped ensemble reaches the ceiling
+  const ids = orchestraTrackIds(GW_ROBOT_ORCHESTRA);
+  let full = emptyPattern(ids, GW_ROBOT_ORCHESTRA.steps);
+  ids.forEach((id, i) => { full = toggleCell(full, id, i % GW_ROBOT_ORCHESTRA.steps); });
+  check('a full looped ensemble earns all three stars', orchestraStars(GW_ROBOT_ORCHESTRA, full, BEAT_LOOP_MAX) === 3);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

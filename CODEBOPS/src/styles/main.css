@@ -1867,3 +1867,82 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-shelf-hint { display: none; }
   .gw-part-name { display: none; }
 }
+
+/* ============================================================
+   Phase 13 — Robot Orchestra beat sequencer
+   ============================================================ */
+.beat-seq {
+  position: absolute; left: max(14px, var(--sal)); right: max(14px, var(--sar));
+  bottom: max(10px, var(--sab));
+  display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(180deg, #202f77 0%, var(--ink-800) 74%);
+  border: 3px solid rgba(255,255,255,.14);
+  border-radius: var(--r-xl);
+  padding: 12px 16px 14px;
+  box-shadow: 0 6px 0 var(--ink-line), var(--shadow-card);
+}
+
+.seq-grid { display: flex; flex-direction: column; gap: 7px; }
+.seq-row { display: flex; align-items: center; gap: 10px; }
+.seq-inst {
+  display: flex; align-items: center; gap: 8px;
+  width: clamp(96px, 12vw, 150px); flex: 0 0 auto;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--track) 78%, #fff 22%), var(--track));
+  border-radius: 14px; padding: 7px 10px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.4), 0 3px 0 rgba(13,20,55,.35);
+}
+.seq-inst .si-emoji { font-size: clamp(20px, 2.4vw, 28px); line-height: 1; filter: drop-shadow(0 1px 0 rgba(13,20,55,.3)); }
+.seq-inst .si-label {
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(11px, 1.2vw, 14px);
+  color: #fff; text-shadow: 0 1px 0 rgba(13,20,55,.45); letter-spacing: .3px;
+}
+
+.seq-cells { display: grid; grid-template-columns: repeat(var(--steps), 1fr); gap: clamp(5px, .7vw, 9px); flex: 1; min-width: 0; }
+.seq-cell {
+  position: relative; aspect-ratio: 1 / 1; min-width: 0;
+  border: 3px solid rgba(255,255,255,.16); border-radius: 14px; padding: 0;
+  background: rgba(13,20,55,.5);
+  cursor: pointer; touch-action: manipulation;
+  transition: transform .14s var(--ease-bounce), background .16s, border-color .16s, box-shadow .16s;
+}
+.seq-cell .sc-dot {
+  position: absolute; inset: 22%; border-radius: 50%;
+  background: rgba(255,255,255,.14); transition: background .16s, transform .16s;
+}
+.seq-cell:hover { border-color: rgba(255,255,255,.4); }
+.seq-cell.on {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--track) 82%, #fff 18%), var(--track));
+  border-color: #fff;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.5), 0 0 12px color-mix(in srgb, var(--track) 60%, transparent);
+}
+.seq-cell.on .sc-dot { background: #fff; transform: scale(1.15); }
+.seq-cell.beam { border-color: var(--yellow); }
+.seq-cell.hit { animation: seqHit .32s var(--ease-bounce); }
+@keyframes seqHit {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.28); box-shadow: 0 0 18px var(--yellow); }
+  100% { transform: scale(1); }
+}
+.seq-row { --track: #6ad0ff; }
+
+/* Playhead beam: a thin row of ticks that lights the current column */
+.seq-beam { display: grid; grid-template-columns: repeat(var(--steps), 1fr); gap: clamp(5px, .7vw, 9px);
+  margin-left: clamp(106px, calc(12vw + 10px), 160px); }
+.seq-tick { height: 6px; border-radius: 999px; background: rgba(255,255,255,.1); transition: background .12s, box-shadow .12s; }
+.seq-tick.on { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+
+/* Controls row */
+.seq-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bop-btn.seq-bop { flex: 0 0 auto; height: clamp(52px, 5vw, 68px); font-size: clamp(20px, 2.2vw, 30px); padding: 0 clamp(18px, 2vw, 30px); }
+.seq-loop.looping { background: linear-gradient(180deg, #c79bff, #8a4fff); color: #fff; }
+.seq-load.is-off { filter: grayscale(.7) brightness(.8); opacity: .7; }
+.beat-seq.running .seq-cell { cursor: default; }
+.calm-mode .seq-cell.hit { animation: none; }
+
+@media (max-width: 700px) {
+  .beat-seq { padding: 9px 10px 11px; gap: 6px; }
+  .seq-inst { width: clamp(58px, 20vw, 88px); padding: 5px 7px; gap: 5px; }
+  .seq-inst .si-label { display: none; }
+  .seq-beam { margin-left: clamp(64px, 20vw, 94px); }
+  .bop-btn.seq-bop { height: 50px; font-size: 18px; }
+}
