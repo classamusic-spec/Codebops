@@ -60,7 +60,84 @@ export function loadSvg(url: string): Promise<string> {
 export async function inlineSvgInto(container: HTMLElement, url: string): Promise<SVGSVGElement | null> {
   const text = await loadSvg(url);
   container.innerHTML = text;
-  return container.querySelector('svg');
+  const svg = container.querySelector('svg');
+  if (svg) rigMascotParts(svg);
+  return svg;
+}
+
+/**
+ * Tag the mascot's face parts so they can be animated.
+ *
+ * The art is exported as flat, unnamed paths — no ids, no semantic
+ * classes — so we identify parts by MEASURING them: each shape's
+ * bounding box (normalised against the viewBox) plus its fill. That is
+ * far more reliable than reading path data, and it self-corrects if the
+ * art is re-exported, since it reasons about where things actually are.
+ *
+ * Tags applied: cb-eye (whites + pupils), cb-pupil, cb-shine, cb-mouth,
+ * cb-ear, cb-crest (tuft / lightning bolt), cb-glitch (GlitchBop's
+ * scattered pixels). Anything unrecognised is simply left alone.
+ */
+export function rigMascotParts(svg: SVGSVGElement): void {
+  if (svg.dataset.cbRigged === '1') return;
+  const vb = svg.viewBox?.baseVal;
+  if (!vb || vb.width <= 0 || vb.height <= 0) return;
+
+  const shapes = Array.from(svg.querySelectorAll<SVGGraphicsElement>('path,circle,ellipse,rect,polygon'));
+  type Part = { el: SVGGraphicsElement; cx: number; cy: number; rw: number; rh: number; rgb: [number, number, number] | null };
+  const parts: Part[] = [];
+  for (const el of shapes) {
+    let bb: DOMRect;
+    try { bb = el.getBBox(); } catch { continue; }          // not rendered yet
+    if (bb.width <= 0 || bb.height <= 0) continue;
+    const fill = getComputedStyle(el).fill;
+    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(fill);
+    parts.push({
+      el,
+      cx: (bb.x + bb.width / 2 - vb.x) / vb.width,
+      cy: (bb.y + bb.height / 2 - vb.y) / vb.height,
+      rw: bb.width / vb.width,
+      rh: bb.height / vb.height,
+      rgb: m ? [+m[1], +m[2], +m[3]] : null,
+    });
+  }
+  if (parts.length === 0) return;
+
+  const isWhite = (p: Part): boolean => !!p.rgb && p.rgb.every((c) => c > 232);
+  const isDark = (p: Part): boolean => !!p.rgb && p.rgb[0] + p.rgb[1] + p.rgb[2] < 260;
+  const isRed = (p: Part): boolean => !!p.rgb && p.rgb[0] > 150 && p.rgb[1] < 120;
+  const offCentre = (p: Part): number => Math.abs(p.cx - 0.5);
+
+  for (const p of parts) {
+    if (p.rw > 0.6) continue;                               // the head/body itself
+
+    // --- eyes: a left/right pair on the face, whites + dark pupils ---
+    if (p.cy > 0.5 && p.cy < 0.84 && offCentre(p) > 0.09 && offCentre(p) < 0.32) {
+      if (p.rw < 0.075 && isWhite(p)) { p.el.classList.add('cb-shine'); continue; }
+      if (isWhite(p) && p.rw > 0.08) { p.el.classList.add('cb-eye', 'cb-eyewhite'); continue; }
+      if (isDark(p) && p.rw > 0.08) { p.el.classList.add('cb-eye', 'cb-pupil'); continue; }
+    }
+    // --- mouth: centred, low on the face ---
+    if (p.cy > 0.70 && offCentre(p) < 0.09 && p.rw < 0.22 && (isRed(p) || isDark(p))) {
+      p.el.classList.add('cb-mouth');
+      continue;
+    }
+    // --- ears: high and wide of the head ---
+    if (p.cy < 0.42 && offCentre(p) > 0.26) {
+      p.el.classList.add('cb-ear', p.cx < 0.5 ? 'cb-ear-l' : 'cb-ear-r');
+      continue;
+    }
+    // --- crest: the tuft / lightning bolt above the face ---
+    if (p.cy < 0.46 && offCentre(p) < 0.2 && p.rw > 0.07) {
+      p.el.classList.add('cb-crest');
+      continue;
+    }
+    // --- GlitchBop's scattered pixels: tiny, saturated, off to the sides ---
+    if (p.rw < 0.07 && p.rh < 0.07 && offCentre(p) > 0.3) {
+      p.el.classList.add('cb-glitch-bit');
+    }
+  }
+  svg.dataset.cbRigged = '1';
 }
 
 /**
