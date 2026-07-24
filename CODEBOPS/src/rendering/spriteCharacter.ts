@@ -86,6 +86,15 @@ export class SpriteCharacter {
   private svg: SVGSVGElement | null = null;
   private bobPhase = Math.random() * Math.PI * 2;
   private calm = false;
+  /** Idle-hop state: -1 = resting, 0..1 = mid-hop. */
+  private hopT = -1;
+  private hopDur = 0.5;
+  private hopWait = 0.6 + Math.random() * 1.6;
+  /**
+   * Each bop hops with its own personality: Zip is a steady, confident
+   * bouncer; GlitchBop is twitchier — shorter gaps, snappier, higher.
+   */
+  private hopStyle = { dur: 0.52, height: 0.16, gap: 1.5, jitter: 1.7 };
   private blinkClock = 1.2 + Math.random() * 2.2;
   private lookClock = 5 + Math.random() * 4;
   private ready: Promise<void>;
@@ -97,6 +106,8 @@ export class SpriteCharacter {
     private readonly viewport: HTMLElement,
   ) {
     this.root.name = opts.name;
+    // GlitchBop is the twitchy one — hops more often, snappier and higher.
+    if (opts.mixy) this.hopStyle = { dur: 0.44, height: 0.2, gap: 0.9, jitter: 1.2 };
 
     this.shadow = new THREE.Mesh(
       new THREE.PlaneGeometry(1.25, 1.25),
@@ -263,8 +274,61 @@ export class SpriteCharacter {
     const pxPerUnit = Math.max(1, Math.abs(sy - sy2));
     const pxH = pxPerUnit * this.opts.height;
     this.el.style.height = `${pxH.toFixed(1)}px`;
-    const bob = this.calm ? 0 : Math.sin(elapsed * 2.4 + this.bobPhase) * pxH * 0.022;
-    this.el.style.transform = `translate(${sx.toFixed(1)}px, ${(sy + bob).toFixed(1)}px) translate(-50%, -100%)`;
+    const { lift, sqx, sqy } = this.idleHop(dt, elapsed, pxH);
+    this.el.style.transform =
+      `translate(${sx.toFixed(1)}px, ${(sy - lift).toFixed(1)}px) translate(-50%, -100%)`
+      + ` scale(${sqx.toFixed(3)}, ${sqy.toFixed(3)})`;
+  }
+
+  /**
+   * Idle life: a springy little HOP instead of a flat float. The bops are
+   * heads with ears and no legs, so the whole body has to carry the
+   * motion — anticipation squash, a stretch on launch, a floaty apex, then
+   * a landing squash that settles. Between hops they breathe.
+   *
+   * Returns a vertical lift in px plus squash/stretch scales (applied
+   * about the base, so they never look like they leave the ground).
+   */
+  private idleHop(dt: number, elapsed: number, pxH: number): { lift: number; sqx: number; sqy: number } {
+    if (this.calm) return { lift: 0, sqx: 1, sqy: 1 };
+
+    if (this.hopT >= 0) {
+      this.hopT += dt / this.hopDur;
+      if (this.hopT >= 1) { this.hopT = -1; this.hopWait = this.nextHopWait(); }
+    } else {
+      this.hopWait -= dt;
+      if (this.hopWait <= 0) { this.hopT = 0; this.hopDur = this.hopStyle.dur; }
+    }
+
+    // Resting breath — tiny, so the hop reads as the big beat.
+    const breath = Math.sin(elapsed * 2.2 + this.bobPhase) * pxH * 0.012;
+    if (this.hopT < 0) return { lift: breath, sqx: 1, sqy: 1 };
+
+    const t = this.hopT;
+    const A = 0.18;            // anticipation (crouch)
+    const L = 0.30;            // launch
+    const D = 0.82;            // land
+    let lift = 0;
+    let sqy = 1;
+    if (t < A) {                                   // crouch: squash down
+      const k = t / A;
+      sqy = 1 - 0.14 * Math.sin(k * Math.PI * 0.5);
+    } else if (t < D) {                            // airborne arc
+      const k = (t - A) / (D - A);
+      lift = Math.sin(k * Math.PI) * pxH * this.hopStyle.height;
+      // stretch just after launch, neutral at apex, stretch again on fall
+      sqy = t < L ? 1 + 0.12 * (1 - (t - A) / (L - A)) : 1 + 0.06 * Math.abs(Math.cos(k * Math.PI));
+    } else {                                       // landing squash + settle
+      const k = (t - D) / (1 - D);
+      sqy = 1 - 0.16 * Math.sin(k * Math.PI) * (1 - k * 0.4);
+    }
+    // Volume-preserving-ish: widen as it squashes, narrow as it stretches.
+    return { lift: lift + breath * 0.3, sqx: 1 + (1 - sqy) * 0.55, sqy };
+  }
+
+  private nextHopWait(): number {
+    const s = this.hopStyle;
+    return s.gap + Math.random() * s.jitter;
   }
 
   dispose(): void {

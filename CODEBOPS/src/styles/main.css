@@ -467,6 +467,8 @@ body.high-contrast .slot { border-color: rgba(255,255,255,.8); }
 }
 .char-sprite {
   position: absolute; left: 0; top: 0;
+  /* Squash/stretch pivots on the base so hops push off the ground. */
+  transform-origin: 50% 100%;
   will-change: transform, height;
 }
 .char-sprite svg { display: block; height: 100%; width: auto; filter: drop-shadow(0 10px 12px rgba(13,20,55,.25)); }
@@ -1478,7 +1480,8 @@ button.stars-pill:active { transform: translateY(3px); }
    ============================================================ */
 .title-logo-art {
   position: relative;
-  width: min(80vw, 620px);
+  /* Hero mark: the wordmark IS the splash screen. */
+  width: min(92vw, 860px);
   margin-bottom: auto;
   filter: drop-shadow(0 10px 26px rgba(13,20,55,.42));
   animation: logo-drop .95s var(--ease-bounce) both .1s;
