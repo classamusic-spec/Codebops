@@ -154,6 +154,15 @@ import {
 } from '../src/data/gearworks/levels';
 import { GEARWORKS_SEQUENCE } from '../src/data/gearworks/world';
 import {
+  CURRICULUM_STAGES, stage, allPrerequisites,
+} from '../src/data/curriculum/stages';
+import { LEVEL_CURRICULUM, levelsForStage } from '../src/data/curriculum/levelMeta';
+import { validateCurriculum } from '../src/data/curriculum/validate';
+import {
+  allMastery, stageMastery, childTier, isStageAvailable, nextStage,
+} from '../src/data/curriculum/mastery';
+import type { EvidenceEvent } from '../src/data/curriculum/mastery';
+import {
   GEARWORKS_CONCEPTS, conceptLevels, conceptProgress, garageTotals, nextConcept, diplomaEarned,
 } from '../src/data/gearworks/progress';
 
@@ -1350,6 +1359,71 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   const over: Record<string, number> = {};
   for (const e of SEQ) over[e.level.id] = 9;
   check('stars above 3 per level are clamped in totals', garageTotals(over).earned === SEQ.length * 3);
+}
+
+// --- Curriculum enforcement (addendum sections 1-7, 12) ---
+{
+  const issues = validateCurriculum();
+  check('curriculum has zero validation issues', issues.length === 0);
+  if (issues.length) for (const i of issues.slice(0, 12)) console.log('    !', i.where, '::', i.problem);
+
+  check('all fourteen stages exist in typed data', CURRICULUM_STAGES.length === 14);
+  check('stages are in the official order',
+    CURRICULUM_STAGES.map((s) => s.id).join(',') ===
+    'sequence,events,loops,conditions,if-else,functions,variables,state,messages,parallelism,debugging,decomposition,data,agents');
+  check('every stage has child-facing language', CURRICULUM_STAGES.every((s) => s.childFacingLanguage.length > 0));
+  check('every stage has evidence requirements', CURRICULUM_STAGES.every((s) => s.evidenceRequirements.length > 0));
+  check('prerequisites always point earlier in the curriculum',
+    CURRICULUM_STAGES.every((s) => s.prerequisites.every((p) => stage(p).order < s.order)));
+  check('if-else requires conditions', stage('if-else').prerequisites.includes('conditions'));
+  check('parallelism requires events and messages',
+    ['events', 'messages'].every((p) => stage('parallelism').prerequisites.includes(p as any)));
+  check('agents require state, variables, data and conditions',
+    ['state', 'variables', 'data', 'conditions'].every((p) => allPrerequisites('agents').includes(p as any)));
+
+  // every level in the app carries metadata
+  const metaIds = new Set(LEVEL_CURRICULUM.map((l) => l.levelId));
+  check('every legacy level has curriculum metadata', ALL_LEVELS.every((l) => metaIds.has(l.id)));
+  check('every gearworks level has curriculum metadata', GEARWORKS_SEQUENCE.every((e) => metaIds.has(e.level.id)));
+  check('no orphan metadata', LEVEL_CURRICULUM.every((l) =>
+    ALL_LEVELS.some((x) => x.id === l.levelId) || GEARWORKS_SEQUENCE.some((e) => e.level.id === l.levelId)));
+
+  // debugging is cross-curricular (section 8)
+  const dbgWorlds = new Set(levelsForStage('debugging').map((l) => l.world));
+  check('debugging is practised in every world that has levels',
+    [...new Set(LEVEL_CURRICULUM.map((l) => l.world))].every((w) => dbgWorlds.has(w)));
+
+  // mastery is evidence-driven, never level-count-driven (sections 5, 13)
+  const empty: EvidenceEvent[] = [];
+  check('an empty log leaves every stage not-introduced',
+    allMastery(empty).every((m) => m.state === 'not-introduced'));
+  const guidedOnly: EvidenceEvent[] = [
+    { stage: 'loops', requirement: 'loop-spot', phase: 'guide', levelId: 'bb-1', note: 'n' },
+  ];
+  check('one guided level does NOT count as learned', stageMastery('loops', guidedOnly).state === 'guided');
+  const built = [...guidedOnly,
+    { stage: 'loops', requirement: 'loop-replace', phase: 'build', levelId: 'bb-3', note: 'n' } as EvidenceEvent];
+  check('building unaided reaches practised', stageMastery('loops', built).state === 'practiced');
+  const repaired = [...built,
+    { stage: 'loops', requirement: 'loop-count', phase: 'debug', levelId: 'bb-debug', note: 'n' } as EvidenceEvent];
+  check('build + repair reaches demonstrated', stageMastery('loops', repaired).state === 'demonstrated');
+  const transferred = [...repaired,
+    { stage: 'loops', requirement: 'loop-replace', phase: 'create', levelId: 'bb-creative', note: 'n' } as EvidenceEvent];
+  check('creative transfer reaches applied-creatively', stageMastery('loops', transferred).state === 'applied-creatively');
+  check('child tiers never expose formal labels',
+    childTier(stageMastery('loops', transferred).state).label === 'Shining Bloom');
+
+  // gating is gentle: prerequisites must be MET, not mastered
+  const seqSeen: EvidenceEvent[] = [
+    { stage: 'sequence', requirement: 'seq-order', phase: 'discover', levelId: 'sm-1', note: 'n' },
+  ];
+  check('a stage unlocks once its prerequisites are merely introduced',
+    isStageAvailable('loops', seqSeen) && isStageAvailable('if-else', [
+      { stage: 'conditions', requirement: 'cond-check', phase: 'discover', levelId: 'pf-1', note: 'n' },
+    ]));
+  check('loops stay closed until sequence is met', !isStageAvailable('loops', []));
+  check('a stage stays closed until prerequisites are met', !isStageAvailable('agents', empty));
+  check('nextStage on an empty log is sequence', nextStage(empty) === 'sequence');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
