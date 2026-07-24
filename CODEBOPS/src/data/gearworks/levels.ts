@@ -17,7 +17,7 @@ import { runSorter, correctDest } from '../../gameplay/gearworks/sorterMachine';
 import type { GcCommandId, GcStep, GcMachineKind, CounterGoal, SafeGoal } from '../../gameplay/gearworks/counterMachine';
 import { runCounter, runSafeStop } from '../../gameplay/gearworks/counterMachine';
 import type { GjCommandId, GjStep, JamGoal } from '../../gameplay/gearworks/jamMachine';
-import { runJam, jamGoalMet } from '../../gameplay/gearworks/jamMachine';
+import { runJam, jamGoalMet, jamBugIndex } from '../../gameplay/gearworks/jamMachine';
 import type { JobPrimId, JobMainId, JobStep, JobGoal } from '../../gameplay/gearworks/jobMachine';
 import { runJobProgram } from '../../gameplay/gearworks/jobMachine';
 import type { SignalCommandId, SignalStep, SignalGoal } from '../../gameplay/gearworks/signalMachine';
@@ -1081,5 +1081,114 @@ export function assertSignalLevelValid(level: GearworksSignalLevel): void {
   const errors = validateSignalLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Signal level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 11 — advanced debugging: Broken Machine (find & fix the bug)
+// ==================================================================
+
+export interface DebugPuzzle {
+  readonly n: number;
+  readonly title: string;
+  readonly brief: string;
+  /** The machine comes PRE-LOADED with this buggy program. */
+  readonly program: readonly GjStep[];
+  readonly commands: readonly GjCommandId[];
+  readonly maxSlots: number;
+  readonly goal: JamGoal;
+  readonly coachHint: string;
+  /** A corrected program (validated; never shown — the child finds it). */
+  readonly fixed: readonly GjStep[];
+}
+
+export interface GearworksDebugLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly puzzles: readonly DebugPuzzle[];
+}
+
+const dSM: GjStep = { cmd: 'jmStartMotor' };
+const dXM: GjStep = { cmd: 'jmStopMotor' };
+const dSC: GjStep = { cmd: 'jmStartConveyor' };
+const dXC: GjStep = { cmd: 'jmStopConveyor' };
+const dWS: GjStep = { cmd: 'jmWaitSensor' };
+const dLP: GjStep = { cmd: 'jmLowerPress' };
+const dRP: GjStep = { cmd: 'jmRaisePress' };
+const ALL_JAM: GjCommandId[] = ['jmStartMotor', 'jmStopMotor', 'jmStartConveyor', 'jmStopConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', 'jmRepeat'];
+
+export const GW_BROKEN_MACHINE: GearworksDebugLevel = {
+  id: 'gw-broken-machine',
+  title: 'Gearworks Garage',
+  shortTitle: 'Broken Machine',
+  family: 'bench',
+  goalText: 'Three machines are BROKEN — find each bug and fix it!',
+  emoji: '🔧',
+  brief: {
+    title: 'The Broken Machines!',
+    text: 'Uh oh — these machines were built with a bug! Press BOP to run one, watch the Think Trail to see where it GOES WRONG, then fix the plan and BOP again. You are a machine detective now!',
+    emoji: '🔧',
+  },
+  puzzles: [
+    {
+      n: 1, title: 'The Extra Brake',
+      brief: 'This jam machine makes NO jam. Run it, watch the Think Trail, and find the tile that shuts everything off too soon — then take it out!',
+      program: [dSM, dXM, dSC, dWS, dLP, dRP, dXC, dXM],
+      commands: ALL_JAM, maxSlots: 10,
+      goal: { minJam: 1, needSafeStop: true },
+      coachHint: 'A STOP MOTOR near the start turns the power off before the belt can run — remove it!',
+      fixed: [dSM, dSC, dWS, dLP, dRP, dXC, dXM],
+    },
+    {
+      n: 2, title: 'Too Few Loops',
+      brief: 'This one needs THREE jars but only makes two. The loop is not repeating enough — find the Repeat tile and tap its number!',
+      program: [dSM, dSC, dWS, dLP, dRP, { cmd: 'jmRepeat', arg: 2 }, dXC, dXM],
+      commands: ALL_JAM, maxSlots: 10,
+      goal: { minJam: 3 },
+      coachHint: 'The Repeat badge says ×2 — tap it up to ×3 so the loop makes all three jars!',
+      fixed: [dSM, dSC, dWS, dLP, dRP, { cmd: 'jmRepeat', arg: 3 }, dXC, dXM],
+    },
+    {
+      n: 3, title: 'The Early Belt-Stop',
+      brief: 'This machine should make TWO jars but only makes one. Something stops the belt in the middle, so the second strawberry never comes. Find it and remove it!',
+      program: [dSM, dSC, dWS, dLP, dXC, dRP, dWS, dLP, dRP, dXM],
+      commands: ALL_JAM, maxSlots: 12,
+      goal: { minJam: 2 },
+      coachHint: 'A STOP BELT (Belt Off) in the middle kills the belt too early — take it out so the next berry arrives!',
+      fixed: [dSM, dSC, dWS, dLP, dRP, dWS, dLP, dRP, dXM],
+    },
+  ],
+};
+
+export const GEARWORKS_DEBUG_LEVELS: readonly GearworksDebugLevel[] = [GW_BROKEN_MACHINE];
+
+/** The tile to spotlight when a puzzle's current program fails. */
+export function debugBugIndex(puzzle: DebugPuzzle, program: readonly GjStep[]): number {
+  return jamBugIndex(program, puzzle.goal);
+}
+
+export function validateDebugLevel(level: GearworksDebugLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.puzzles.length < 1) errors.push('A debug level needs at least one puzzle.');
+  level.puzzles.forEach((p, i) => {
+    if (p.n !== i + 1) errors.push(`Puzzle ${i + 1} has wrong number ${p.n}.`);
+    if (jamGoalMet(p.goal, runJam(p.program))) errors.push(`Puzzle ${p.n} is not actually broken.`);
+    if (!jamGoalMet(p.goal, runJam(p.fixed))) errors.push(`Puzzle ${p.n}'s fix does not work.`);
+    if (p.fixed.length > p.maxSlots || p.program.length > p.maxSlots) errors.push(`Puzzle ${p.n} exceeds maxSlots.`);
+    if (jamBugIndex(p.program, p.goal) < 0) errors.push(`Puzzle ${p.n} has no locatable bug.`);
+  });
+  return errors;
+}
+
+export function assertDebugLevelValid(level: GearworksDebugLevel): void {
+  const errors = validateDebugLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Debug level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

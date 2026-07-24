@@ -42,6 +42,8 @@ export interface DeckConfig<C extends string> {
   readonly badges?: Partial<Readonly<Record<C, BadgeSpec>>>;
   /** Commands whose tile "collects" the tiles before it (Repeat). */
   readonly loopCmds?: readonly C[];
+  /** Pre-load the program slots (debug levels ship a buggy program). */
+  readonly initial?: ReadonlyArray<DeckStep<C>>;
 }
 
 const MACHINE_DECK_DEFAULTS: DeckConfig<GearworksCommandId> = {
@@ -66,6 +68,7 @@ export class MachineDeck<C extends string = GearworksCommandId> {
     cfg?: DeckConfig<C>,
   ) {
     this.cfg = cfg ?? (MACHINE_DECK_DEFAULTS as unknown as DeckConfig<C>);
+    if (this.cfg.initial) this.program = this.cfg.initial.slice(0, maxSlots).map((s) => ({ ...s }));
     this.root = el('div', 'bottom-deck', parent);
     const panel = el('div', 'deck-panel', this.root);
 
@@ -135,6 +138,16 @@ export class MachineDeck<C extends string = GearworksCommandId> {
 
   highlightSlot(index: number): void {
     this.slotNodes.forEach((s, i) => s.classList.toggle('running', i === index));
+  }
+
+  /** Glitch Replay: persistently spotlight the buggy tile (debug levels). */
+  spotlight(index: number): void {
+    this.clearSpotlight();
+    this.slotNodes[index]?.classList.add('bug');
+  }
+
+  clearSpotlight(): void {
+    this.slotNodes.forEach((s) => s.classList.remove('bug'));
   }
 
   /** Branch highlighting: a skipped tile visibly greys out for a beat. */
@@ -210,6 +223,7 @@ export class MachineDeck<C extends string = GearworksCommandId> {
         this.program[slotIndex] = { cmd, arg: next };
         badge.textContent = `${pre}${next}`;
         sharedSfx.play('tap');
+        this.clearSpotlight();
         this.emit();
       });
     }
@@ -228,6 +242,7 @@ export class MachineDeck<C extends string = GearworksCommandId> {
     this.program.push(spec ? { cmd, arg: spec.def } : { cmd });
     this.lastPlaced = this.program.length - 1;
     sharedSfx.play('place');
+    this.clearSpotlight();
     this.renderSlots();
     this.emit();
   }
@@ -237,6 +252,7 @@ export class MachineDeck<C extends string = GearworksCommandId> {
     this.program.splice(index, 1);
     this.lastPlaced = -1;
     sharedSfx.play('remove');
+    this.clearSpotlight();
     this.renderSlots();
     this.emit();
   }

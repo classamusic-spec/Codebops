@@ -1661,6 +1661,21 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 }
 .calm-mode .slot.skip-flash .gw-tile { transform: none; }
 
+/* Glitch Replay: the buggy tile pulses red until it is fixed (Phase 11) */
+.slot.bug .gw-tile {
+  box-shadow: 0 0 0 3px #ff5f6d, 0 0 18px rgba(255,95,109,.85);
+  animation: gwBugPulse .8s ease infinite;
+}
+.slot.bug::after {
+  content: '🐞'; position: absolute; top: -12px; right: -8px; font-size: 18px;
+  filter: drop-shadow(0 1px 1px rgba(42,24,69,.5)); pointer-events: none;
+}
+@keyframes gwBugPulse {
+  0%, 100% { box-shadow: 0 0 0 3px #ff5f6d, 0 0 14px rgba(255,95,109,.7); }
+  50% { box-shadow: 0 0 0 4px #ff8088, 0 0 24px rgba(255,95,109,.95); }
+}
+.calm-mode .slot.bug .gw-tile { animation: none; }
+
 /* Jam Machine mission banner (Phase 8 hero level) */
 .gw-mission-banner {
   position: absolute; left: max(10px, var(--sal)); top: calc(max(8px, var(--sat)) + 66px);

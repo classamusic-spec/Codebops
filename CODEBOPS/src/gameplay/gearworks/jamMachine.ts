@@ -176,6 +176,42 @@ export function jamGoalMet(goal: JamGoal, r: GjResult): boolean {
   return true;
 }
 
+/**
+ * Locate the tile to spotlight on a failed run (the Glitch Replay bug
+ * finder). Traces the first thing that goes wrong back to its ROOT tile:
+ * "no power" and "no berry came" point at the stop that turned things
+ * off too soon; an undercount points at the loop tile.
+ * Returns the program index to highlight, or -1 if nothing obvious.
+ */
+export function jamBugIndex(program: readonly GjStep[], goal: JamGoal): number {
+  const r = runJam(program);
+  let cur = -1;
+  let failIndex = -1;
+  let failType = '';
+  for (const ev of r.events) {
+    if (ev.type === 'commandStart') cur = ev.index;
+    if (ev.type === 'conveyorNoPower' || ev.type === 'waitStuck' || ev.type === 'pressMiss') {
+      failIndex = cur; failType = ev.type; break;
+    }
+  }
+  if (failIndex >= 0) {
+    if (failType === 'conveyorNoPower' || failType === 'waitStuck') {
+      for (let j = failIndex - 1; j >= 0; j--) {
+        if (program[j].cmd === 'jmStopMotor' || program[j].cmd === 'jmStopConveyor') return j;
+      }
+    }
+    return failIndex;
+  }
+  // no hard error — an undercount: the loop is the usual suspect
+  if ((goal.minJam ?? 0) > r.finalState.jam) {
+    const rep = program.findIndex((s) => s.cmd === 'jmRepeat');
+    if (rep >= 0) return rep;
+  }
+  // safe-stop miss → the missing/last teardown tile
+  if (goal.needSafeStop && !r.endedSafe) return program.length - 1;
+  return -1;
+}
+
 export function jamMisses(goal: JamGoal, r: GjResult): string[] {
   const misses: string[] = [];
   const st = r.finalState;

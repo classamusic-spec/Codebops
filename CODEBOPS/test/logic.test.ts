@@ -93,6 +93,10 @@ import {
   GW_TWO_MACHINE, validateSignalLevel, signalStars,
   signalFullSolution, signalLoopSolution, signalOneSolution,
 } from '../src/data/gearworks/levels';
+import { runJam, jamGoalMet, jamBugIndex } from '../src/gameplay/gearworks/jamMachine';
+import {
+  GW_BROKEN_MACHINE, validateDebugLevel, debugBugIndex,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -833,6 +837,33 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('looped lanes deliver both gifts', loop.finalState.delivered === 2 && loop.usedLoop);
   const signalsBalanced = runParallel(signalFullSolution(), { target: 2 }).finalState.signals;
   check('every signal sent is consumed by a wait', signalsBalanced === 0);
+}
+
+// --- Gearworks advanced debugging (Phase 11) ---
+{
+  check('broken-machine level validates', validateDebugLevel(GW_BROKEN_MACHINE).length === 0);
+  GW_BROKEN_MACHINE.puzzles.forEach((p) => {
+    check(`bug ${p.n} is actually broken`, !jamGoalMet(p.goal, runJam(p.program)));
+    check(`bug ${p.n}'s fix works`, jamGoalMet(p.goal, runJam(p.fixed)));
+    const idx = debugBugIndex(p, p.program);
+    check(`bug ${p.n} is locatable in the plan`, idx >= 0 && idx < p.program.length);
+  });
+}
+{
+  // the bug locator points at the ROOT tile, not just the symptom
+  const p1 = GW_BROKEN_MACHINE.puzzles[0]; // stray Stop Motor near the start
+  check('extra-brake bug points at the stray Stop Motor',
+    p1.program[jamBugIndex(p1.program, p1.goal)].cmd === 'jmStopMotor');
+  const p2 = GW_BROKEN_MACHINE.puzzles[1]; // loop runs too few times
+  check('loop-miscount bug points at the Repeat tile',
+    p2.program[jamBugIndex(p2.program, p2.goal)].cmd === 'jmRepeat');
+  const p3 = GW_BROKEN_MACHINE.puzzles[2]; // early Belt Off
+  check('early-belt-stop bug points at the Stop Conveyor',
+    p3.program[jamBugIndex(p3.program, p3.goal)].cmd === 'jmStopConveyor');
+}
+{
+  // a correct program has no bug to locate
+  check('a working program reports no bug', jamBugIndex(GW_BROKEN_MACHINE.puzzles[0].fixed, GW_BROKEN_MACHINE.puzzles[0].goal) === -1);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
