@@ -14,6 +14,8 @@ import type { GwSensorCommandId, GwSensorMachineKind, GwSensorStep, GwBerryGoal 
 import { runSensorMachine, berryGoalMet, workshopRunCorrect } from '../../gameplay/gearworks/sensorMachine';
 import type { GtCommandId, GtStep, SortItem, RouteRule } from '../../gameplay/gearworks/sorterMachine';
 import { runSorter, correctDest } from '../../gameplay/gearworks/sorterMachine';
+import type { GcCommandId, GcStep, GcMachineKind, CounterGoal, SafeGoal } from '../../gameplay/gearworks/counterMachine';
+import { runCounter, runSafeStop } from '../../gameplay/gearworks/counterMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -610,5 +612,134 @@ export function assertSorterLevelValid(level: GearworksSorterLevel): void {
   const errors = validateSorterLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Sorter level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 7 — counter levels: Berry Counter + Safe Stop
+// ==================================================================
+
+export type GwCounterBonusKind = 'bothWays' | 'debugFred';
+
+export interface GearworksCounterLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly machine: GcMachineKind;
+  readonly commands: readonly GcCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  /** counter machine: where the wheel starts. */
+  readonly start?: number;
+  readonly target: number;
+  /**
+   * Creative star:
+   *  'bothWays'  — reach the counter target by SETTING it and by
+   *                COUNTING to it (a variable is its value, not its path)
+   *  'debugFred' — meet Forever Fred (run the un-stopped loop) AND fix
+   *                it with REPEAT UNTIL FULL in the same sitting
+   */
+  readonly bonus: { readonly kind: GwCounterBonusKind; readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_BERRY_COUNTER: GearworksCounterLevel = {
+  id: 'gw-berry-counter',
+  title: 'Gearworks Garage',
+  shortTitle: 'Berry Counter',
+  family: 'factory',
+  goalText: 'Make the counter wheel show exactly 5 berries!',
+  emoji: '🔢',
+  brief: {
+    title: 'The Berry Counter!',
+    text: 'This jar has a counter wheel — a number the machine remembers! It starts at 2. ADD 1 drops a berry in, SUBTRACT 1 takes one out, and SET VALUE spins the dial straight to any number. Make the wheel read 5!',
+    emoji: '🔢',
+  },
+  machine: 'counter',
+  commands: ['gcSet', 'gcAdd', 'gcSub'],
+  maxSlots: 6,
+  par: 2,
+  start: 2,
+  target: 5,
+  bonus: { kind: 'bothWays', text: 'Reach 5 by SETTING it and by counting up' },
+  coachHint: 'SET VALUE jumps straight there. Or ADD 1 until the wheel reads 5!',
+};
+
+export const GW_SAFE_STOP: GearworksCounterLevel = {
+  id: 'gw-safe-stop',
+  title: 'Gearworks Garage',
+  shortTitle: 'Safe Stop',
+  family: 'factory',
+  goalText: 'Fill 4 jars and STOP — a loop that knows when to quit!',
+  emoji: '🛑',
+  brief: {
+    title: 'Safe Stop!',
+    text: 'The press stamps a jar each turn. REPEAT UNTIL FULL keeps pressing until the counter hits 4 — then it stops all by itself! Plain REPEAT never stops… and you might meet Forever Fred. Every loop needs a stopping rule!',
+    emoji: '🛑',
+  },
+  machine: 'safeStop',
+  commands: ['ssPress', 'ssRepeatUntilFull', 'ssRepeat'],
+  maxSlots: 6,
+  par: 3,
+  target: 4,
+  bonus: { kind: 'debugFred', text: 'Meet Forever Fred, then fix the loop' },
+  coachHint: 'Put PRESS before REPEAT UNTIL FULL — the loop stamps until the jar is full, then stops!',
+};
+
+export const GEARWORKS_COUNTER_LEVELS: readonly GearworksCounterLevel[] = [
+  GW_BERRY_COUNTER,
+  GW_SAFE_STOP,
+];
+
+export function canonicalCounterSolution(level: GearworksCounterLevel): GcStep[] {
+  return level.machine === 'counter'
+    ? [{ cmd: 'gcSet', arg: level.target }]
+    : [{ cmd: 'ssPress' }, { cmd: 'ssRepeatUntilFull' }];
+}
+
+/** The "other way" for Berry Counter — count up from the start. */
+export function countUpSolution(level: GearworksCounterLevel): GcStep[] {
+  const steps: GcStep[] = [];
+  const from = level.start ?? 0;
+  for (let v = from; v < level.target; v++) steps.push({ cmd: 'gcAdd' });
+  return steps;
+}
+
+/** The un-safe plan that meets Forever Fred (Safe Stop only). */
+export function foreverFredSolution(): GcStep[] {
+  return [{ cmd: 'ssPress' }, { cmd: 'ssRepeat' }];
+}
+
+export function validateCounterLevel(level: GearworksCounterLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  const canon = canonicalCounterSolution(level);
+  if (canon.length > level.par) errors.push('Canonical solution must fit par.');
+  if (canon.length > level.maxSlots) errors.push('Canonical solution must fit the deck.');
+  if (!canon.every((s) => level.commands.includes(s.cmd))) errors.push('Canonical uses unavailable tiles.');
+  if (level.machine === 'counter') {
+    const goal: CounterGoal = { target: level.target };
+    if (!runCounter(canon, goal, level.start).success) errors.push('Canonical must reach the target.');
+    const countUp = countUpSolution(level);
+    if (!runCounter(countUp, goal, level.start).success) errors.push('Count-up solution must also reach the target.');
+    if (countUp.length <= level.par) errors.push('Count-up must be longer than par (or SET teaches nothing).');
+    if (countUp.length > level.maxSlots) errors.push('Count-up must fit the deck (both ways must be buildable).');
+  } else {
+    const goal: SafeGoal = { target: level.target };
+    if (!runSafeStop(canon, goal).success) errors.push('Canonical safe-stop plan must win.');
+    if (!runSafeStop(foreverFredSolution(), goal).ranaway) errors.push('The plain-repeat plan must run away (meet Fred).');
+    if (runSafeStop(foreverFredSolution(), goal).success) errors.push('The plain-repeat plan must NOT win.');
+  }
+  return errors;
+}
+
+export function assertCounterLevelValid(level: GearworksCounterLevel): void {
+  const errors = validateCounterLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Counter level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

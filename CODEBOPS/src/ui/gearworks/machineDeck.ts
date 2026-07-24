@@ -33,6 +33,8 @@ export interface BadgeSpec {
   readonly max: number;
   readonly def: number;
   readonly aria: string;
+  /** Badge glyph before the number: '×' (default) for counts, '=' for a value dial. */
+  readonly prefix?: string;
 }
 
 export interface DeckConfig<C extends string> {
@@ -123,10 +125,10 @@ export class MachineDeck<C extends string = GearworksCommandId> {
         const badge = s.querySelector('.count-badge');
         badge?.classList.remove('looping');
       });
-      // restore ×n badges after a run
+      // restore ×n / =n badges after a run
       this.program.forEach((step, i) => {
         const badge = this.slotNodes[i]?.querySelector('.count-badge');
-        if (badge && step.arg !== undefined) badge.textContent = `×${step.arg}`;
+        if (badge && step.arg !== undefined) badge.textContent = `${this.badgePrefix(step.cmd)}${step.arg}`;
       });
     }
   }
@@ -163,6 +165,10 @@ export class MachineDeck<C extends string = GearworksCommandId> {
     return this.cfg.badges?.[cmd];
   }
 
+  private badgePrefix(cmd: C): string {
+    return this.badgeFor(cmd)?.prefix ?? '×';
+  }
+
   private isLoopCmd(cmd: C): boolean {
     return this.cfg.loopCmds?.includes(cmd) ?? false;
   }
@@ -188,8 +194,9 @@ export class MachineDeck<C extends string = GearworksCommandId> {
     // ×n badge: tap-to-cycle (Speed 1–3, Repeat 2–4 — same pattern)
     const spec = this.badgeFor(cmd);
     if (spec && kind === 'slot') {
+      const pre = spec.prefix ?? '×';
       const step = this.program[slotIndex];
-      const badge = el('span', 'count-badge', tile, `×${step?.arg ?? spec.def}`);
+      const badge = el('span', 'count-badge', tile, `${pre}${step?.arg ?? spec.def}`);
       badge.setAttribute('role', 'button');
       badge.setAttribute('aria-label', spec.aria);
       badge.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -201,7 +208,7 @@ export class MachineDeck<C extends string = GearworksCommandId> {
         const cur = st.arg ?? spec.def;
         const next = cur >= spec.max ? spec.min : cur + 1;
         this.program[slotIndex] = { cmd, arg: next };
-        badge.textContent = `×${next}`;
+        badge.textContent = `${pre}${next}`;
         sharedSfx.play('tap');
         this.emit();
       });

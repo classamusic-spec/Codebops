@@ -61,6 +61,15 @@ import {
   GEARWORKS_SORTER_LEVELS, GW_SENSOR_SORTER, GW_CONVEYOR_FACTORY,
   validateSorterLevel, canonicalSorterSolution, elseTrickSolution,
 } from '../src/data/gearworks/levels';
+import {
+  runCounter, counterMisses, runSafeStop, safeStopMisses,
+  CN_MAX, SS_RUNAWAY,
+} from '../src/gameplay/gearworks/counterMachine';
+import type { GcStep } from '../src/gameplay/gearworks/counterMachine';
+import {
+  GEARWORKS_COUNTER_LEVELS, GW_BERRY_COUNTER, GW_SAFE_STOP,
+  validateCounterLevel, canonicalCounterSolution, countUpSolution, foreverFredSolution,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -609,6 +618,63 @@ for (const l of GEARWORKS_SORTER_LEVELS) {
     && empty.placements.every((p) => p === 'pass'));
   check('correctDest falls through to pass', correctDest(GW_CONVEYOR_FACTORY.rules, IT('red', 'square')) === 'pass');
   check('itemName reads naturally', itemName(IT('blue', 'round')) === 'blue berry' && itemName(IT('red', 'square')) === 'red block');
+}
+
+// --- Gearworks variables and safe loops (Phase 7) ---
+const CP = (...cmds: Array<GcStep['cmd'] | [GcStep['cmd'], number]>): GcStep[] =>
+  cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
+
+for (const l of GEARWORKS_COUNTER_LEVELS) {
+  const errs = validateCounterLevel(l);
+  check(`${l.id} validates`, errs.length === 0);
+  check(`${l.id} canonical fits par`, canonicalCounterSolution(l).length <= l.par);
+}
+
+{
+  // counter is a variable: set jumps, add/sub nudge, both reach the target
+  const setWin = runCounter(canonicalCounterSolution(GW_BERRY_COUNTER), { target: 5 }, GW_BERRY_COUNTER.start);
+  check('SET VALUE reaches the target in one tile', setWin.success && setWin.usedSet && setWin.finalValue === 5);
+  const countWin = runCounter(countUpSolution(GW_BERRY_COUNTER), { target: 5 }, GW_BERRY_COUNTER.start);
+  check('counting up from 2 reaches 5', countWin.success && !countWin.usedSet);
+  check('count-up is longer than par (SET is the clever path)', countUpSolution(GW_BERRY_COUNTER).length > GW_BERRY_COUNTER.par);
+  const overshoot = runCounter(CP(['gcSet', 7], 'gcSub', 'gcSub'), { target: 5 }, 2);
+  check('subtract brings an overshoot back down', overshoot.success && overshoot.finalValue === 5);
+}
+{
+  // clamps: the wheel never goes below 0 or above CN_MAX
+  const floor = runCounter(CP('gcSub', 'gcSub', 'gcSub'), { target: 0 }, 1);
+  check('subtract stops at 0 (no negative jars)', floor.finalValue === 0
+    && floor.events.some((e) => e.type === 'noop' && e.reason === 'atZero'));
+  const ceil = runCounter(CP(['gcSet', 9], 'gcAdd', 'gcAdd'), { target: CN_MAX }, 0);
+  check('add stops at the max digit', ceil.finalValue === CN_MAX
+    && ceil.events.some((e) => e.type === 'noop' && e.reason === 'atMax'));
+  const miss = runCounter(CP('gcAdd'), { target: 5 }, 2);
+  check('counter miss coaches the gap', !miss.success
+    && counterMisses({ target: 5 }, miss.finalValue).some((m) => m.includes('needs 5') || m.includes('Add')));
+}
+{
+  // safe stop: REPEAT UNTIL FULL stops itself; plain REPEAT runs away
+  const safe = runSafeStop(canonicalCounterSolution(GW_SAFE_STOP), { target: 4 });
+  check('repeat-until-full fills 4 jars and stops', safe.success && safe.finalJars === 4
+    && safe.events.some((e) => e.type === 'loopStopped') && safe.usedSafeLoop);
+  const fred = runSafeStop(foreverFredSolution(), { target: 4 });
+  check('plain repeat runs away (meets Fred)', fred.ranaway && !fred.success
+    && fred.events.some((e) => e.type === 'loopRunaway'));
+  check('runaway loop is bounded by SS_RUNAWAY',
+    fred.events.filter((e) => e.type === 'loopIter').length === SS_RUNAWAY);
+  check('Fred miss explains the missing stop rule',
+    safeStopMisses({ target: 4 }, fred).some((m) => m.includes('STOP') || m.includes('forever')));
+}
+{
+  // manual presses also win (gentle path); empty loop fails kindly
+  const manual = runSafeStop(CP('ssPress', 'ssPress', 'ssPress', 'ssPress'), { target: 4 });
+  check('four manual presses fill four jars', manual.success && manual.finalJars === 4 && !manual.ranaway);
+  check('manual path is longer than par', 4 > GW_SAFE_STOP.par);
+  const emptyLoop = runSafeStop(CP('ssRepeatUntilFull'), { target: 4 });
+  check('a loop with no body fails gently', !emptyLoop.success
+    && emptyLoop.events.some((e) => e.type === 'loopFail'));
+  const twoBody = runSafeStop(CP('ssPress', 'ssPress', 'ssRepeatUntilFull'), { target: 4 });
+  check('two-press body still stops safely at the target', twoBody.success && twoBody.finalJars === 4);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -6,13 +6,14 @@ import type { GearworksCommandId } from '../../gameplay/gearworks/machine';
 import type { GwLoopCommandId } from '../../gameplay/gearworks/loopMachine';
 import type { GwSensorCommandId } from '../../gameplay/gearworks/sensorMachine';
 import type { GtCommandId } from '../../gameplay/gearworks/sorterMachine';
+import type { GcCommandId } from '../../gameplay/gearworks/counterMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
-  GEARWORKS_SORTER_LEVELS,
+  GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
-  GearworksSorterLevel,
+  GearworksSorterLevel, GearworksCounterLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -120,6 +121,23 @@ export const GW_SORTER_TILES: Readonly<Record<GtCommandId, GwTileDef>> = {
   gtSendRight: { label: 'Send Right', spoken: 'Push the item into the right basket', tone: 'loop', icon: ICON_SEND_RIGHT },
 };
 
+// ---------- Phase 7 counter-level tiles ----------
+
+const ICON_SET = '<circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M12 12 L12 6.4" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/><path d="M12 12 L16 14.4" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6"/><path d="M12 2.6 L13 4.4 L11 4.4 Z"/>';
+const ICON_ADD1 = '<path d="M12 5 V19 M5 12 H19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>';
+const ICON_SUB1 = '<path d="M5 12 H19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>';
+const ICON_PRESS = '<rect x="4.4" y="16.4" width="15.2" height="3.4" rx="1.5"/><rect x="9.2" y="8.6" width="5.6" height="6.4" rx="1.2"/><path d="M6 4.6 H18" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M12 5 V8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>';
+const ICON_REPEAT_UNTIL = '<path d="M7.2 7.6 H14 A4 4 0 0 1 18 11.6 V12.4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M15.6 16.4 H9.2 A4 4 0 0 1 5.2 12.4 V11.8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M18 10.4 L20 13.4 L15.8 13.6 Z"/><rect x="2.6" y="15.6" width="4.4" height="4.4" rx="1"/><path d="M3.4 17.8 L4.4 18.8 L6.2 16.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>';
+
+export const GW_COUNTER_TILES: Readonly<Record<GcCommandId, GwTileDef>> = {
+  gcSet:              { label: 'Set Value', spoken: 'Set the counter — tap the dial to pick a number', tone: 'move', icon: ICON_SET },
+  gcAdd:              { label: 'Add 1', spoken: 'Add one to the counter', tone: 'start', icon: ICON_ADD1 },
+  gcSub:              { label: 'Take 1', spoken: 'Take one off the counter', tone: 'stop', icon: ICON_SUB1 },
+  ssPress:            { label: 'Press', spoken: 'Stamp one jar with the press', tone: 'rotate', icon: ICON_PRESS },
+  ssRepeatUntilFull:  { label: 'Until Full', spoken: 'Repeat the tiles before this until the jar is full, then stop', tone: 'check', icon: ICON_REPEAT_UNTIL },
+  ssRepeat:           { label: 'Repeat', spoken: 'Repeat the tiles before this — but it never stops on its own!', tone: 'loop', icon: ICON_REPEAT },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -128,7 +146,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'chain'; readonly level: GearworksChainLevel }
   | { readonly kind: 'loop'; readonly level: GearworksLoopLevel }
   | { readonly kind: 'sensor'; readonly level: GearworksSensorLevel }
-  | { readonly kind: 'sorter'; readonly level: GearworksSorterLevel };
+  | { readonly kind: 'sorter'; readonly level: GearworksSorterLevel }
+  | { readonly kind: 'counter'; readonly level: GearworksCounterLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -136,6 +155,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_LOOP_LEVELS.map((level) => ({ kind: 'loop' as const, level })),
   ...GEARWORKS_SENSOR_LEVELS.map((level) => ({ kind: 'sensor' as const, level })),
   ...GEARWORKS_SORTER_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
+  ...GEARWORKS_COUNTER_LEVELS.map((level) => ({ kind: 'counter' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -149,5 +169,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-berry-counter', shortTitle: 'Berry Counter', emoji: '🔢' },
+  { kind: 'soon', id: 'gw-jam-machine', shortTitle: 'Jam Machine', emoji: '🍯' },
 ];
