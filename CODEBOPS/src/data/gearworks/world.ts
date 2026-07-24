@@ -12,17 +12,18 @@ import type { JobMainId } from '../../gameplay/gearworks/jobMachine';
 import type { SignalCommandId } from '../../gameplay/gearworks/signalMachine';
 import type { LlCommandId } from '../../gameplay/gearworks/logicMachine';
 import type { DvCommandId } from '../../gameplay/gearworks/deliveryMachine';
+import type { PpCommandId } from '../../gameplay/gearworks/paintMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
   GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS, GEARWORKS_JOB_LEVELS,
   GEARWORKS_SIGNAL_LEVELS, GEARWORKS_DEBUG_LEVELS, GEARWORKS_FACTORY_LEVELS, GEARWORKS_ORCHESTRA_LEVELS,
-  GEARWORKS_LIGHTHOUSE_LEVELS, GEARWORKS_DELIVERY_LEVELS,
+  GEARWORKS_LIGHTHOUSE_LEVELS, GEARWORKS_DELIVERY_LEVELS, GEARWORKS_PAINT_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
   GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel, GearworksJobLevel,
   GearworksSignalLevel, GearworksDebugLevel, GearworksOrchestraLevel, GearworksLighthouseLevel,
-  GearworksDeliveryLevel,
+  GearworksDeliveryLevel, GearworksPaintLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -231,6 +232,21 @@ export const GW_DELIVERY_TILES: Readonly<Record<DvCommandId, GwTileDef>> = {
   dvRepeat:  { label: 'Repeat', spoken: 'Repeat the tiles before this — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
 };
 
+// ---------- Phase 16 Paint Parade tiles ----------
+
+const ICON_STAMP = '<circle cx="12" cy="13.5" r="5.6"/><path d="M12 7.9 V3.4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M8.6 4.4 H15.4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>';
+const ICON_STEP = '<path d="M4 12 H17" stroke="currentColor" stroke-width="2.9" stroke-linecap="round"/><path d="M13.4 7 L19.6 12 L13.4 17 Z"/>';
+const ICON_NEWROW = '<path d="M18 5 V11 A3 3 0 0 1 15 14 H6" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 10.4 L5 14 L9 17.6 Z"/>';
+const ICON_REPEAT_PARADE = '<rect x="3.2" y="4.4" width="17.6" height="15.2" rx="3.4" fill="none" stroke="currentColor" stroke-width="2.2" opacity="0.85"/><path d="M9 9.2 H14.4 A2.6 2.6 0 0 1 17 11.8 V12.4" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M15.2 15 H9.8 A2.6 2.6 0 0 1 7.2 12.4 V11.8" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/><path d="M17 10.6 L18.6 13 L15.4 13.1 Z"/><path d="M7.2 13.6 L5.6 11.2 L8.8 11.1 Z"/>';
+
+export const GW_PAINT_TILES: Readonly<Record<PpCommandId, GwTileDef>> = {
+  ppStamp:         { label: 'Stamp', spoken: 'Stamp a coloured dot here', tone: 'start', icon: ICON_STAMP },
+  ppStep:          { label: 'Step', spoken: 'Step one square to the right', tone: 'move', icon: ICON_STEP },
+  ppNewRow:        { label: 'New Row', spoken: 'Drop down to the start of the next row', tone: 'rotate', icon: ICON_NEWROW },
+  ppRepeatRow:     { label: 'Repeat Row', spoken: 'Repeat the tiles before this to make a row — tap the badge to change how many', tone: 'loop', icon: ICON_REPEAT },
+  ppRepeatParade:  { label: 'Repeat Parade', spoken: 'Repeat the whole design so far down the banner — tap the badge to change how many', tone: 'check', icon: ICON_REPEAT_PARADE },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -247,7 +263,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'debug'; readonly level: GearworksDebugLevel }
   | { readonly kind: 'orchestra'; readonly level: GearworksOrchestraLevel }
   | { readonly kind: 'lighthouse'; readonly level: GearworksLighthouseLevel }
-  | { readonly kind: 'delivery'; readonly level: GearworksDeliveryLevel };
+  | { readonly kind: 'delivery'; readonly level: GearworksDeliveryLevel }
+  | { readonly kind: 'painter'; readonly level: GearworksPaintLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -264,6 +281,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_ORCHESTRA_LEVELS.map((level) => ({ kind: 'orchestra' as const, level })),
   ...GEARWORKS_LIGHTHOUSE_LEVELS.map((level) => ({ kind: 'lighthouse' as const, level })),
   ...GEARWORKS_DELIVERY_LEVELS.map((level) => ({ kind: 'delivery' as const, level })),
+  ...GEARWORKS_PAINT_LEVELS.map((level) => ({ kind: 'painter' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -277,5 +295,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-paint-parade', shortTitle: 'Paint Parade', emoji: '🎨' },
+  { kind: 'soon', id: 'gw-story-studio', shortTitle: 'Story Studio', emoji: '📖' },
 ];

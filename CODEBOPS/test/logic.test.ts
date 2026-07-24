@@ -126,6 +126,15 @@ import {
   validateDeliveryLevel, deliveryGoalOf, deliveryManualSolution,
   deliveryLoopSolution, deliveryStars,
 } from '../src/data/gearworks/levels';
+import {
+  runPaint, expandPaint, paintMisses, cellKey,
+} from '../src/gameplay/gearworks/paintMachine';
+import type { PpStep } from '../src/gameplay/gearworks/paintMachine';
+import {
+  GW_PAINT_PARADE, GW_BIG_BANNER, GEARWORKS_PAINT_LEVELS,
+  validatePaintLevel, paintGoalOf, paintManualSolution,
+  paintOneLoopSolution, paintNestedSolution, paintStars,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1106,6 +1115,69 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     check(`${l.id} loop solution wins`, runDelivery(deliveryLoopSolution(l), deliveryGoalOf(l)).allCorrect);
   }
   check('Rush Hour needs a x4 loop', runDelivery(deliveryLoopSolution(GW_RUSH_HOUR), deliveryGoalOf(GW_RUSH_HOUR)).deliveredCount === 4);
+}
+
+// --- Gearworks Paint Parade (Phase 16) ---
+{
+  const P = (...steps: Array<PpStep['cmd'] | [PpStep['cmd'], number]>): PpStep[] =>
+    steps.map((s) => (Array.isArray(s) ? { cmd: s[0], arg: s[1] } : { cmd: s }));
+  const goal = paintGoalOf(GW_PAINT_PARADE); // 3×2
+
+  // inner loop stamps a row
+  const oneRow = runPaint(P('ppStamp', 'ppStep', ['ppRepeatRow', 3]), goal);
+  check('REPEAT ROW ×3 stamps 3 dots in a row', oneRow.painted.size === 3 &&
+    oneRow.painted.has(cellKey(0, 0)) && oneRow.painted.has(cellKey(1, 0)) && oneRow.painted.has(cellKey(2, 0)));
+  check('a single row does not fill the whole banner', !oneRow.success);
+
+  // nested loop fills the grid
+  const nested = paintNestedSolution(GW_PAINT_PARADE);
+  const rn = runPaint(nested, goal);
+  check('the nested loop fills the whole 3×2 banner', rn.success && rn.painted.size === 6);
+  check('the nested run reports both loops used', rn.usedRowLoop && rn.usedParadeLoop);
+  check('nested paint paints no stray dots', rn.strayCount === 0);
+
+  // the OUTER loop wraps EVERYTHING before it (nesting semantics)
+  const exp = expandPaint(nested);
+  check('the parade loop expands the whole row design', exp.prims.filter((p) => p.cmd === 'ppStamp').length === 6);
+
+  // one loop only (hand-stamped row, parade loop stacks it) → 2 stars
+  const oneLoop = paintOneLoopSolution(GW_PAINT_PARADE);
+  check('one-loop still fills the banner', runPaint(oneLoop, goal).success);
+  check('one-loop uses the parade loop but not the row loop',
+    runPaint(oneLoop, goal).usedParadeLoop && !runPaint(oneLoop, goal).usedRowLoop);
+
+  // manual fills it with no loops
+  const manual = paintManualSolution(GW_PAINT_PARADE);
+  const rmn = runPaint(manual, goal);
+  check('painting by hand fills the banner with no loops', rmn.success && !rmn.usedRowLoop && !rmn.usedParadeLoop);
+
+  // over-counting a loop stamps off the banner (a stray)
+  const over = runPaint(P('ppStamp', 'ppStep', ['ppRepeatRow', 4], 'ppNewRow', ['ppRepeatParade', 2]), goal);
+  check('a row loop counted too high stamps off the banner', over.strayCount > 0 && !over.success);
+  check('the miss report warns about dots off the banner', paintMisses(P('ppStamp', 'ppStep', ['ppRepeatRow', 4], 'ppNewRow', ['ppRepeatParade', 2]), goal).some((m) => m.includes('off the banner')));
+
+  // under-counting the row loop leaves a column blank
+  const under = runPaint(P('ppStamp', 'ppStep', ['ppRepeatRow', 2], 'ppNewRow', ['ppRepeatParade', 2]), goal);
+  check('a row loop of 2 on a 3-wide banner leaves the last column blank', !under.success && under.painted.size === 4);
+
+  // an empty loop is flagged
+  check('a REPEAT with nothing before it is an empty loop', expandPaint(P('ppRepeatRow', 2)).emptyLoop);
+
+  // determinism
+  check('runPaint is deterministic', JSON.stringify(runPaint(nested, goal)) === JSON.stringify(rn));
+
+  // stars ladder
+  check('an unfinished banner earns no stars', paintStars(GW_PAINT_PARADE, P('ppStamp')) === 0);
+  check('painting by hand earns exactly 1 star', paintStars(GW_PAINT_PARADE, manual) === 1);
+  check('one loop earns 2 stars', paintStars(GW_PAINT_PARADE, oneLoop) === 2);
+  check('the nested loop earns all 3 stars', paintStars(GW_PAINT_PARADE, nested) === 3);
+
+  // levels validate + Big Banner scales the same nested loop to 4×3
+  for (const l of GEARWORKS_PAINT_LEVELS) {
+    check(`${l.id} validates`, validatePaintLevel(l).length === 0);
+    check(`${l.id} nested solution wins`, runPaint(paintNestedSolution(l), paintGoalOf(l)).success);
+  }
+  check('Big Banner fills 12 dots with the nested loop', runPaint(paintNestedSolution(GW_BIG_BANNER), paintGoalOf(GW_BIG_BANNER)).painted.size === 12);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -2043,3 +2043,35 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-queue-strip { left: max(8px, var(--sal)); transform: none; padding: 6px 10px; gap: 6px; }
   .queue-front { display: none; }
 }
+
+/* ============================================================
+   Phase 16 — Paint Parade target board (make this!)
+   ============================================================ */
+.gw-paint-board {
+  position: absolute; left: max(14px, var(--sal));
+  top: calc(max(8px, var(--sat)) + 118px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, rgba(20,28,74,.92), rgba(13,20,55,.92));
+  border: 3px solid rgba(255,255,255,.14); border-radius: var(--r-lg);
+  padding: 9px 11px 11px; box-shadow: var(--shadow-card); z-index: 20;
+}
+.pb-title {
+  font-family: var(--font-display); font-weight: 800; font-size: 11px;
+  letter-spacing: 2px; color: #c7b3ff;
+}
+.pb-grid { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 6px; }
+.pb-cell {
+  width: clamp(20px, 2.4vw, 30px); height: clamp(20px, 2.4vw, 30px); border-radius: 50%;
+  background: rgba(255,255,255,.08); border: 2px dashed rgba(255,255,255,.22);
+  transition: transform .2s var(--ease-bounce), background .18s, border-color .18s, box-shadow .18s;
+}
+.pb-cell.on {
+  background: var(--dot); border: 2px solid #fff;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--dot) 65%, transparent), inset 0 2px 0 rgba(255,255,255,.4);
+  transform: scale(1.1);
+}
+
+@media (max-width: 700px) {
+  .gw-paint-board { padding: 6px 8px 8px; }
+  .pb-cell { width: 18px; height: 18px; }
+}

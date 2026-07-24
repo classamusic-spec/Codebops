@@ -28,6 +28,8 @@ import type { LlCommandId, LlStep, LlSignal, LighthouseScenario } from '../../ga
 import { runLighthouse, evalRule, condOrder, isCond } from '../../gameplay/gearworks/logicMachine';
 import type { DvCommandId, DvStep, DeliveryPackage, DeliveryGoal } from '../../gameplay/gearworks/deliveryMachine';
 import { runDelivery, DV_REPEAT_MAX } from '../../gameplay/gearworks/deliveryMachine';
+import type { PpCommandId, PpStep, PaintGoal } from '../../gameplay/gearworks/paintMachine';
+import { runPaint } from '../../gameplay/gearworks/paintMachine';
 import type { SfxName } from '../../audio/sfx';
 import type { GearworksFamilyId } from './world';
 
@@ -1667,5 +1669,143 @@ export function assertDeliveryLevelValid(level: GearworksDeliveryLevel): void {
   const errors = validateDeliveryLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Delivery level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 16 — Paint Parade: nested loops (a loop inside a loop)
+//
+// An inner REPEAT ROW stamps a line of dots; an outer REPEAT PARADE
+// repeats the whole design down the banner. Filling a grid the tidy way
+// takes a loop inside a loop.
+// ==================================================================
+
+export interface GearworksPaintLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly commands: readonly PpCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  readonly cols: number;
+  readonly rows: number;
+  readonly bonus: { readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_PAINT_PARADE: GearworksPaintLevel = {
+  id: 'gw-paint-parade',
+  title: 'Gearworks Garage',
+  shortTitle: 'Paint Parade',
+  family: 'painter',
+  goalText: 'Fill the banner with dots — a row loop inside a parade loop!',
+  emoji: '🎨',
+  brief: {
+    title: 'Paint Parade!',
+    text: 'Paint a whole banner of dots! STAMP a dot, STEP along, and REPEAT ROW makes a line. Then NEW ROW drops down and REPEAT PARADE repeats the WHOLE design — a loop inside a loop! Fill every square: 3 across and 2 down.',
+    emoji: '🎨',
+  },
+  commands: ['ppStamp', 'ppStep', 'ppNewRow', 'ppRepeatRow', 'ppRepeatParade'],
+  maxSlots: 12,
+  par: 5,
+  cols: 3,
+  rows: 2,
+  bonus: { text: 'A loop inside a loop — nested!' },
+  coachHint: 'STAMP, STEP, REPEAT ROW ×3 makes a row. Then NEW ROW and REPEAT PARADE ×2 stacks the rows!',
+};
+
+export const GW_BIG_BANNER: GearworksPaintLevel = {
+  id: 'gw-big-banner',
+  title: 'Gearworks Garage',
+  shortTitle: 'Big Banner',
+  family: 'painter',
+  goalText: 'A bigger banner — 4 across and 3 down. The nested loop still fills it!',
+  emoji: '🖼️',
+  brief: {
+    title: 'Big Banner!',
+    text: 'A giant banner today — 4 dots across, 3 rows down! Doing it by hand is a LOT of tiles. But the same little nested loop fills it: just tap the Repeat badges up. A loop inside a loop does the whole thing!',
+    emoji: '🖼️',
+  },
+  commands: ['ppStamp', 'ppStep', 'ppNewRow', 'ppRepeatRow', 'ppRepeatParade'],
+  maxSlots: 12,
+  par: 5,
+  cols: 4,
+  rows: 3,
+  bonus: { text: 'One nested loop paints the whole wall' },
+  coachHint: 'STAMP, STEP, REPEAT ROW ×4, NEW ROW, REPEAT PARADE ×3 — a loop inside a loop!',
+};
+
+export const GEARWORKS_PAINT_LEVELS: readonly GearworksPaintLevel[] = [
+  GW_PAINT_PARADE, GW_BIG_BANNER,
+];
+
+export function paintGoalOf(level: GearworksPaintLevel): PaintGoal {
+  return { cols: level.cols, rows: level.rows };
+}
+
+/** Stamp every cell by hand — no loops (the long baseline, 1 star). */
+export function paintManualSolution(level: GearworksPaintLevel): PpStep[] {
+  const out: PpStep[] = [];
+  for (let r = 0; r < level.rows; r++) {
+    for (let c = 0; c < level.cols; c++) out.push({ cmd: 'ppStamp' }, { cmd: 'ppStep' });
+    if (r < level.rows - 1) out.push({ cmd: 'ppNewRow' });
+  }
+  return out;
+}
+
+/** One loop only: hand-stamp a row, then the parade loop stacks it (2 stars). */
+export function paintOneLoopSolution(level: GearworksPaintLevel): PpStep[] {
+  const out: PpStep[] = [];
+  for (let c = 0; c < level.cols; c++) out.push({ cmd: 'ppStamp' }, { cmd: 'ppStep' });
+  out.push({ cmd: 'ppNewRow' }, { cmd: 'ppRepeatParade', arg: level.rows });
+  return out;
+}
+
+/** The tidy nested loop: row loop wrapped by a parade loop (3 stars). */
+export function paintNestedSolution(level: GearworksPaintLevel): PpStep[] {
+  return [
+    { cmd: 'ppStamp' }, { cmd: 'ppStep' }, { cmd: 'ppRepeatRow', arg: level.cols },
+    { cmd: 'ppNewRow' }, { cmd: 'ppRepeatParade', arg: level.rows },
+  ];
+}
+
+/** works (banner filled) / clever (used a loop) / creative (nested both loops). */
+export function paintStars(level: GearworksPaintLevel, program: readonly PpStep[]): number {
+  const r = runPaint(program, paintGoalOf(level));
+  if (!r.success) return 0;
+  const usedAny = r.usedRowLoop || r.usedParadeLoop;
+  const nested = r.usedRowLoop && r.usedParadeLoop;
+  return 1 + (usedAny ? 1 : 0) + (nested ? 1 : 0);
+}
+
+export function validatePaintLevel(level: GearworksPaintLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.cols < 2 || level.rows < 2) errors.push('A paint level needs at least a 2×2 banner (so nesting matters).');
+  const goal = paintGoalOf(level);
+  const manual = paintManualSolution(level);
+  const oneLoop = paintOneLoopSolution(level);
+  const nested = paintNestedSolution(level);
+  if (!runPaint(manual, goal).success) errors.push('Manual solution must fill the banner.');
+  if (!runPaint(oneLoop, goal).success) errors.push('One-loop solution must fill the banner.');
+  if (!runPaint(nested, goal).success) errors.push('Nested solution must fill the banner.');
+  if (paintStars(level, manual) !== 1) errors.push('Manual solution should earn exactly 1 star.');
+  if (paintStars(level, oneLoop) !== 2) errors.push('One-loop solution should earn 2 stars.');
+  if (paintStars(level, nested) !== 3) errors.push('Nested solution should earn all 3 stars.');
+  if (nested.length > level.par) errors.push('Nested solution must fit par.');
+  if (nested.length > level.maxSlots) errors.push('Nested solution must fit the deck.');
+  if (oneLoop.length > level.maxSlots) errors.push('One-loop solution must fit the deck (the 2-star path must be buildable).');
+  if (nested.length >= manual.length) errors.push('The nested loop must be shorter than painting by hand.');
+  return errors;
+}
+
+export function assertPaintLevelValid(level: GearworksPaintLevel): void {
+  const errors = validatePaintLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Paint level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }
