@@ -16,6 +16,8 @@ import type { GtCommandId, GtStep, SortItem, RouteRule } from '../../gameplay/ge
 import { runSorter, correctDest } from '../../gameplay/gearworks/sorterMachine';
 import type { GcCommandId, GcStep, GcMachineKind, CounterGoal, SafeGoal } from '../../gameplay/gearworks/counterMachine';
 import { runCounter, runSafeStop } from '../../gameplay/gearworks/counterMachine';
+import type { GjCommandId, GjStep, JamGoal } from '../../gameplay/gearworks/jamMachine';
+import { runJam, jamGoalMet } from '../../gameplay/gearworks/jamMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -741,5 +743,137 @@ export function assertCounterLevelValid(level: GearworksCounterLevel): void {
   const errors = validateCounterLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Counter level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 8 — the hero level: Strawberry Jam Machine (6 missions)
+// ==================================================================
+
+export interface JamMission {
+  readonly n: number;
+  readonly title: string;
+  readonly goalText: string;
+  readonly brief: string;
+  /** Tiles this mission adds to the tray (progressive unlock). */
+  readonly commands: readonly GjCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  readonly goal: JamGoal;
+  /** A worked plan that satisfies this mission (validated + never shown). */
+  readonly solution: readonly GjStep[];
+}
+
+export interface GearworksJamLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly missions: readonly JamMission[];
+}
+
+const SM: GjStep = { cmd: 'jmStartMotor' };
+const XM: GjStep = { cmd: 'jmStopMotor' };
+const SC: GjStep = { cmd: 'jmStartConveyor' };
+const XC: GjStep = { cmd: 'jmStopConveyor' };
+const WS: GjStep = { cmd: 'jmWaitSensor' };
+const LP: GjStep = { cmd: 'jmLowerPress' };
+const RP: GjStep = { cmd: 'jmRaisePress' };
+const R3: GjStep = { cmd: 'jmRepeat', arg: 3 };
+
+export const GW_JAM_MACHINE: GearworksJamLevel = {
+  id: 'gw-jam-machine',
+  title: 'Gearworks Garage',
+  shortTitle: 'Jam Machine',
+  family: 'bench',
+  goalText: 'Build the Strawberry Jam Machine — one mission at a time!',
+  emoji: '🍯',
+  brief: {
+    title: 'The Strawberry Jam Machine!',
+    text: 'This is the big one — a whole machine! We will build it together in six little missions. Each one adds a new part: the motor, the belt, the sensor, the press, a loop, then the WHOLE program. Ready, Zip?',
+    emoji: '🍯',
+  },
+  missions: [
+    {
+      n: 1, title: 'Wake the Motor', goalText: 'Start the motor, then stop it.',
+      brief: 'Every machine needs power. Turn the motor ON, then OFF again — always leave a machine safely stopped!',
+      commands: ['jmStartMotor', 'jmStopMotor'], maxSlots: 4, par: 2,
+      goal: { needMotorCycled: true, needSafeStop: true },
+      solution: [SM, XM],
+    },
+    {
+      n: 2, title: 'Run the Belt', goalText: 'Run the conveyor belt — but power it first!',
+      brief: 'The belt carries strawberries. It only moves when the motor is ON, so START MOTOR before START CONVEYOR. Then stop them both.',
+      commands: ['jmStartMotor', 'jmStopMotor', 'jmStartConveyor', 'jmStopConveyor'], maxSlots: 6, par: 4,
+      goal: { needConveyorRun: true, needSafeStop: true },
+      solution: [SM, SC, XC, XM],
+    },
+    {
+      n: 3, title: 'Wait for a Berry', goalText: 'Wait for a strawberry to reach the sensor.',
+      brief: 'The eye sensor watches the press. WAIT FOR SENSOR sleeps until a strawberry slides into place — no counting needed!',
+      commands: ['jmStartMotor', 'jmStopMotor', 'jmStartConveyor', 'jmStopConveyor', 'jmWaitSensor'], maxSlots: 7, par: 5,
+      goal: { needSensorHit: true, needSafeStop: true },
+      solution: [SM, SC, WS, XC, XM],
+    },
+    {
+      n: 4, title: 'Make Jam!', goalText: 'Press ONE strawberry into a jar of jam.',
+      brief: 'Now squish! WAIT FOR SENSOR, then LOWER PRESS to make jam, then RAISE PRESS so the belt carries it away. Make one jar!',
+      commands: ['jmStartMotor', 'jmStopMotor', 'jmStartConveyor', 'jmStopConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress'], maxSlots: 9, par: 7,
+      goal: { minJam: 1, needSafeStop: true },
+      solution: [SM, SC, WS, LP, RP, XC, XM],
+    },
+    {
+      n: 5, title: 'Three in a Loop', goalText: 'Make 3 jars — use a REPEAT loop!',
+      brief: 'Three jars by hand is a lot of tiles. Put WAIT–LOWER–RAISE before a REPEAT ×3 and the loop makes all three!',
+      commands: ['jmStartMotor', 'jmStartConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', 'jmRepeat'], maxSlots: 8, par: 6,
+      goal: { minJam: 3 },
+      solution: [SM, SC, WS, LP, RP, R3],
+    },
+    {
+      n: 6, title: 'The Whole Machine', goalText: 'Run the FULL machine: 3 jars, then a safe stop!',
+      brief: 'Put it ALL together: power on, belt on, loop three jars, then shut it down safely. You are running the whole Jam Machine!',
+      commands: ['jmStartMotor', 'jmStopMotor', 'jmStartConveyor', 'jmStopConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', 'jmRepeat'], maxSlots: 10, par: 8,
+      goal: { minJam: 3 },
+      solution: [SM, SC, WS, LP, RP, R3, XC, XM],
+    },
+  ],
+};
+
+export const GEARWORKS_JAM_LEVELS: readonly GearworksJamLevel[] = [GW_JAM_MACHINE];
+
+/** Final-mission stars: works (3 jars) / clever (looped, within par) / safe (clean stop). */
+export function jamFinalStars(level: GearworksJamLevel, program: readonly GjStep[]): number {
+  const last = level.missions[level.missions.length - 1];
+  const r = runJam(program);
+  if (!jamGoalMet(last.goal, r)) return 0;
+  let stars = 1;
+  if (program.length <= last.par) stars++;
+  if (r.endedSafe) stars++;
+  return stars;
+}
+
+export function validateJamLevel(level: GearworksJamLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.missions.length !== 6) errors.push('The hero level needs exactly 6 missions.');
+  level.missions.forEach((m, i) => {
+    if (m.n !== i + 1) errors.push(`Mission ${i + 1} has wrong number ${m.n}.`);
+    if (m.solution.length > m.maxSlots) errors.push(`Mission ${m.n} solution exceeds maxSlots.`);
+    if (m.solution.length > m.par) errors.push(`Mission ${m.n} solution exceeds par.`);
+    if (!m.solution.every((s) => m.commands.includes(s.cmd))) errors.push(`Mission ${m.n} solution uses locked tiles.`);
+    if (!jamGoalMet(m.goal, runJam(m.solution))) errors.push(`Mission ${m.n} solution does not meet its goal.`);
+  });
+  // the final solution must earn all three stars
+  if (jamFinalStars(level, level.missions[5].solution) !== 3) errors.push('The final solution must earn 3 stars.');
+  return errors;
+}
+
+export function assertJamLevelValid(level: GearworksJamLevel): void {
+  const errors = validateJamLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Jam level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

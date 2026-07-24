@@ -7,13 +7,14 @@ import type { GwLoopCommandId } from '../../gameplay/gearworks/loopMachine';
 import type { GwSensorCommandId } from '../../gameplay/gearworks/sensorMachine';
 import type { GtCommandId } from '../../gameplay/gearworks/sorterMachine';
 import type { GcCommandId } from '../../gameplay/gearworks/counterMachine';
+import type { GjCommandId } from '../../gameplay/gearworks/jamMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
-  GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS,
+  GEARWORKS_SORTER_LEVELS, GEARWORKS_COUNTER_LEVELS, GEARWORKS_JAM_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
-  GearworksSorterLevel, GearworksCounterLevel,
+  GearworksSorterLevel, GearworksCounterLevel, GearworksJamLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -138,6 +139,26 @@ export const GW_COUNTER_TILES: Readonly<Record<GcCommandId, GwTileDef>> = {
   ssRepeat:           { label: 'Repeat', spoken: 'Repeat the tiles before this — but it never stops on its own!', tone: 'loop', icon: ICON_REPEAT },
 };
 
+// ---------- Phase 8 Jam Machine tiles ----------
+
+const ICON_MOTOR_ON = '<rect x="4" y="8" width="12" height="8" rx="2.4"/><rect x="16.5" y="10.4" width="2.6" height="3.2" rx="0.8"/><path d="M8.8 12 L11.4 9 L10.2 11.6 L12.6 11.6 L9.4 15.6 L10.8 12.4 Z" fill="var(--tile-deep, #157a33)"/>';
+const ICON_MOTOR_OFF = '<rect x="4" y="8" width="12" height="8" rx="2.4" fill="none" stroke="currentColor" stroke-width="2.4"/><rect x="16.5" y="10.4" width="2.6" height="3.2" rx="0.8"/><rect x="8.4" y="10.4" width="3.2" height="3.2" rx="0.8"/>';
+const ICON_CONV_ON = '<rect x="2.8" y="12.5" width="18.4" height="5" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.3"/><circle cx="6.6" cy="15" r="1.2"/><circle cx="12" cy="15" r="1.2"/><circle cx="17.4" cy="15" r="1.2"/><path d="M9.6 4.6 L15.2 8 L9.6 11.4 Z"/>';
+const ICON_CONV_OFF = '<rect x="2.8" y="12.5" width="18.4" height="5" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.3"/><circle cx="6.6" cy="15" r="1.2"/><circle cx="12" cy="15" r="1.2"/><circle cx="17.4" cy="15" r="1.2"/><rect x="9.8" y="5" width="4.4" height="4.4" rx="1"/>';
+const ICON_LOWER = '<rect x="4.4" y="17" width="15.2" height="3" rx="1.4"/><rect x="9" y="9" width="6" height="6" rx="1.2"/><path d="M12 3 V8 M9.2 5.4 L12 8.2 L14.8 5.4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+const ICON_RAISE = '<rect x="4.4" y="17" width="15.2" height="3" rx="1.4"/><rect x="9" y="9" width="6" height="6" rx="1.2"/><path d="M12 8 V3 M9.2 5.6 L12 2.8 L14.8 5.6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+
+export const GW_JAM_TILES: Readonly<Record<GjCommandId, GwTileDef>> = {
+  jmStartMotor:    { label: 'Start Motor', spoken: 'Start the motor', tone: 'start', icon: ICON_MOTOR_ON },
+  jmStopMotor:     { label: 'Stop Motor', spoken: 'Stop the motor', tone: 'stop', icon: ICON_MOTOR_OFF },
+  jmStartConveyor: { label: 'Belt On', spoken: 'Start the conveyor belt', tone: 'start', icon: ICON_CONV_ON },
+  jmStopConveyor:  { label: 'Belt Off', spoken: 'Stop the conveyor belt', tone: 'stop', icon: ICON_CONV_OFF },
+  jmWaitSensor:    { label: 'Wait Sensor', spoken: 'Wait until a strawberry reaches the sensor', tone: 'check', icon: ICON_EYE },
+  jmLowerPress:    { label: 'Lower Press', spoken: 'Lower the press to make jam', tone: 'rotate', icon: ICON_LOWER },
+  jmRaisePress:    { label: 'Raise Press', spoken: 'Raise the press', tone: 'move', icon: ICON_RAISE },
+  jmRepeat:        { label: 'Repeat', spoken: 'Repeat the tiles before this — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -147,7 +168,8 @@ export type GearworksLevelEntry =
   | { readonly kind: 'loop'; readonly level: GearworksLoopLevel }
   | { readonly kind: 'sensor'; readonly level: GearworksSensorLevel }
   | { readonly kind: 'sorter'; readonly level: GearworksSorterLevel }
-  | { readonly kind: 'counter'; readonly level: GearworksCounterLevel };
+  | { readonly kind: 'counter'; readonly level: GearworksCounterLevel }
+  | { readonly kind: 'jam'; readonly level: GearworksJamLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
@@ -156,6 +178,7 @@ export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_SENSOR_LEVELS.map((level) => ({ kind: 'sensor' as const, level })),
   ...GEARWORKS_SORTER_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
   ...GEARWORKS_COUNTER_LEVELS.map((level) => ({ kind: 'counter' as const, level })),
+  ...GEARWORKS_JAM_LEVELS.map((level) => ({ kind: 'jam' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -169,5 +192,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-jam-machine', shortTitle: 'Jam Machine', emoji: '🍯' },
+  { kind: 'soon', id: 'gw-save-a-job', shortTitle: 'Save a Job', emoji: '📇' },
 ];

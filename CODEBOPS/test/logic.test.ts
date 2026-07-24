@@ -70,6 +70,13 @@ import {
   GEARWORKS_COUNTER_LEVELS, GW_BERRY_COUNTER, GW_SAFE_STOP,
   validateCounterLevel, canonicalCounterSolution, countUpSolution, foreverFredSolution,
 } from '../src/data/gearworks/levels';
+import {
+  runJam, jamGoalMet, jamMisses, initialJam, JM_SUPPLY,
+} from '../src/gameplay/gearworks/jamMachine';
+import type { GjStep } from '../src/gameplay/gearworks/jamMachine';
+import {
+  GW_JAM_MACHINE, validateJamLevel, jamFinalStars,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -675,6 +682,56 @@ for (const l of GEARWORKS_COUNTER_LEVELS) {
     && emptyLoop.events.some((e) => e.type === 'loopFail'));
   const twoBody = runSafeStop(CP('ssPress', 'ssPress', 'ssRepeatUntilFull'), { target: 4 });
   check('two-press body still stops safely at the target', twoBody.success && twoBody.finalJars === 4);
+}
+
+// --- Gearworks Jam Machine hero level (Phase 8) ---
+const JP = (...cmds: Array<GjStep['cmd'] | [GjStep['cmd'], number]>): GjStep[] =>
+  cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
+
+{
+  check('jam level validates', validateJamLevel(GW_JAM_MACHINE).length === 0);
+  // every mission's built-in solution meets its own goal
+  GW_JAM_MACHINE.missions.forEach((m) => {
+    check(`jam mission ${m.n} solution meets its goal`, jamGoalMet(m.goal, runJam(m.solution)));
+  });
+}
+{
+  // power dependency: the belt needs the motor first
+  const noPower = runJam(JP('jmStartConveyor'));
+  check('conveyor without a motor has no power', noPower.events.some((e) => e.type === 'conveyorNoPower')
+    && !noPower.flags.sawConveyorRun);
+  const powered = runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmStopConveyor', 'jmStopMotor'));
+  check('motor-then-belt runs and shuts down safely', powered.flags.sawConveyorRun && powered.endedSafe);
+}
+{
+  // the press needs a berry under it (sensor wait first)
+  const dryPress = runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmLowerPress'));
+  check('lowering the press with no berry misses', dryPress.finalState.jam === 0
+    && dryPress.events.some((e) => e.type === 'pressMiss' && e.reason === 'noBerry'));
+  const oneJam = runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', 'jmStopConveyor', 'jmStopMotor'));
+  check('wait-lower-raise makes one jar of jam', oneJam.finalState.jam === 1 && oneJam.endedSafe);
+}
+{
+  // the loop makes three jars — setup tiles are idempotent inside it
+  const looped = runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', ['jmRepeat', 3]));
+  check('repeat x3 makes exactly 3 jars', looped.finalState.jam === 3);
+  check('idempotent start-motor inside the loop only powers once',
+    looped.events.filter((e) => e.type === 'motorOn').length === 1);
+  const full = GW_JAM_MACHINE.missions[5].solution as GjStep[];
+  check('full program earns all 3 stars', jamFinalStars(GW_JAM_MACHINE, full) === 3);
+  const noStop = runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', ['jmRepeat', 3]));
+  check('forgetting the shutdown loses only the safe star',
+    jamGoalMet({ minJam: 3 }, noStop) && !noStop.endedSafe);
+  const stars2 = jamFinalStars(GW_JAM_MACHINE, JP('jmStartMotor', 'jmStartConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', ['jmRepeat', 3]));
+  check('no safe stop = 2 stars (works + clever)', stars2 === 2);
+}
+{
+  // supply is bounded; misses coach in kid language
+  const greedy = runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmWaitSensor', 'jmLowerPress', 'jmRaisePress', ['jmRepeat', 4]));
+  check('cannot make more jam than the berry supply', greedy.finalState.jam <= JM_SUPPLY);
+  const miss = jamMisses({ minJam: 1, needSafeStop: true }, runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmLowerPress')));
+  check('press-with-no-berry miss coaches WAIT FOR SENSOR', miss.some((m) => m.includes('WAIT FOR SENSOR')));
+  check('fresh jam machine is idle', initialJam().jam === 0 && !initialJam().motorOn);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
