@@ -18,6 +18,8 @@ import type { GcCommandId, GcStep, GcMachineKind, CounterGoal, SafeGoal } from '
 import { runCounter, runSafeStop } from '../../gameplay/gearworks/counterMachine';
 import type { GjCommandId, GjStep, JamGoal } from '../../gameplay/gearworks/jamMachine';
 import { runJam, jamGoalMet } from '../../gameplay/gearworks/jamMachine';
+import type { JobPrimId, JobMainId, JobStep, JobGoal } from '../../gameplay/gearworks/jobMachine';
+import { runJobProgram } from '../../gameplay/gearworks/jobMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -875,5 +877,104 @@ export function assertJamLevelValid(level: GearworksJamLevel): void {
   const errors = validateJamLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Jam level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 9 — functions and job cards: Save a Job
+// ==================================================================
+
+export interface GearworksJobLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  /** The Job Card the child fills in. */
+  readonly jobName: string;
+  readonly jobIcon: string;
+  readonly jobPrims: readonly JobPrimId[];
+  readonly jobSlots: number;
+  /** Tiles for the MAIN program (primitives + DO + Repeat). */
+  readonly mainCommands: readonly JobMainId[];
+  readonly maxSlots: number;
+  readonly target: number;
+  readonly coachHint: string;
+  /** The intended job body (validated; the child rebuilds it). */
+  readonly jobSolution: readonly JobStep[];
+}
+
+const F: JobStep = { cmd: 'jbFetch' };
+const P: JobStep = { cmd: 'jbPress' };
+const DO: JobStep = { cmd: 'jbDoJob' };
+
+export const GW_SAVE_A_JOB: GearworksJobLevel = {
+  id: 'gw-save-a-job',
+  title: 'Gearworks Garage',
+  shortTitle: 'Save a Job',
+  family: 'maker',
+  goalText: 'Teach the machine a JOB, then use it to make 3 jars!',
+  emoji: '📇',
+  brief: {
+    title: 'Save a Job!',
+    text: 'Doing the same steps over and over is a lot of tiles! Fill the "Make Jam" job card with FETCH then PRESS — now the machine remembers it. Drop DO MAKE JAM into your plan to run the whole job at once. Make 3 jars!',
+    emoji: '📇',
+  },
+  jobName: 'Make Jam',
+  jobIcon: '🍯',
+  jobPrims: ['jbFetch', 'jbPress'],
+  jobSlots: 3,
+  mainCommands: ['jbFetch', 'jbPress', 'jbDoJob', 'jbRepeat'],
+  maxSlots: 6,
+  target: 3,
+  coachHint: 'Fill the Make Jam card (FETCH, PRESS). Then DO it three times — or loop it with REPEAT!',
+  jobSolution: [F, P],
+};
+
+export const GEARWORKS_JOB_LEVELS: readonly GearworksJobLevel[] = [GW_SAVE_A_JOB];
+
+export function jobRawSolution(level: GearworksJobLevel): JobStep[] {
+  const out: JobStep[] = [];
+  for (let i = 0; i < level.target; i++) out.push(F, P);
+  return out;
+}
+export function jobCallSolution(level: GearworksJobLevel): JobStep[] {
+  return Array.from({ length: level.target }, () => ({ ...DO }));
+}
+export function jobLoopSolution(level: GearworksJobLevel): JobStep[] {
+  return [{ ...DO }, { cmd: 'jbRepeat', arg: level.target }];
+}
+
+/** works (3 jars) / clever (used the job) / creative (looped the call). */
+export function jobStars(level: GearworksJobLevel, jobBody: readonly JobStep[], main: readonly JobStep[]): number {
+  const r = runJobProgram(jobBody, main, { target: level.target });
+  if (!r.success) return 0;
+  return 1 + (r.usedJob ? 1 : 0) + (r.refactored ? 1 : 0);
+}
+
+export function validateJobLevel(level: GearworksJobLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  const goal: JobGoal = { target: level.target };
+  if (level.jobSolution.length > level.jobSlots) errors.push('Job solution exceeds the job card slots.');
+  if (!level.jobSolution.every((s) => level.jobPrims.includes(s.cmd as JobPrimId))) errors.push('Job solution uses non-primitive tiles.');
+  const raw = jobRawSolution(level);
+  const call = jobCallSolution(level);
+  const loop = jobLoopSolution(level);
+  if (raw.length > level.maxSlots) errors.push('Raw solution must fit the deck (the baseline path).');
+  if (!runJobProgram(level.jobSolution, raw, goal).success) errors.push('Raw solution must make the jam.');
+  if (jobStars(level, level.jobSolution, raw) !== 1) errors.push('Raw solution should earn exactly 1 star.');
+  if (jobStars(level, level.jobSolution, call) !== 2) errors.push('Call solution should earn 2 stars.');
+  if (jobStars(level, level.jobSolution, loop) !== 3) errors.push('Loop solution should earn all 3 stars.');
+  if (call.length >= raw.length) errors.push('Calling the job must be shorter than the raw steps.');
+  return errors;
+}
+
+export function assertJobLevelValid(level: GearworksJobLevel): void {
+  const errors = validateJobLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Job level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

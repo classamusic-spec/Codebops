@@ -1694,6 +1694,48 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .gw-mb-pip { width: 13px; height: 13px; }
 }
 
+/* Phase 9 Job Card editor (left-docked) */
+.gw-job-goal {
+  position: absolute; left: max(10px, var(--sal)); top: calc(max(8px, var(--sat)) + 66px);
+  width: clamp(200px, 24vw, 260px); display: flex; align-items: center; gap: 7px;
+  background: linear-gradient(180deg, #fff7e8, #ffeccb); border-radius: 16px; padding: 9px 12px;
+  font-family: var(--font-display); font-weight: 800; font-size: 13px; color: #6b4a12;
+  box-shadow: 0 5px 0 rgba(201,132,60,.32), 0 8px 16px rgba(42,24,69,.2); z-index: 12;
+}
+.gw-job-goal-emoji { font-size: 22px; }
+.gw-jobcard {
+  position: absolute; left: max(10px, var(--sal)); top: calc(max(8px, var(--sat)) + 132px);
+  width: clamp(200px, 24vw, 260px);
+  background: linear-gradient(180deg, #ecf3ff, #d4e2ff);
+  border: 3px dashed #7fa6f0; border-radius: 20px; padding: 12px;
+  box-shadow: 0 6px 0 rgba(84,120,200,.3), 0 10px 20px rgba(42,24,69,.2); z-index: 12;
+}
+.gw-jc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.gw-jc-icon {
+  font-size: 26px; background: #fff; border-radius: 12px; padding: 3px 6px;
+  box-shadow: inset 0 -2px 0 rgba(84,120,200,.2);
+}
+.gw-jc-titles { display: flex; flex-direction: column; line-height: 1.05; }
+.gw-jc-kicker { font-family: var(--font-display); font-weight: 800; font-size: 10px; letter-spacing: 1.5px; color: #5478c8; }
+.gw-jc-name { font-family: var(--font-display); font-weight: 800; font-size: 16px; color: #24408f; }
+.gw-jc-slots { display: flex; gap: 6px; margin-bottom: 9px; }
+.gw-jc-slot { width: 46px; height: 46px; border-radius: 12px; }
+.gw-jc-tray { display: flex; gap: 6px; padding-top: 9px; border-top: 2px dashed rgba(84,120,200,.35); }
+.gw-jc-tile { width: 46px; height: 46px; }
+.gw-jc-tile .lbl { font-size: 8.5px; }
+.gw-jc-tile .cmd-ico { width: 20px; height: 20px; }
+.gw-jc-foot { margin-top: 8px; font-family: var(--font-display); font-weight: 700; font-size: 11px; color: #4a5f96; text-align: center; }
+@media (max-width: 900px) {
+  .gw-job-goal { width: clamp(150px, 34vw, 200px); font-size: 11.5px; }
+  .gw-jobcard { width: clamp(150px, 34vw, 200px); top: calc(max(8px, var(--sat)) + 120px); padding: 9px; }
+  .gw-jc-slot, .gw-jc-tile { width: 40px; height: 40px; }
+  .gw-jc-name { font-size: 14px; }
+}
+@media (max-width: 700px) {
+  .gw-job-goal, .gw-jobcard { width: clamp(132px, 42vw, 172px); }
+  .gw-jc-foot { display: none; }
+}
+
 /* Loop visualization: body tiles read as one group feeding the Repeat */
 .slot.in-loop {
   box-shadow: inset 0 0 0 3px rgba(160,107,255,.65), inset 0 2px 6px rgba(42,24,69,.25);

@@ -77,6 +77,14 @@ import type { GjStep } from '../src/gameplay/gearworks/jamMachine';
 import {
   GW_JAM_MACHINE, validateJamLevel, jamFinalStars,
 } from '../src/data/gearworks/levels';
+import {
+  runJobProgram, jobMisses,
+} from '../src/gameplay/gearworks/jobMachine';
+import type { JobStep } from '../src/gameplay/gearworks/jobMachine';
+import {
+  GW_SAVE_A_JOB, validateJobLevel, jobStars,
+  jobRawSolution, jobCallSolution, jobLoopSolution,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -732,6 +740,45 @@ const JP = (...cmds: Array<GjStep['cmd'] | [GjStep['cmd'], number]>): GjStep[] =
   const miss = jamMisses({ minJam: 1, needSafeStop: true }, runJam(JP('jmStartMotor', 'jmStartConveyor', 'jmLowerPress')));
   check('press-with-no-berry miss coaches WAIT FOR SENSOR', miss.some((m) => m.includes('WAIT FOR SENSOR')));
   check('fresh jam machine is idle', initialJam().jam === 0 && !initialJam().motorOn);
+}
+
+// --- Gearworks functions and job cards (Phase 9) ---
+const BODY: JobStep[] = [{ cmd: 'jbFetch' }, { cmd: 'jbPress' }];
+const MAIN = (...cmds: Array<JobStep['cmd'] | [JobStep['cmd'], number]>): JobStep[] =>
+  cmds.map((c) => (Array.isArray(c) ? { cmd: c[0], arg: c[1] } : { cmd: c }));
+
+{
+  check('job level validates', validateJobLevel(GW_SAVE_A_JOB).length === 0);
+  // the abstraction ladder: raw = 1 star, call = 2, loop = 3
+  check('raw fetch/press ×3 works but earns 1 star',
+    jobStars(GW_SAVE_A_JOB, BODY, jobRawSolution(GW_SAVE_A_JOB)) === 1);
+  check('calling the job earns 2 stars (reuse)',
+    jobStars(GW_SAVE_A_JOB, BODY, jobCallSolution(GW_SAVE_A_JOB)) === 2);
+  check('looping the call earns 3 stars (refactor)',
+    jobStars(GW_SAVE_A_JOB, BODY, jobLoopSolution(GW_SAVE_A_JOB)) === 3);
+  check('calling the job is fewer tiles than raw',
+    jobCallSolution(GW_SAVE_A_JOB).length < jobRawSolution(GW_SAVE_A_JOB).length);
+}
+{
+  // the job body defines the function; DO expands it inline
+  const r = runJobProgram(BODY, MAIN('jbDoJob', 'jbDoJob', 'jbDoJob'), { target: 3 });
+  check('three DO calls make three jars', r.finalState.jars === 3 && r.usedJob && !r.refactored);
+  check('each call traces its inner steps', r.events.filter((e) => e.type === 'jobCallStart').length === 3
+    && r.events.filter((e) => e.type === 'press' && e.inJob).length === 3);
+  const loop = runJobProgram(BODY, MAIN('jbDoJob', ['jbRepeat', 3]), { target: 3 });
+  check('repeat over one DO call makes three jars', loop.finalState.jars === 3 && loop.refactored);
+}
+{
+  // an empty job card cannot make jam; ordering matters inside the job
+  const emptyJob = runJobProgram([], MAIN('jbDoJob', 'jbDoJob', 'jbDoJob'), { target: 3 });
+  check('DO-ing an empty job makes nothing', emptyJob.finalState.jars === 0
+    && emptyJob.events.some((e) => e.type === 'callEmpty'));
+  check('empty-job miss says to fill the card', jobMisses([], MAIN('jbDoJob'), { target: 3 }).some((m) => m.includes('empty')));
+  const badOrder = runJobProgram([{ cmd: 'jbPress' }, { cmd: 'jbFetch' }], MAIN('jbDoJob'), { target: 1 });
+  check('press-before-fetch inside the job squishes nothing', badOrder.finalState.jars === 0
+    && badOrder.events.some((e) => e.type === 'pressMiss'));
+  const rawMiss = jobMisses(BODY, MAIN('jbFetch', 'jbFetch'), { target: 3 });
+  check('short raw plan coaches making/looping the job', rawMiss.some((m) => m.includes('jar') || m.includes('DO')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
