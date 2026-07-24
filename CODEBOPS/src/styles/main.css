@@ -1653,6 +1653,14 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .gw-tile[data-gw-tone="loop"]   { --tile-deep: #5c2ba8; background: radial-gradient(120% 120% at 50% 12%, #cba4ff 0%, #a06bff 46%, #7e3fe8 100%); }
 .gw-tile[data-gw-tone="check"]  { --tile-deep: #0c7a72; background: radial-gradient(120% 120% at 50% 12%, #7deee0 0%, #33c9ba 46%, #14a89a 100%); }
 
+/* Branch highlighting: a skipped tile visibly greys out for a beat */
+.slot.skip-flash .gw-tile {
+  filter: grayscale(.85) brightness(.75);
+  transform: scale(.92);
+  transition: filter .15s ease, transform .15s ease;
+}
+.calm-mode .slot.skip-flash .gw-tile { transform: none; }
+
 /* Loop visualization: body tiles read as one group feeding the Repeat */
 .slot.in-loop {
   box-shadow: inset 0 0 0 3px rgba(160,107,255,.65), inset 0 2px 6px rgba(42,24,69,.25);

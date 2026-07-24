@@ -13,6 +13,7 @@ import { GearworksScreen } from './gearworksScreen';
 import { GearworksChainScreen } from './gearworksChainScreen';
 import { GearworksLoopScreen } from './gearworksLoopScreen';
 import { GearworksSensorScreen } from './gearworksSensorScreen';
+import { GearworksSorterScreen } from './gearworksSorterScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
 import { createCampfireGate, showCampfire } from './campfire';
 
@@ -42,7 +43,7 @@ export class App {
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
   private editor: EditorScreen | null = null;
-  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | null = null;
+  private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
 
@@ -391,7 +392,9 @@ export class App {
         ? new GearworksChainScreen(screen, entry.level, events)
         : entry.kind === 'loop'
           ? new GearworksLoopScreen(screen, entry.level, events)
-          : new GearworksSensorScreen(screen, entry.level, events);
+          : entry.kind === 'sensor'
+            ? new GearworksSensorScreen(screen, entry.level, events)
+            : new GearworksSorterScreen(screen, entry.level, events);
     this.gearworks.enter();
   }
 

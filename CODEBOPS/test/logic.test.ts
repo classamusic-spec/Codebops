@@ -53,6 +53,14 @@ import {
   GEARWORKS_SENSOR_LEVELS, GW_WAIT_BERRY, GW_SENSOR_WORKSHOP,
   validateSensorLevel, canonicalSensorSolution,
 } from '../src/data/gearworks/levels';
+import {
+  runSorter, sorterMisses, correctDest, itemName,
+} from '../src/gameplay/gearworks/sorterMachine';
+import type { GtStep, SortItem } from '../src/gameplay/gearworks/sorterMachine';
+import {
+  GEARWORKS_SORTER_LEVELS, GW_SENSOR_SORTER, GW_CONVEYOR_FACTORY,
+  validateSorterLevel, canonicalSorterSolution, elseTrickSolution,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -534,6 +542,73 @@ for (const l of GEARWORKS_SENSOR_LEVELS) {
   // step-limit protection
   const huge = runSensorMachine(Array.from({ length: 40 }, () => ({ cmd: 'gsWait' as const })), 'berry');
   check('sensor runs are bounded by the tick cap', huge.overflowed && huge.finalState.tick <= GS_MAX_TICKS);
+}
+
+// --- Gearworks conditions and sorting (Phase 6) ---
+const TP = (...cmds: GtStep['cmd'][]): GtStep[] => cmds.map((cmd) => ({ cmd }));
+const IT = (color: 'red' | 'blue', shape: 'round' | 'square'): SortItem => ({ color, shape });
+
+for (const l of GEARWORKS_SORTER_LEVELS) {
+  const errs = validateSorterLevel(l);
+  check(`${l.id} validates`, errs.length === 0);
+  const canon = canonicalSorterSolution(l);
+  check(`${l.id} canonical sorts the batch within par`,
+    canon.length <= l.par && runSorter(canon, l.stream, l.rules).allCorrect);
+}
+
+{
+  // per-item rule: the same program runs again for every item
+  const r = runSorter(canonicalSorterSolution(GW_SENSOR_SORTER), GW_SENSOR_SORTER.stream, GW_SENSOR_SORTER.rules);
+  check('sorter routes reds left and blues right',
+    r.allCorrect && r.placements.join(',') === 'left,right,right,left');
+  check('one itemEnter per stream item',
+    r.events.filter((e) => e.type === 'itemEnter').length === GW_SENSOR_SORTER.stream.length);
+}
+{
+  // the ELSE trick: trailing unguarded send catches everything else
+  const r = runSorter(elseTrickSolution(), GW_SENSOR_SORTER.stream, GW_SENSOR_SORTER.rules);
+  check('3-tile else trick sorts perfectly', r.allCorrect);
+  check('else trick fits the creative-star bar', elseTrickSolution().length <= 3);
+  // first send wins: red is sent left, the bare Send Right does nothing
+  const redOnly = runSorter(elseTrickSolution(), [IT('red', 'round')], GW_SENSOR_SORTER.rules);
+  check('first send wins — later sends are noops',
+    redOnly.placements[0] === 'left' && redOnly.events.some((e) => e.type === 'alreadySorted'));
+}
+{
+  // chained guards are AND: a skipped IF drags its guarded tile along
+  const andPlan = TP('gtIfRed', 'gtIfRound', 'gtSendLeft');
+  const redRound = runSorter(andPlan, [IT('red', 'round')], GW_CONVEYOR_FACTORY.rules);
+  check('red AND round goes left', redRound.placements[0] === 'left');
+  const redSquare = runSorter(andPlan, [IT('red', 'square')], GW_CONVEYOR_FACTORY.rules);
+  check('red but square is NOT sent (second guard fails)', redSquare.placements[0] === 'pass');
+  const blueRound = runSorter(andPlan, [IT('blue', 'round')], GW_CONVEYOR_FACTORY.rules);
+  check('blue skips BOTH the second guard and the send', blueRound.placements[0] === 'pass'
+    && blueRound.events.filter((e) => e.type === 'skipped').length === 2);
+}
+{
+  // factory batch: blocks must ride through to the parts crate
+  const canon = canonicalSorterSolution(GW_CONVEYOR_FACTORY);
+  const r = runSorter(canon, GW_CONVEYOR_FACTORY.stream, GW_CONVEYOR_FACTORY.rules);
+  check('factory batch sorts with pass-through blocks',
+    r.allCorrect && r.placements.join(',') === 'left,right,pass,left');
+  const mega = runSorter(canon, GW_CONVEYOR_FACTORY.megaStream ?? [], GW_CONVEYOR_FACTORY.rules);
+  check('same rule survives the mega batch', mega.allCorrect);
+  // the else shortcut must NOT work here — blocks would land in pie
+  const shortcut = runSorter(TP('gtIfRed', 'gtIfRound', 'gtSendLeft', 'gtSendRight'), GW_CONVEYOR_FACTORY.stream, GW_CONVEYOR_FACTORY.rules);
+  check('factory resists the bare-else shortcut (blocks mis-sort)', !shortcut.allCorrect);
+}
+{
+  // misses coach in kid language
+  const wrong = runSorter(TP('gtSendLeft'), GW_SENSOR_SORTER.stream, GW_SENSOR_SORTER.rules);
+  check('send-everything-left mis-sorts blues', !wrong.allCorrect && wrong.wrongCount === 2);
+  check('miss text names the item and basket',
+    sorterMisses(TP('gtSendLeft'), GW_SENSOR_SORTER.stream, GW_SENSOR_SORTER.rules)
+      .some((m) => m.includes('blue berry')));
+  const empty = runSorter([], GW_SENSOR_SORTER.stream, GW_SENSOR_SORTER.rules);
+  check('empty rule: everything rides past, batch fails', !empty.allCorrect
+    && empty.placements.every((p) => p === 'pass'));
+  check('correctDest falls through to pass', correctDest(GW_CONVEYOR_FACTORY.rules, IT('red', 'square')) === 'pass');
+  check('itemName reads naturally', itemName(IT('blue', 'round')) === 'blue berry' && itemName(IT('red', 'square')) === 'red block');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

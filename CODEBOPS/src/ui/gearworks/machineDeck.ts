@@ -135,6 +135,16 @@ export class MachineDeck<C extends string = GearworksCommandId> {
     this.slotNodes.forEach((s, i) => s.classList.toggle('running', i === index));
   }
 
+  /** Branch highlighting: a skipped tile visibly greys out for a beat. */
+  flashSkip(index: number): void {
+    const slot = this.slotNodes[index];
+    if (!slot) return;
+    slot.classList.remove('skip-flash');
+    void slot.offsetWidth;
+    slot.classList.add('skip-flash');
+    window.setTimeout(() => slot.classList.remove('skip-flash'), 700);
+  }
+
   /** Loop playback beat: show "k/n" live on a loop tile's badge. */
   setIterBadge(slotIndex: number, text: string | null): void {
     const badge = this.slotNodes[slotIndex]?.querySelector('.count-badge');

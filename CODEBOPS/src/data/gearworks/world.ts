@@ -5,11 +5,14 @@
 import type { GearworksCommandId } from '../../gameplay/gearworks/machine';
 import type { GwLoopCommandId } from '../../gameplay/gearworks/loopMachine';
 import type { GwSensorCommandId } from '../../gameplay/gearworks/sensorMachine';
+import type { GtCommandId } from '../../gameplay/gearworks/sorterMachine';
 import {
   GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
+  GEARWORKS_SORTER_LEVELS,
 } from './levels';
 import type {
   GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
+  GearworksSorterLevel,
 } from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
@@ -100,6 +103,23 @@ export const GW_SENSOR_TILES: Readonly<Record<GwSensorCommandId, GwTileDef>> = {
   gsWarnLight: { label: 'Warning', spoken: 'Shine the warning light', tone: 'stop', icon: ICON_WARN },
 };
 
+// ---------- Phase 6 sorter-level tiles ----------
+
+const ICON_BERRY = '<path d="M12 5.2 C15.6 5.2 18.4 8 18.4 11.2 C18.4 15.4 15.2 19.4 12 19.4 C8.8 19.4 5.6 15.4 5.6 11.2 C5.6 8 8.4 5.2 12 5.2 Z"/><path d="M9.4 4.8 L12 2.6 L14.6 4.8 L12 6.4 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>';
+const ICON_BLOCK = '<rect x="5" y="5" width="14" height="14" rx="2.6"/>';
+const ICON_ROUND = '<circle cx="12" cy="12" r="7.4" fill="none" stroke="currentColor" stroke-width="2.7"/><circle cx="12" cy="12" r="2.4"/>';
+const ICON_SEND_LEFT = '<path d="M20 6.4 H10 A4.4 4.4 0 0 0 5.6 10.8 V17" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M1.8 13.6 L5.6 19.4 L9.4 13.6 Z"/>';
+const ICON_SEND_RIGHT = '<path d="M4 6.4 H14 A4.4 4.4 0 0 1 18.4 10.8 V17" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M14.6 13.6 L18.4 19.4 L22.2 13.6 Z"/>';
+
+export const GW_SORTER_TILES: Readonly<Record<GtCommandId, GwTileDef>> = {
+  gtIfRed:     { label: 'If Red', spoken: 'Only do the next tile if the item is red', tone: 'stop', icon: ICON_BERRY },
+  gtIfBlue:    { label: 'If Blue', spoken: 'Only do the next tile if the item is blue', tone: 'move', icon: ICON_BERRY },
+  gtIfRound:   { label: 'If Round', spoken: 'Only do the next tile if the item is round', tone: 'check', icon: ICON_ROUND },
+  gtIfSquare:  { label: 'If Square', spoken: 'Only do the next tile if the item is square', tone: 'check', icon: ICON_BLOCK },
+  gtSendLeft:  { label: 'Send Left', spoken: 'Push the item into the left basket', tone: 'rotate', icon: ICON_SEND_LEFT },
+  gtSendRight: { label: 'Send Right', spoken: 'Push the item into the right basket', tone: 'loop', icon: ICON_SEND_RIGHT },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
@@ -107,13 +127,15 @@ export type GearworksLevelEntry =
   | { readonly kind: 'machine'; readonly level: GearworksMachineLevel }
   | { readonly kind: 'chain'; readonly level: GearworksChainLevel }
   | { readonly kind: 'loop'; readonly level: GearworksLoopLevel }
-  | { readonly kind: 'sensor'; readonly level: GearworksSensorLevel };
+  | { readonly kind: 'sensor'; readonly level: GearworksSensorLevel }
+  | { readonly kind: 'sorter'; readonly level: GearworksSorterLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
   ...GEARWORKS_CHAIN_LEVELS.map((level) => ({ kind: 'chain' as const, level })),
   ...GEARWORKS_LOOP_LEVELS.map((level) => ({ kind: 'loop' as const, level })),
   ...GEARWORKS_SENSOR_LEVELS.map((level) => ({ kind: 'sensor' as const, level })),
+  ...GEARWORKS_SORTER_LEVELS.map((level) => ({ kind: 'sorter' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -127,5 +149,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-sensor-sorter', shortTitle: 'Sensor Sorter', emoji: '🍓' },
+  { kind: 'soon', id: 'gw-berry-counter', shortTitle: 'Berry Counter', emoji: '🔢' },
 ];

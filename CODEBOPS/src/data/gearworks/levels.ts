@@ -12,6 +12,8 @@ import type { GwLoopCommandId, GwLoopGoal, GwLoopMachineKind, GwLoopStep } from 
 import { runLoopMachine } from '../../gameplay/gearworks/loopMachine';
 import type { GwSensorCommandId, GwSensorMachineKind, GwSensorStep, GwBerryGoal } from '../../gameplay/gearworks/sensorMachine';
 import { runSensorMachine, berryGoalMet, workshopRunCorrect } from '../../gameplay/gearworks/sensorMachine';
+import type { GtCommandId, GtStep, SortItem, RouteRule } from '../../gameplay/gearworks/sorterMachine';
+import { runSorter, correctDest } from '../../gameplay/gearworks/sorterMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -466,5 +468,147 @@ export function assertSensorLevelValid(level: GearworksSensorLevel): void {
   const errors = validateSensorLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Sensor level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 6 — sorter levels: Sensor Sorter + Conveyor Factory foundation
+// ==================================================================
+
+export type GwSorterBonusKind = 'elseTrick' | 'megaBatch';
+
+export interface GearworksSorterLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly commands: readonly GtCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  /** The batch every run sorts (deterministic order — same rule, every item). */
+  readonly stream: readonly SortItem[];
+  /** Bonus batch offered after the first win (megaBatch levels). */
+  readonly megaStream?: readonly SortItem[];
+  readonly rules: readonly RouteRule[];
+  /**
+   * Creative star:
+   *  'elseTrick' — win with a plan of 3 tiles or fewer: the trailing
+   *                unguarded send IS the else. A real refactor insight.
+   *  'megaBatch' — after winning the batch, win the longer mega batch
+   *                with the same kind of rule.
+   */
+  readonly bonus: { readonly kind: GwSorterBonusKind; readonly text: string };
+  readonly coachHint: string;
+  readonly binLabels: { readonly left: string; readonly right: string; readonly pass: string };
+}
+
+const R = (color: 'red' | 'blue', shape: 'round' | 'square'): SortItem => ({ color, shape });
+
+export const GW_SENSOR_SORTER: GearworksSorterLevel = {
+  id: 'gw-sensor-sorter',
+  title: 'Gearworks Garage',
+  shortTitle: 'Sensor Sorter',
+  family: 'factory',
+  goalText: 'Red berries LEFT, blue berries RIGHT — sort the whole batch!',
+  emoji: '🍓',
+  brief: {
+    title: 'The Sensor Sorter!',
+    text: 'Berries ride the belt to the sorting paddle, one at a time. Your plan runs again for EVERY berry! IF RED does the next tile only for red berries. Send reds LEFT into the jam basket and blues RIGHT into the pie basket — no mix-ups!',
+    emoji: '🍓',
+  },
+  commands: ['gtIfRed', 'gtIfBlue', 'gtSendLeft', 'gtSendRight'],
+  maxSlots: 6,
+  par: 4,
+  stream: [R('red', 'round'), R('blue', 'round'), R('blue', 'round'), R('red', 'round')],
+  rules: [
+    { match: { color: 'red' }, dest: 'left' },
+    { match: { color: 'blue' }, dest: 'right' },
+  ],
+  bonus: { kind: 'elseTrick', text: 'Sort it in 3 tiles — the last send catches the rest' },
+  coachHint: 'IF RED guards the next tile. Pair each send with the right IF — or find the shortcut!',
+  binLabels: { left: 'Jam', right: 'Pie', pass: 'Lost' },
+};
+
+export const GW_CONVEYOR_FACTORY: GearworksSorterLevel = {
+  id: 'gw-conveyor-factory',
+  title: 'Gearworks Garage',
+  shortTitle: 'Conveyor Factory',
+  family: 'factory',
+  goalText: 'Red AND round → jam! Blue → pie! Blocks ride through to parts!',
+  emoji: '🏭',
+  brief: {
+    title: 'Conveyor Factory!',
+    text: 'New shipment — berries AND red blocks! Two IFs in a row means BOTH must be true: IF RED then IF ROUND sends only red berries. Blocks are red but NOT round — let no tile touch them and they ride straight into the parts crate!',
+    emoji: '🏭',
+  },
+  commands: ['gtIfRed', 'gtIfBlue', 'gtIfRound', 'gtSendLeft', 'gtSendRight'],
+  maxSlots: 7,
+  par: 5,
+  stream: [R('red', 'round'), R('blue', 'round'), R('red', 'square'), R('red', 'round')],
+  megaStream: [
+    R('red', 'round'), R('red', 'square'), R('blue', 'round'), R('red', 'round'),
+    R('blue', 'round'), R('red', 'square'), R('red', 'round'),
+  ],
+  rules: [
+    { match: { color: 'red', shape: 'round' }, dest: 'left' },
+    { match: { color: 'blue' }, dest: 'right' },
+    { match: {}, dest: 'pass' },
+  ],
+  bonus: { kind: 'megaBatch', text: 'Sort the MEGA batch of 7' },
+  coachHint: 'IF RED + IF ROUND together mean red AND round. Blocks need NO send — they pass through!',
+  binLabels: { left: 'Jam', right: 'Pie', pass: 'Parts' },
+};
+
+export const GEARWORKS_SORTER_LEVELS: readonly GearworksSorterLevel[] = [
+  GW_SENSOR_SORTER,
+  GW_CONVEYOR_FACTORY,
+];
+
+export function canonicalSorterSolution(level: GearworksSorterLevel): GtStep[] {
+  return level.commands.includes('gtIfRound')
+    ? [{ cmd: 'gtIfRed' }, { cmd: 'gtIfRound' }, { cmd: 'gtSendLeft' }, { cmd: 'gtIfBlue' }, { cmd: 'gtSendRight' }]
+    : [{ cmd: 'gtIfRed' }, { cmd: 'gtSendLeft' }, { cmd: 'gtIfBlue' }, { cmd: 'gtSendRight' }];
+}
+
+/** The 3-tile else-trick plan (Sensor Sorter creative star). */
+export function elseTrickSolution(): GtStep[] {
+  return [{ cmd: 'gtIfRed' }, { cmd: 'gtSendLeft' }, { cmd: 'gtSendRight' }];
+}
+
+export function validateSorterLevel(level: GearworksSorterLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  if (level.stream.length === 0) errors.push('The stream must have at least one item.');
+  const canon = canonicalSorterSolution(level);
+  if (canon.length > level.par) errors.push('Canonical solution must fit par.');
+  if (canon.length > level.maxSlots) errors.push('Canonical solution must fit the deck.');
+  if (!canon.every((s) => level.commands.includes(s.cmd))) errors.push('Canonical uses unavailable tiles.');
+  if (!runSorter(canon, level.stream, level.rules).allCorrect) errors.push('Canonical must sort the batch.');
+  if (level.bonus.kind === 'elseTrick') {
+    if (!runSorter(elseTrickSolution(), level.stream, level.rules).allCorrect) {
+      errors.push('The 3-tile else trick must work on an elseTrick level.');
+    }
+  }
+  if (level.bonus.kind === 'megaBatch') {
+    if (!level.megaStream || level.megaStream.length <= level.stream.length) {
+      errors.push('megaBatch levels need a longer megaStream.');
+    } else if (!runSorter(canon, level.megaStream, level.rules).allCorrect) {
+      errors.push('Canonical must also sort the mega batch.');
+    }
+  }
+  // every item must have a reachable destination
+  for (const item of [...level.stream, ...(level.megaStream ?? [])]) {
+    void correctDest(level.rules, item);
+  }
+  return errors;
+}
+
+export function assertSorterLevelValid(level: GearworksSorterLevel): void {
+  const errors = validateSorterLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Sorter level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }
