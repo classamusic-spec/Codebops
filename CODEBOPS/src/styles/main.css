@@ -1651,6 +1651,7 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .gw-tile[data-gw-tone="wait"] .lbl, .gw-tile[data-gw-tone="wait"] .cmd-ico { color: #4a3500; }
 .gw-tile[data-gw-tone="move"]   { --tile-deep: #1257a8; background: radial-gradient(120% 120% at 50% 12%, #74d0ff 0%, #37a2f2 46%, #1f79df 100%); }
 .gw-tile[data-gw-tone="loop"]   { --tile-deep: #5c2ba8; background: radial-gradient(120% 120% at 50% 12%, #cba4ff 0%, #a06bff 46%, #7e3fe8 100%); }
+.gw-tile[data-gw-tone="check"]  { --tile-deep: #0c7a72; background: radial-gradient(120% 120% at 50% 12%, #7deee0 0%, #33c9ba 46%, #14a89a 100%); }
 
 /* Loop visualization: body tiles read as one group feeding the Repeat */
 .slot.in-loop {

@@ -221,17 +221,21 @@ export class GearworksScreen {
 
     if (result.success) {
       const runTicks = result.finalState.motor.ranDir.cw + result.finalState.motor.ranDir.ccw;
-      const stars =
-        1 +
-        (program.length <= this.level.par ? 1 : 0) +
-        (bonusMet(this.level.bonus, result.finalState.motor.ranAt, runTicks) ? 1 : 0);
-      this.events.store.setStars(this.level.id, stars);
-      this.topBar.setStars(stars);
+      // Name only the EARNED stars, in earned order.
+      const starNames = ['It works!'];
+      if (program.length <= this.level.par) starNames.push('It is clever!');
+      if (bonusMet(this.level.bonus, result.finalState.motor.ranAt, runTicks)) {
+        starNames.push(`Creative: ${this.level.bonus.text}!`);
+      }
+      const stars = starNames.length;
+      const prev = this.events.store.stars[this.level.id] ?? 0;
+      this.events.store.setStars(this.level.id, Math.max(prev, stars));
+      this.topBar.setStars(Math.max(prev, stars));
       void this.zip.celebrate();
       sharedSfx.play('celebrate');
       showCelebration(this.ui, {
         stars,
-        starNames: ['It works!', 'It is clever!', `Creative: ${this.level.bonus.text}!`],
+        starNames,
         predictedCorrectly: null,
       }, sharedSfx, {
         onReplay: () => this.resetMachine(),

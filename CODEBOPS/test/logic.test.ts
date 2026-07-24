@@ -43,6 +43,16 @@ import {
   GEARWORKS_LOOP_LEVELS, GW_GEAR_LOOP, GW_LOOP_LIFT,
   validateLoopLevel, canonicalLoopSolution, longLoopSolution,
 } from '../src/data/gearworks/levels';
+import {
+  runSensorMachine, berryPresent, berryGoalMet, berryGoalMisses,
+  workshopRunCorrect, workshopRunMisses, initialSensorMachine,
+  GS_ARRIVAL_DELAY, GS_BERRY_WINDOW, GS_MAX_TICKS,
+} from '../src/gameplay/gearworks/sensorMachine';
+import type { GwSensorStep } from '../src/gameplay/gearworks/sensorMachine';
+import {
+  GEARWORKS_SENSOR_LEVELS, GW_WAIT_BERRY, GW_SENSOR_WORKSHOP,
+  validateSensorLevel, canonicalSensorSolution,
+} from '../src/data/gearworks/levels';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -452,6 +462,78 @@ for (const l of GEARWORKS_LOOP_LEVELS) {
   // Step-limit protection bounds any plan
   const huge = runLoopMachine(Array.from({ length: 60 }, () => ({ cmd: 'glTurnGear' as const })), GW_GEAR_LOOP.goal, 'gearBell');
   check('action cap bounds runaway loop plans', huge.overflowed && huge.finalState.actions <= GL_MAX_ACTIONS);
+}
+
+// --- Gearworks sensors and waiting (Phase 5) ---
+const SP = (...cmds: GwSensorStep['cmd'][]): GwSensorStep[] => cmds.map((cmd) => ({ cmd }));
+
+for (const l of GEARWORKS_SENSOR_LEVELS) {
+  const errs = validateSensorLevel(l);
+  check(`${l.id} validates`, errs.length === 0);
+  check(`${l.id} canonical fits par`, canonicalSensorSolution(l).length <= l.par);
+}
+
+{
+  // arrival events: the berry shows up on the belt's schedule, not ours
+  const r = runSensorMachine(SP('gsStartBelt', 'gsWaitUntil', 'gsGrab'), 'berry');
+  check('wait-until grabs the berry', berryGoalMet({ needBerries: 1 }, r.finalState));
+  const arrive = r.events.find((e) => e.type === 'berryArrive');
+  check('berry arrives exactly on schedule', arrive?.type === 'berryArrive' && arrive.tick === GS_ARRIVAL_DELAY);
+  const met = r.events.find((e) => e.type === 'waitUntilMet');
+  check('wait-until reports how long it slept', met?.type === 'waitUntilMet' && met.slept === 2);
+}
+{
+  // grabber timing: too early snaps, hand-counted waits also work
+  const early = runSensorMachine(SP('gsStartBelt', 'gsGrab'), 'berry');
+  check('grabbing too early snaps on air', early.finalState.snaps === 1 && early.finalState.berriesGrabbed === 0);
+  check('snap miss coaches wait-until', berryGoalMisses({ needBerries: 1 }, early.finalState).some((m) => m.includes('WAIT UNTIL')));
+  const counted = runSensorMachine(SP('gsStartBelt', 'gsWait', 'gsWait', 'gsGrab'), 'berry');
+  check('hand-counted waits can also win (timing!)', berryGoalMet({ needBerries: 1 }, counted.finalState));
+  check('hand-counting needs more than par tiles', 4 > GW_WAIT_BERRY.par);
+}
+{
+  // the berry window: wait too long and it rides away
+  const late = runSensorMachine(SP('gsStartBelt', 'gsWait', 'gsWait', 'gsWait', 'gsWait', 'gsGrab'), 'berry');
+  check('late grab misses — the berry rode off', late.finalState.missed >= 1 && late.finalState.berriesGrabbed === 0);
+  check('missed-berry coaching mentions the window', berryGoalMisses({ needBerries: 1 }, late.finalState).some((m) => m.includes('2 ticks')));
+  const s0 = initialSensorMachine();
+  check('berryPresent window is exactly GS_BERRY_WINDOW ticks',
+    !berryPresent({ ...s0, nextArrival: 3 }, 2)
+    && berryPresent({ ...s0, nextArrival: 3 }, 3)
+    && berryPresent({ ...s0, nextArrival: 3 }, 3 + GS_BERRY_WINDOW - 1)
+    && !berryPresent({ ...s0, nextArrival: 3 }, 3 + GS_BERRY_WINDOW));
+}
+{
+  // second berry (creative star) + wait-until without a belt gives up kindly
+  const two = runSensorMachine(SP('gsStartBelt', 'gsWaitUntil', 'gsGrab', 'gsWaitUntil', 'gsGrab'), 'berry');
+  check('the belt keeps delivering — two berries grabbable', two.finalState.berriesGrabbed === 2);
+  const noBelt = runSensorMachine(SP('gsWaitUntil', 'gsGrab'), 'berry');
+  check('wait-until with no belt gives up gently', noBelt.events.some((e) => e.type === 'waitUntilGaveUp'));
+  check('no-belt miss says to start the belt', berryGoalMisses({ needBerries: 1 }, noBelt.finalState).some((m) => m.includes('belt never started')));
+}
+{
+  // if–else via guarded tiles: one program, correct for BOTH inputs
+  const canon = canonicalSensorSolution(GW_SENSOR_WORKSHOP);
+  const spin = runSensorMachine(canon, 'workshop', { gearTurning: true });
+  check('turning input: gate opens, no false alarm',
+    workshopRunCorrect(spin.finalState, true) && spin.events.some((e) => e.type === 'gateOpen' && !e.wrong));
+  check('turning input skips the warning tile', spin.events.some((e) => e.type === 'skipped'));
+  const still = runSensorMachine(canon, 'workshop', { gearTurning: false });
+  check('still input: warning shines, gate stays shut',
+    workshopRunCorrect(still.finalState, false) && still.events.some((e) => e.type === 'warnLight' && !e.wrong));
+  // unguarded program is wrong on some input — booleans need coverage
+  const naive = runSensorMachine(SP('gsOpenGate', 'gsWarnLight'), 'workshop', { gearTurning: true });
+  check('unguarded plan fails while turning (false alarm)', !workshopRunCorrect(naive.finalState, true));
+  check('false-alarm miss explains itself', workshopRunMisses(naive.finalState, true).some((m) => m.includes('False alarm')));
+  const naiveStill = runSensorMachine(SP('gsOpenGate', 'gsWarnLight'), 'workshop', { gearTurning: false });
+  check('unguarded plan fails while still (gate w/o power)', !workshopRunCorrect(naiveStill.finalState, false));
+  const wrongGuard = runSensorMachine(SP('gsIfStill', 'gsOpenGate'), 'workshop', { gearTurning: false });
+  check('wrong pairing caught: gate opened while still', !workshopRunCorrect(wrongGuard.finalState, false));
+}
+{
+  // step-limit protection
+  const huge = runSensorMachine(Array.from({ length: 40 }, () => ({ cmd: 'gsWait' as const })), 'berry');
+  check('sensor runs are bounded by the tick cap', huge.overflowed && huge.finalState.tick <= GS_MAX_TICKS);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -320,13 +320,18 @@ export class GearworksChainScreen {
   private finishSuccess(): void {
     this.running = false;
     this.shelf.setRunning(false);
-    const stars = 1 + (this.predicted === true ? 1 : 0) + (this.testedEarly ? 1 : 0);
-    this.events.store.setStars(this.level.id, stars);
-    this.topBar.setStars(stars);
+    // Name only the EARNED stars, in earned order.
+    const starNames = ['It works!'];
+    if (this.predicted === true) starNames.push('Great prediction!');
+    if (this.testedEarly) starNames.push(`Creative: ${this.level.bonusText}!`);
+    const stars = starNames.length;
+    const prev = this.events.store.stars[this.level.id] ?? 0;
+    this.events.store.setStars(this.level.id, Math.max(prev, stars));
+    this.topBar.setStars(Math.max(prev, stars));
     void this.zip.celebrate();
     showCelebration(this.ui, {
       stars,
-      starNames: ['It works!', 'Great prediction!', `Creative: ${this.level.bonusText}!`],
+      starNames,
       predictedCorrectly: this.predicted,
     }, sharedSfx, {
       onReplay: () => { this.predicted = null; this.resetBuild(); },

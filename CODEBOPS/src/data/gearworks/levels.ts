@@ -10,6 +10,8 @@ import type { ChainSpec } from '../../gameplay/gearworks/gearChain';
 import { finalDirection, neededPieces } from '../../gameplay/gearworks/gearChain';
 import type { GwLoopCommandId, GwLoopGoal, GwLoopMachineKind, GwLoopStep } from '../../gameplay/gearworks/loopMachine';
 import { runLoopMachine } from '../../gameplay/gearworks/loopMachine';
+import type { GwSensorCommandId, GwSensorMachineKind, GwSensorStep, GwBerryGoal } from '../../gameplay/gearworks/sensorMachine';
+import { runSensorMachine, berryGoalMet, workshopRunCorrect } from '../../gameplay/gearworks/sensorMachine';
 import type { GearworksFamilyId } from './world';
 
 export interface GwBonusRule {
@@ -354,5 +356,115 @@ export function assertLoopLevelValid(level: GearworksLoopLevel): void {
   const errors = validateLoopLevel(level);
   if (errors.length > 0) {
     throw new Error(`[Gearworks] Loop level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
+  }
+}
+
+// ==================================================================
+// Phase 5 — sensor levels: Wait for the Berry + Sensor Workshop
+// ==================================================================
+
+export type GwSensorBonusKind = 'secondBerry' | 'bothInputs';
+
+export interface GearworksSensorLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly family: GearworksFamilyId;
+  readonly goalText: string;
+  readonly emoji: string;
+  readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  readonly machine: GwSensorMachineKind;
+  readonly commands: readonly GwSensorCommandId[];
+  readonly maxSlots: number;
+  readonly par: number;
+  /** Berry machines only. */
+  readonly berryGoal?: GwBerryGoal;
+  /**
+   * Creative star:
+   *  'secondBerry' — the belt keeps bringing berries; grab a second one
+   *  'bothInputs'  — run correctly with the gear TURNING and STILL
+   *                  (test both branches — boolean coverage for age 5!)
+   */
+  readonly bonus: { readonly kind: GwSensorBonusKind; readonly text: string };
+  readonly coachHint: string;
+}
+
+export const GW_WAIT_BERRY: GearworksSensorLevel = {
+  id: 'gw-wait-berry',
+  title: 'Gearworks Garage',
+  shortTitle: 'Wait for the Berry',
+  family: 'bench',
+  goalText: 'Wait until the eye sees the berry — then grab it!',
+  emoji: '👁️',
+  brief: {
+    title: 'Wait for the Berry!',
+    text: 'The belt brings a berry — but not right away! The eye sensor turns green the moment the berry arrives, and it only stays for 2 ticks. Grab too soon and the claw snaps on air. WAIT UNTIL sleeps exactly until the eye sees it — no counting needed!',
+    emoji: '👁️',
+  },
+  machine: 'berry',
+  commands: ['gsStartBelt', 'gsWait', 'gsWaitUntil', 'gsGrab'],
+  maxSlots: 8,
+  par: 3,
+  berryGoal: { needBerries: 1 },
+  bonus: { kind: 'secondBerry', text: 'The belt keeps going — grab a SECOND berry' },
+  coachHint: 'START BELT, then WAIT UNTIL the eye turns green, then GRAB!',
+};
+
+export const GW_SENSOR_WORKSHOP: GearworksSensorLevel = {
+  id: 'gw-sensor-workshop',
+  title: 'Gearworks Garage',
+  shortTitle: 'Sensor Workshop',
+  family: 'bench',
+  goalText: 'Gear turning → open the gate. Gear still → warning light!',
+  emoji: '🚦',
+  brief: {
+    title: 'The Sensor Workshop!',
+    text: 'TAP THE BIG GEAR to set it spinning or still — that is the machine\'s INPUT. The eye sensor watches it. IF TURNING does the next tile only when the gear spins; IF STILL only when it does not. Make the machine do the right thing for BOTH settings!',
+    emoji: '🚦',
+  },
+  machine: 'workshop',
+  commands: ['gsIfTurning', 'gsOpenGate', 'gsIfStill', 'gsWarnLight'],
+  maxSlots: 6,
+  par: 4,
+  bonus: { kind: 'bothInputs', text: 'Test it with the gear turning AND still' },
+  coachHint: 'An IF tile guards the very next tile — pair each action with the right IF!',
+};
+
+export const GEARWORKS_SENSOR_LEVELS: readonly GearworksSensorLevel[] = [
+  GW_WAIT_BERRY,
+  GW_SENSOR_WORKSHOP,
+];
+
+export function canonicalSensorSolution(level: GearworksSensorLevel): GwSensorStep[] {
+  return level.machine === 'berry'
+    ? [{ cmd: 'gsStartBelt' }, { cmd: 'gsWaitUntil' }, { cmd: 'gsGrab' }]
+    : [{ cmd: 'gsIfTurning' }, { cmd: 'gsOpenGate' }, { cmd: 'gsIfStill' }, { cmd: 'gsWarnLight' }];
+}
+
+export function validateSensorLevel(level: GearworksSensorLevel): string[] {
+  const errors: string[] = [];
+  if (!level.id.startsWith('gw-')) errors.push(`Level id "${level.id}" must start with gw-.`);
+  const canon = canonicalSensorSolution(level);
+  if (canon.length > level.par) errors.push('Canonical solution must fit par.');
+  if (canon.length > level.maxSlots) errors.push('Canonical solution must fit the deck.');
+  if (level.machine === 'berry') {
+    if (!level.berryGoal) errors.push('Berry levels need berryGoal.');
+    else {
+      const r = runSensorMachine(canon, 'berry');
+      if (!berryGoalMet(level.berryGoal, r.finalState)) errors.push('Canonical berry solution must win.');
+    }
+  } else {
+    const spin = runSensorMachine(canon, 'workshop', { gearTurning: true });
+    const still = runSensorMachine(canon, 'workshop', { gearTurning: false });
+    if (!workshopRunCorrect(spin.finalState, true)) errors.push('Canonical must be correct while turning.');
+    if (!workshopRunCorrect(still.finalState, false)) errors.push('Canonical must be correct while still.');
+  }
+  return errors;
+}
+
+export function assertSensorLevelValid(level: GearworksSensorLevel): void {
+  const errors = validateSensorLevel(level);
+  if (errors.length > 0) {
+    throw new Error(`[Gearworks] Sensor level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
   }
 }

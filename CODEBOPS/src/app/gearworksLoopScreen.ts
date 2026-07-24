@@ -274,7 +274,12 @@ export class GearworksLoopScreen {
         ? this.wonLongWay && this.wonLoopWay
         : result.finalState.floor === 0; // roundTrip: delivered at the top, ended home
       if (bonusNow) this.everBonus = true;
-      const stars = 1 + (this.everPar ? 1 : 0) + (this.everBonus ? 1 : 0);
+      // Name only the EARNED stars, in earned order (creative can land
+      // without clever — the label must match the star, not the slot).
+      const starNames = ['It works!'];
+      if (this.everPar) starNames.push('Loop-short and clever!');
+      if (this.everBonus) starNames.push(`Creative: ${this.level.bonus.text}!`);
+      const stars = starNames.length;
       const prev = this.events.store.stars[this.level.id] ?? 0;
       this.events.store.setStars(this.level.id, Math.max(prev, stars));
       this.topBar.setStars(Math.max(prev, stars));
@@ -282,7 +287,7 @@ export class GearworksLoopScreen {
       sharedSfx.play('celebrate');
       showCelebration(this.ui, {
         stars,
-        starNames: ['It works!', 'Loop-short and clever!', `Creative: ${this.level.bonus.text}!`],
+        starNames,
         predictedCorrectly: null,
       }, sharedSfx, {
         onReplay: () => this.resetMachine(),

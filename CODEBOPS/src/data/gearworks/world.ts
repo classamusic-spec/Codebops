@@ -4,8 +4,13 @@
  */
 import type { GearworksCommandId } from '../../gameplay/gearworks/machine';
 import type { GwLoopCommandId } from '../../gameplay/gearworks/loopMachine';
-import { GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS } from './levels';
-import type { GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel } from './levels';
+import type { GwSensorCommandId } from '../../gameplay/gearworks/sensorMachine';
+import {
+  GEARWORKS_MACHINE_LEVELS, GEARWORKS_CHAIN_LEVELS, GEARWORKS_LOOP_LEVELS, GEARWORKS_SENSOR_LEVELS,
+} from './levels';
+import type {
+  GearworksMachineLevel, GearworksChainLevel, GearworksLoopLevel, GearworksSensorLevel,
+} from './levels';
 
 export const GEARWORKS_WORLD_ID = 'gearworks-garage' as const;
 
@@ -31,7 +36,7 @@ export type GearworksFamilyId =
 
 // ---------- command-tile registry (semantic tones from the locked palette) ----------
 
-export type GwTileTone = 'start' | 'stop' | 'rotate' | 'wait' | 'move' | 'loop';
+export type GwTileTone = 'start' | 'stop' | 'rotate' | 'wait' | 'move' | 'loop' | 'check';
 
 export interface GwTileDef {
   readonly label: string;
@@ -74,18 +79,41 @@ export const GW_LOOP_TILES: Readonly<Record<GwLoopCommandId, GwTileDef>> = {
   glRepeat:   { label: 'Repeat', spoken: 'Repeat the tiles before this one — tap the badge to change how many times', tone: 'loop', icon: ICON_REPEAT },
 };
 
+// ---------- Phase 5 sensor-level tiles ----------
+
+const ICON_BELT = '<rect x="2.6" y="12.5" width="18.8" height="5.4" rx="2.7" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="7" cy="15.2" r="1.3"/><circle cx="12" cy="15.2" r="1.3"/><circle cx="17" cy="15.2" r="1.3"/><path d="M9.5 4.4 L15.5 8 L9.5 11.6 Z"/>';
+const ICON_EYE = '<path d="M12 6.2 C7 6.2 3.6 10.1 2.6 12 C3.6 13.9 7 17.8 12 17.8 C17 17.8 20.4 13.9 21.4 12 C20.4 10.1 17 6.2 12 6.2 Z" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="3.1"/>';
+const ICON_CLAW = '<path d="M6.4 4.6 C4.4 7.2 4.6 10.4 7.2 12.6 L10 14.8 M17.6 4.6 C19.6 7.2 19.4 10.4 16.8 12.6 L14 14.8" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17.6" r="3.0"/>';
+const ICON_IF_TURN = '<path d="M12 3.4 L13.2 5.3 A6 6 0 0 1 15 6 L17.2 5.4 L18.6 7.8 L17 9.5 A6 6 0 0 1 17 11.5 L18.6 13.2 L17.2 15.6 L15 15 A6 6 0 0 1 13.2 15.7 L12 17.6 L10.8 15.7 A6 6 0 0 1 9 15 L6.8 15.6 L5.4 13.2 L7 11.5 A6 6 0 0 1 7 9.5 L5.4 7.8 L6.8 5.4 L9 6 A6 6 0 0 1 10.8 5.3 Z"/><circle cx="12" cy="10.5" r="2.2" fill="var(--tile-deep, #333)"/><path d="M5.4 20.6 L9.4 20.6 M7.4 18.6 L9.4 20.6 L7.4 22.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.6 20.6 H18.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+const ICON_IF_STILL = '<path d="M12 3.4 L13.2 5.3 A6 6 0 0 1 15 6 L17.2 5.4 L18.6 7.8 L17 9.5 A6 6 0 0 1 17 11.5 L18.6 13.2 L17.2 15.6 L15 15 A6 6 0 0 1 13.2 15.7 L12 17.6 L10.8 15.7 A6 6 0 0 1 9 15 L6.8 15.6 L5.4 13.2 L7 11.5 A6 6 0 0 1 7 9.5 L5.4 7.8 L6.8 5.4 L9 6 A6 6 0 0 1 10.8 5.3 Z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M8.4 20.9 L15.6 20.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="10.5" r="2.2"/>';
+const ICON_GATE = '<path d="M4 20 V7 M20 20 V7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none"/><path d="M4 8.4 L20 8.4" stroke="currentColor" stroke-width="2.4" fill="none"/><path d="M7.2 12 L12 16.4 L16.8 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+const ICON_WARN = '<path d="M12 3.6 L21.4 19.6 H2.6 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M12 9 V13.8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="16.9" r="1.4"/>';
+
+export const GW_SENSOR_TILES: Readonly<Record<GwSensorCommandId, GwTileDef>> = {
+  gsStartBelt: { label: 'Start Belt', spoken: 'Start the conveyor belt', tone: 'start', icon: ICON_BELT },
+  gsWait:      { label: 'Wait', spoken: 'Wait one tick', tone: 'wait', icon: ICON_WAIT },
+  gsWaitUntil: { label: 'Wait Until', spoken: 'Sleep until the eye sensor sees the berry', tone: 'check', icon: ICON_EYE },
+  gsGrab:      { label: 'Grab', spoken: 'Close the claw and grab', tone: 'move', icon: ICON_CLAW },
+  gsIfTurning: { label: 'If Turning', spoken: 'Only do the next tile if the gear is turning', tone: 'check', icon: ICON_IF_TURN },
+  gsIfStill:   { label: 'If Still', spoken: 'Only do the next tile if the gear is still', tone: 'check', icon: ICON_IF_STILL },
+  gsOpenGate:  { label: 'Open Gate', spoken: 'Open the gate', tone: 'start', icon: ICON_GATE },
+  gsWarnLight: { label: 'Warning', spoken: 'Shine the warning light', tone: 'stop', icon: ICON_WARN },
+};
+
 // ---------- level picker roster ----------
 
 /** A playable Gearworks level of either kind, in campaign order. */
 export type GearworksLevelEntry =
   | { readonly kind: 'machine'; readonly level: GearworksMachineLevel }
   | { readonly kind: 'chain'; readonly level: GearworksChainLevel }
-  | { readonly kind: 'loop'; readonly level: GearworksLoopLevel };
+  | { readonly kind: 'loop'; readonly level: GearworksLoopLevel }
+  | { readonly kind: 'sensor'; readonly level: GearworksSensorLevel };
 
 export const GEARWORKS_SEQUENCE: readonly GearworksLevelEntry[] = [
   ...GEARWORKS_MACHINE_LEVELS.map((level) => ({ kind: 'machine' as const, level })),
   ...GEARWORKS_CHAIN_LEVELS.map((level) => ({ kind: 'chain' as const, level })),
   ...GEARWORKS_LOOP_LEVELS.map((level) => ({ kind: 'loop' as const, level })),
+  ...GEARWORKS_SENSOR_LEVELS.map((level) => ({ kind: 'sensor' as const, level })),
 ];
 
 /** Save-store id of a sequence entry (unlock chain + star display). */
@@ -99,5 +127,5 @@ export type GearworksPickerEntry =
 
 export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
-  { kind: 'soon', id: 'gw-sensor-lab', shortTitle: 'Sensor Lab', emoji: '👀' },
+  { kind: 'soon', id: 'gw-sensor-sorter', shortTitle: 'Sensor Sorter', emoji: '🍓' },
 ];
