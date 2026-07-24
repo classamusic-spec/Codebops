@@ -149,6 +149,8 @@ export class GearworksChainScreen {
       this.mixy.update(dt, elapsed);
     }));
     this.stage.startLoop();
+    // Frame the puzzle into the space the UI chrome leaves, not the whole canvas.
+    this.stage.observeChrome(this.ui);
 
     void showBrief(this.ui, this.level, sharedSfx).then(() => {
       this.zip.setMood('happy');

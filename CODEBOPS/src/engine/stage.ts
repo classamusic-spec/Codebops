@@ -34,6 +34,17 @@ export class Stage {
   /** World-space points the camera must always keep in frame. */
   private frameCenter = new THREE.Vector3(0.1, 0.2, 0.1);
   private framePoints: THREE.Vector3[] = [];
+  /**
+   * UI chrome that overlays the canvas (top bar, goal card, Think Trail,
+   * command deck). The puzzle is framed into the space these LEAVE, not
+   * the whole canvas — otherwise it is sized for room it does not have
+   * and ends up small and half-hidden behind the panels.
+   */
+  private chromeHost: HTMLElement | null = null;
+  private insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  /** Free-area half-extents in NDC (1 = the whole canvas). */
+  private fitX = 1;
+  private fitY = 1;
   /** View direction (normalized) — the classic three-quarter storybook angle. */
   private static readonly VIEW_DIR = new THREE.Vector3(0.02, 0.62, 0.782).normalize();
   /** Active view direction (defaults to VIEW_DIR; presets may override). */
@@ -149,15 +160,74 @@ export class Stage {
   }
 
   /**
+   * Watch a UI layer and keep the puzzle clear of its chrome. Call once
+   * after the screen's panels exist; re-measured on every resize, so it
+   * stays right across breakpoints without per-screen tuning.
+   */
+  observeChrome(host: HTMLElement): void {
+    this.chromeHost = host;
+    this.resize();
+  }
+
+  /** Chrome selectors, by the edge they occupy. */
+  private static readonly CHROME = {
+    top: ['.top-bar', '.gw-sky-board', '.gw-queue-strip', '.gw-state-map'],
+    bottom: ['.bottom-deck', '.beat-seq'],
+    left: ['.goal-card', '.gw-jobcard', '.gw-paint-board'],
+    right: ['.gw-trail'],
+  };
+
+  private measureChrome(): void {
+    const host = this.chromeHost;
+    if (!host) return;
+    const box = host.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) return;
+    const next = { top: 0, right: 0, bottom: 0, left: 0 };
+    const intrude = (sel: string[], edge: 'top' | 'right' | 'bottom' | 'left'): void => {
+      for (const s of sel) {
+        for (const node of Array.from(host.querySelectorAll(s))) {
+          const r = (node as HTMLElement).getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          const d = edge === 'top' ? r.bottom - box.top
+            : edge === 'bottom' ? box.bottom - r.top
+              : edge === 'left' ? r.right - box.left
+                : box.right - r.left;
+          // Weight by how much of that edge the panel actually spans: a
+          // full-width bar blocks the view completely, but a small corner
+          // card only clips a corner — reserving its full width would
+          // shove the puzzle off-centre for no reason.
+          const cover = (edge === 'top' || edge === 'bottom')
+            ? r.width / box.width
+            : r.height / box.height;
+          next[edge] = Math.max(next[edge], d * Math.min(1, cover));
+        }
+      }
+    };
+    intrude(Stage.CHROME.top, 'top');
+    intrude(Stage.CHROME.bottom, 'bottom');
+    intrude(Stage.CHROME.left, 'left');
+    intrude(Stage.CHROME.right, 'right');
+    next.top = Math.round(next.top);
+    next.bottom = Math.round(next.bottom);
+    next.left = Math.round(next.left);
+    next.right = Math.round(next.right);
+    // Never let chrome claim so much that nothing is left to play in.
+    next.top = Math.min(next.top, box.height * 0.32);
+    next.bottom = Math.min(next.bottom, box.height * 0.42);
+    next.left = Math.min(next.left, box.width * 0.26);
+    next.right = Math.min(next.right, box.width * 0.26);
+    this.insets = next;
+  }
+
+  /**
    * Fit-by-projection: place the camera along the view direction, project
    * every frame point, and dolly out until all of them land inside the
    * viewport with margin. Iterative (4 passes converge) and aspect-proof.
    */
   private applyFrame(): void {
-    const aspect = this.camera.aspect;
-    // Breathing room for UI chrome + idle bobs; portrait needs less
-    // horizontal slack (the deck sits below, the view is already shifted up).
-    const margin = aspect < 1 ? 1.08 : 1.2;
+    // Chrome is reserved via insets now, so this is just breathing room
+    // for idle bobs and shadows — keep it tight so the toy reads BIG.
+    const margin = 1.04;
     let dist = 11;
     const cam = this.camera;
     for (let pass = 0; pass < 4; pass++) {
@@ -170,7 +240,8 @@ export class Stage {
       let worst = 0;
       for (const pt of this.framePoints) {
         const p = pt.clone().project(cam);
-        worst = Math.max(worst, Math.abs(p.x), Math.abs(p.y));
+        // Measure against the FREE area, not the whole canvas.
+        worst = Math.max(worst, Math.abs(p.x) / this.fitX, Math.abs(p.y) / this.fitY);
       }
       const need = worst * margin;
       if (need <= 1 || this.framePoints.length === 0) break;
@@ -196,10 +267,16 @@ export class Stage {
     // the rest via applyFrame.
     const aspect = w / h;
     this.camera.fov = this.fovFor(aspect);
-    // Portrait phones: shift the scene upward so the bottom command deck
-    // never covers the puzzle (sprites project through the same matrix,
-    // so characters stay glued to their tiles).
-    if (aspect < 1) this.camera.setViewOffset(w, h, 0, Math.round(h * 0.085), w, h);
+    // Re-measure the chrome, then centre the puzzle in the space it
+    // leaves. A positive offset slides the frustum window, which moves
+    // the image the other way — so we push AWAY from the heavier edges.
+    this.measureChrome();
+    const { top, right, bottom, left } = this.insets;
+    this.fitX = Math.max(0.25, (w - left - right) / w);
+    this.fitY = Math.max(0.25, (h - top - bottom) / h);
+    const offX = Math.round((right - left) / 2);
+    const offY = Math.round((bottom - top) / 2);
+    if (offX !== 0 || offY !== 0) this.camera.setViewOffset(w, h, offX, offY, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
     this.applyFrame();

@@ -379,6 +379,41 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 }
 
 /* ============================================================
+   Rotate-to-play nudge (gameplay screens only, portrait phones)
+   ============================================================ */
+.rotate-nudge { display: none; }
+body.needs-landscape .rotate-nudge {
+  position: fixed; inset: 0; z-index: 400;
+  display: none; place-items: center;
+  background: radial-gradient(120% 90% at 50% 20%, #2a2158 0%, #12102e 75%);
+  padding: 24px;
+}
+@media (orientation: portrait) and (max-width: 950px) {
+  body.needs-landscape .rotate-nudge { display: grid; }
+  /* The play screen keeps running underneath — just don't let it scroll. */
+  body.needs-landscape { overflow: hidden; }
+}
+.rn-card {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-align: center; max-width: 320px;
+}
+.rn-phone {
+  font-size: 76px; line-height: 1;
+  animation: rnTilt 2.2s var(--ease-bounce) infinite;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,.45));
+}
+@keyframes rnTilt {
+  0%, 45% { transform: rotate(0deg); }
+  60%, 90% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+.rn-title {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: clamp(20px, 5.6vw, 28px); line-height: 1.2;
+}
+.rn-sub { color: #c7b3ff; font-weight: 700; font-size: clamp(13px, 3.6vw, 16px); }
+
+/* ============================================================
    Responsive landscape tuning
    ============================================================ */
 @media (max-aspect-ratio: 1/1) {
@@ -784,6 +819,8 @@ body.left-handed .deck-tools { right: auto; left: 6px; }
   .title-mascot.mixy { height: 27vh; bottom: 15%; }
   .btn-play { font-size: 20px; padding: 10px 34px; }
 }
+
+
 
 /* ============================================================
    Daily Bop card
@@ -2235,4 +2272,60 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   font-family: var(--font-display); font-weight: 800; font-size: 10px; letter-spacing: 1.5px;
   color: #5a3d00; background: #ffcf3e; border-radius: 999px; padding: 2px 10px;
   transform: rotate(-3deg);
+}
+
+/* ============================================================
+   Landscape phones — hand the screen back to the toy.
+   The camera now frames into the space chrome leaves, so every
+   pixel we save here becomes a bigger machine.
+   ============================================================ */
+@media (max-height: 540px) and (orientation: landscape) {
+  /* --- command tiles: labels must never clip --- */
+  .tile, .slot, .drag-ghost { width: 52px; height: 52px; border-radius: 13px; }
+  .tile { overflow: hidden; gap: 0; padding: 3px 2px; }
+  .tile .ico { font-size: 18px; }
+  .tile .cmd-ico { width: 25px; height: 25px; }
+  .tile .lbl {
+    font-size: 7px; line-height: 1.05; letter-spacing: 0;
+    max-width: 100%; word-break: break-word; hyphens: none;
+  }
+
+  /* --- goal card: a slim chip, not a poster --- */
+  .goal-card { max-width: 210px; padding: 6px 10px 6px 7px; gap: 6px; border-width: 2px; }
+  .goal-card .goal-flag { font-size: 8.5px; padding: 2px 8px; top: -9px; left: 10px; }
+  .goal-visual { font-size: 17px; gap: 3px; }
+  .goal-visual img { height: 20px; }
+  .goal-text { font-size: 10px; line-height: 1.18; }
+
+  /* --- think trail: compact rail, never covers the cast --- */
+  .gw-trail {
+    width: 132px; padding: 11px 7px 7px;
+    top: calc(max(6px, var(--sat)) + 44px); bottom: auto; max-height: 58vh;
+  }
+  .gw-trail-title { font-size: 9.5px; padding: 2px 10px; top: -10px; }
+  .gw-trail-list { max-height: 34vh; gap: 4px; }
+  .gw-trail-step { font-size: 9.5px; padding: 4px 5px; gap: 4px; }
+  .gw-trail-step .n { width: 15px; height: 15px; font-size: 9px; }
+  .gw-trail-empty { font-size: 9.5px; }
+  .gw-machine-line { font-size: 10px; padding: 5px 6px; border-radius: 9px; }
+  .gw-name-chip { font-size: 9.5px; padding: 2px 8px; }
+
+  /* --- concept boards sit tight under the bar --- */
+  .gw-sky-board, .gw-queue-strip, .gw-state-map, .gw-paint-board {
+    top: calc(max(6px, var(--sat)) + 42px); padding: 5px 8px 6px;
+  }
+  .sky-chip, .sm-chip { width: 50px; padding: 5px 4px 4px; }
+  .queue-chip { width: 44px; padding: 5px 4px 4px; }
+  .sky-label, .sm-label, .q-house { font-size: 8.5px; }
+  .sky-emoji, .sm-emoji, .q-emoji { font-size: 17px; }
+  .sky-title, .sm-title, .pb-title, .queue-front { font-size: 8.5px; letter-spacing: 1px; }
+  .pb-cell { width: 15px; height: 15px; }
+
+  /* --- deck + actions --- */
+  .deck-panel { padding: 5px 8px; gap: 6px; }
+  .deck-tools { bottom: calc(100% + 4px); gap: 5px; }
+  .deck-tools .mini-btn { font-size: 11px; padding: 5px 10px; }
+  .bop-btn { height: 54px; font-size: 18px; padding: 0 18px; }
+  .bop-btn .tri { border-left-width: 13px; border-top-width: 9px; border-bottom-width: 9px; }
+  .gw-jobcard, .gw-gadget { transform: scale(.82); transform-origin: left top; }
 }

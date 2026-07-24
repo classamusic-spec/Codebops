@@ -66,10 +66,33 @@ export class App {
   }
 
   start(): void {
+    this.buildRotateNudge();
     this.showTitle();
   }
 
+  /**
+   * The play screens are designed landscape — a phone held upright leaves
+   * the machine squeezed into a thin band. Menus are fine either way, so
+   * this only appears (via `body.needs-landscape`) on gameplay screens.
+   */
+  private buildRotateNudge(): void {
+    if (document.querySelector('.rotate-nudge')) return;
+    const n = el('div', 'rotate-nudge', document.body);
+    n.setAttribute('role', 'alertdialog');
+    n.setAttribute('aria-label', 'Turn your phone sideways to play');
+    const card = el('div', 'rn-card', n);
+    el('div', 'rn-phone', card, '📱');
+    el('div', 'rn-title', card, 'Turn your phone sideways!');
+    el('div', 'rn-sub', card, 'The workshop is much bigger this way 🔧');
+  }
+
+  /** Gameplay screens want landscape; menus do not. */
+  private setNeedsLandscape(on: boolean): void {
+    document.body.classList.toggle('needs-landscape', on);
+  }
+
   private clearHost(): void {
+    this.setNeedsLandscape(false);
     this.mascotStops.forEach((s) => s());
     this.mascotStops = [];
     this.gameScreen?.dispose();
@@ -380,6 +403,7 @@ export class App {
 
   private showGame(index: number, opts: { onSuccess?: () => void } = {}): void {
     this.clearHost();
+    this.setNeedsLandscape(true);
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-game';
     const level = ALL_LEVELS[index];
@@ -395,6 +419,7 @@ export class App {
 
   private showCustomGame(level: LevelDef): void {
     this.clearHost();
+    this.setNeedsLandscape(true);
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-game';
     this.gameScreen = new GameScreen(screen, level, {
@@ -410,6 +435,7 @@ export class App {
 
   private showGearworks(index: number): void {
     this.clearHost();
+    this.setNeedsLandscape(true);
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-gearworks';
     const entry = GEARWORKS_SEQUENCE[index];
@@ -490,6 +516,7 @@ export class App {
       onBack: () => this.showSelect(),
       onPlay: (level) => {
         this.clearHost();
+        this.setNeedsLandscape(true);
         const gameHost = el('section', 'screen', this.host);
         gameHost.id = 'screen-game';
         this.gameScreen = new GameScreen(gameHost, level, {

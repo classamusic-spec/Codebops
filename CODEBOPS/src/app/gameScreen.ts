@@ -146,6 +146,12 @@ export class GameScreen {
       ];
       const center = this.world.cellToWorld((l.cols - 1) / 2, (l.rows - 1) / 2);
       center.y = 0.2;
+      // GlitchBop watches from a perch off the grid. Pull the framing most
+      // of the way toward that perch so the cast (and the scenery around
+      // it) reads as part of the scene instead of being cropped away.
+      const perch = this.world.mixyLookout().clone();
+      perch.y = 0.2;
+      framePts.push(center.clone().lerp(perch, 0.82));
       this.stage.frameArea(center, framePts);
     }
 
@@ -245,6 +251,8 @@ export class GameScreen {
     });
     this.disposers.push(offTick);
     this.stage.startLoop();
+    // Frame the puzzle into the space the UI chrome leaves, not the whole canvas.
+    this.stage.observeChrome(ui);
 
     this.applySettings();
 
