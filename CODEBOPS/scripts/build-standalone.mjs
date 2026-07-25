@@ -151,9 +151,11 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#16225c" />
 <title>CodeBops — Playable Test Build</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+<!-- No webfont link here, deliberately. This file is meant to be opened
+     from a USB stick with no network, and a remote font request would both
+     break that and send a child's IP to a third party for nothing. The
+     font stacks in tokens.css fall back to the platform's rounded UI
+     face, which is what the design wanted anyway. -->
 <style>${css}</style>
 <script>${shim}</script>
 </head>

@@ -37,8 +37,12 @@
   --wood-deep: #8d5a2b;
 
   /* Type */
-  --font-display: 'Fredoka', 'Nunito', system-ui, sans-serif;
-  --font-body: 'Nunito', 'Fredoka', system-ui, sans-serif;
+  /* The webfonts come first when they load. Everything after them is the
+     fallback chain for an offline build: `ui-rounded` is SF Pro Rounded on
+     Apple platforms, then the rounded faces Windows and Android ship, so
+     the friendly look survives with no network at all. */
+  --font-display: 'Fredoka', 'Nunito', ui-rounded, 'Arial Rounded MT Bold', 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-body: 'Nunito', 'Fredoka', ui-rounded, 'Segoe UI', Roboto, system-ui, sans-serif;
 
   /* Shape */
   --r-sm: 10px;
