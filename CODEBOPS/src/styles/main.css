@@ -378,17 +378,62 @@ button { font-family: inherit; border: 0; cursor: pointer; }
   background: rgba(13,20,55,.4); border-radius: var(--r-md); padding: 10px 16px;
   font-weight: 900; color: #e8eeff; font-size: clamp(14px, 1.6vw, 17px);
 }
+/* The switch still LOOKS like a 34px track, but the thing a finger has to
+   hit is the full 44 — the track is drawn by ::before inside a taller
+   button rather than the button being the track (§14). */
 .toggle {
+  width: 64px; height: 44px; min-height: 44px; position: relative;
+  background: none; border: none; padding: 0; flex: 0 0 auto;
+}
+.toggle::before {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   width: 64px; height: 34px; border-radius: var(--r-pill);
-  background: var(--ink-900); position: relative; box-shadow: inset 0 2px 6px rgba(0,0,0,.5);
+  background: var(--ink-900); box-shadow: inset 0 2px 6px rgba(0,0,0,.5);
   transition: background var(--dur-med);
 }
 .toggle::after {
-  content: ''; position: absolute; top: 4px; left: 4px; width: 26px; height: 26px;
+  content: ''; position: absolute; top: 50%; left: 4px; margin-top: -13px;
+  width: 26px; height: 26px;
   border-radius: 50%; background: #8f9bd6; transition: left var(--dur-med) var(--ease-bounce), background var(--dur-med);
 }
-.toggle[aria-pressed="true"] { background: var(--green-deep); }
+.toggle[aria-pressed="true"]::before { background: var(--green-deep); }
 .toggle[aria-pressed="true"]::after { left: 34px; background: var(--green); }
+
+/* ============================================================
+   Tap-target floor (App Lab §14)
+
+   Found by measuring every visible control in a real browser, not by
+   reading the stylesheet: these all rendered between 32 and 42px tall.
+   Three-year-old fingers are not precise, so 44px is the floor and the
+   padding is what gives, never the label.
+   ============================================================ */
+.al-station-open, .al-library-btn, .tp-theme, .cr-tool, .cr-tool.save,
+.lb-cast-chip, .sb-bin, .pm-exit, .pm-restart, .pm-peek, .pm-debug,
+.mini-btn, .cr-scene-tab, .dbg-chip, .acp-toggle {
+  min-height: 44px;
+}
+.pm-exit, .pm-restart, .cr-tool, .cr-tool.save { min-width: 44px; }
+
+/* Visible to a screen reader, invisible on screen (App Lab §14). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ---- watching speed: how long a child looks at each step (§14) ---- */
+.setting-row.speed-row { flex-wrap: wrap; gap: 8px; }
+.speed-picker { display: flex; gap: 6px; }
+.speed-btn {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 64px; min-height: 44px; cursor: pointer; font: inherit;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.16);
+  border-radius: var(--r-lg); padding: 5px 8px; color: #cfe4ff;
+  font-weight: 800; font-size: 11px;
+}
+.speed-btn span:first-child { font-size: 17px; }
+.speed-btn.on {
+  background: linear-gradient(180deg, #8fe3ff, #4fb8e8); border-color: #d8f4ff; color: #0b2340;
+}
 
 /* Confetti pieces (DOM) */
 .confetti { position: absolute; top: -20px; z-index: 45; pointer-events: none; border-radius: 3px; animation: confetti-fall linear both; }
@@ -451,6 +496,22 @@ body.high-contrast {
 }
 body.high-contrast .deck-panel, body.high-contrast .title-pill, body.high-contrast .stars-pill { border-color: #fff; }
 body.high-contrast .slot { border-color: rgba(255,255,255,.8); }
+
+/* ---- App Lab in high contrast (§14): edges everywhere, no faint text ---- */
+body.high-contrast .al-station, body.high-contrast .lib-card,
+body.high-contrast .al-shelf, body.high-contrast .al-collect,
+body.high-contrast .tp-theme, body.high-contrast .tp-card,
+body.high-contrast .cr-step, body.high-contrast .lib-btn,
+body.high-contrast .speed-btn, body.high-contrast .cc-row,
+body.high-contrast .camp-built-row { border-color: #fff; }
+body.high-contrast .al-titles p, body.high-contrast .lib-titles p,
+body.high-contrast .cr-subtitle, body.high-contrast .lib-sub,
+body.high-contrast .al-station-blurb, body.high-contrast .cc-line,
+body.high-contrast .cb-what { color: #fff; }
+body.high-contrast .lib-chip, body.high-contrast .al-concept-chip { color: #fff; background: #000; }
+/* Never communicate "not yet" with opacity alone — the dashes carry it. */
+body.high-contrast .al-collect.waiting, body.high-contrast .tp-theme.waiting,
+body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 
 /* ============================================================
    Character sprites (traced canon SVGs in the 3D world)
@@ -771,6 +832,16 @@ svg .cb-glitch-bit { animation: cb-glitch-bit 3.6s steps(1, end) infinite; }
 /* Left-handed mode: BOP on the left */
 body.left-handed .bottom-deck { flex-direction: row-reverse; }
 body.left-handed .deck-tools { right: auto; left: 6px; }
+
+/* ---- App Lab for a left-handed child (§14) ----
+   The controls a hand rests on move to the left, so a hand reaching for
+   them stops covering the thing it is about to change. Reading order in
+   the DOM is untouched, so a screen reader is unaffected. */
+body.left-handed .cr-head, body.left-handed .al-header,
+body.left-handed .lib-header, body.left-handed .tp-head { flex-direction: row-reverse; }
+body.left-handed .cr-toolbar, body.left-handed .lib-actions,
+body.left-handed .pm-bar, body.left-handed .dlg-actions,
+body.left-handed .dialog-actions { flex-direction: row-reverse; }
 
 /* ============================================================
    Extra UI polish
@@ -3442,6 +3513,16 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   background: #2a2350; color: #fff7e2; border: 3px solid rgba(255,255,255,.28);
   border-radius: 999px; padding: 7px 15px; font-weight: 800; font-size: 12.5px;
   max-width: 92%; text-align: center; z-index: 5;
+}
+
+/* The written form of a sound, for a child who cannot hear it (§14).
+   It sits above .pm-note so the two never cover each other. */
+.pm-caption {
+  position: absolute; left: 50%; bottom: 56px; transform: translateX(-50%);
+  background: rgba(11,20,45,.92); color: #d8f4ff;
+  border: 2px solid rgba(143,227,255,.5); border-radius: var(--r-lg);
+  padding: 5px 13px; font-weight: 800; font-size: 12.5px;
+  max-width: 92%; text-align: center; z-index: 6;
 }
 
 .cr-guess-note {

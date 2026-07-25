@@ -40,6 +40,7 @@ import type { CreatorState } from '../creator/miniAppMode';
 import { initialCreatorState, applyCreatorAction, showsEditingChrome } from '../creator/miniAppMode';
 import { APP_LAB_THEMES } from '../data/app-lab/approvedAssets';
 import { sceneName } from '../creator/miniAppChoices';
+import { isTestSpeed, speak, speechAvailable, announce } from '../ui/a11y';
 import { factsFor, evidenceForCreation } from '../creator/miniAppEvidence';
 import { makerRecord, newlyEarned, earnedRewards } from '../data/app-lab/creatorRewards';
 import { showCreatorCelebration } from '../ui/app-lab/creatorCelebration';
@@ -111,6 +112,21 @@ export class AppCreatorScreen {
     const subtitle = el('p', 'cr-subtitle', titles, 'Pick something to start with.');
     subtitle.id = 'cr-subtitle';
 
+    // Read-it-to-me. Only offered when the browser can actually speak, and
+    // it reads the instruction on the screen — never anything a child
+    // typed, because there is nowhere in the App Lab to type (§14).
+    if (speechAvailable()) {
+      const readBtn = el('button', 'circle-btn cr-read', head, '🗣️') as HTMLButtonElement;
+      readBtn.type = 'button';
+      readBtn.setAttribute('aria-label', 'Read this out loud');
+      readBtn.addEventListener('click', () => {
+        sharedSfx.play('tap');
+        // A tap means "read it now", whether or not the always-on setting
+        // is on, so a child never has to visit Settings to hear one line.
+        speak(subtitle.textContent ?? '', true);
+      });
+    }
+
     this.stepBar = el('div', 'cr-steps', this.root);
     this.stepBar.setAttribute('aria-label', 'Where you are');
     this.body = el('div', 'cr-body', this.root);
@@ -175,12 +191,11 @@ export class AppCreatorScreen {
     this.play?.dispose(); this.play = null;
     this.debug?.dispose(); this.debug = null;
     this.body.innerHTML = '';
-    const subtitle = document.getElementById('cr-subtitle');
 
     switch (this.creator.step) {
       case 'template': {
         if (!this.kit) { this.exit(); return; }
-        if (subtitle) subtitle.textContent = 'Pick something to start with.';
+        this.say('Pick something to start with.');
         const picker = new TemplatePicker(this.body, this.kit, {
           onPick: (starter, themeId) => this.startFrom(starter, themeId),
           onBack: () => this.exit(),
@@ -202,7 +217,7 @@ export class AppCreatorScreen {
       }
       case 'build': {
         if (!this.editor) return;
-        if (subtitle) subtitle.textContent = 'Put things on the screen.';
+        this.say('Put things on the screen.');
         this.renderSceneTabs();
         this.sceneBuilder = new SceneBuilder(this.body, this.editor.project, this.sceneId, {
           onAdd: (type, assetId, slotId) => this.apply(addComponent(this.editor!, {
@@ -218,7 +233,7 @@ export class AppCreatorScreen {
       }
       case 'teach': {
         if (!this.editor) return;
-        if (subtitle) subtitle.textContent = 'Teach it what to do.';
+        this.say('Teach it what to do.');
         this.logicBuilder = new LogicBuilder(this.body, this.editor.project, {
           onSelectOwner: (id) => { this.selectedId = id; },
           onAddScript: (ownerId, trigger) => this.apply(addScript(this.editor!, {
@@ -238,7 +253,7 @@ export class AppCreatorScreen {
       }
       case 'predict': {
         if (!this.editor) return;
-        if (subtitle) subtitle.textContent = 'Guess what will happen.';
+        this.say('Guess what will happen.');
         this.prediction = new PredictionPanel(this.body, this.editor.project, {
           onAnswer: (correct) => {
             this.predictedCorrectly = correct;
@@ -250,18 +265,29 @@ export class AppCreatorScreen {
       }
       case 'play': {
         if (!this.editor) return;
-        if (subtitle) subtitle.textContent = 'Play Mode — this is your app.';
+        this.say('Play Mode — this is your app.');
         this.renderPlay();
         break;
       }
       case 'debug': {
-        if (subtitle) subtitle.textContent = 'What happened?';
+        this.say('What happened?');
         this.renderDebug();
         break;
       }
       default:
         break;
     }
+  }
+
+  /**
+   * The one line that says what to do now: shown, announced to a screen
+   * reader, and read aloud when a grown-up has turned that on (§14).
+   */
+  private say(text: string): void {
+    const subtitle = document.getElementById('cr-subtitle');
+    if (subtitle) subtitle.textContent = text;
+    announce(text);
+    speak(text, this.store.settings.spokenInstructions);
   }
 
   /** Story apps have up to three scenes; the others quietly skip this. */
@@ -296,7 +322,12 @@ export class AppCreatorScreen {
         : 'Your app had a different idea. Watch what it really does.');
     }
 
-    this.play = new AppPlayMode(this.body, this.editor.project, this.store.settings.calmMode, {
+    const s = this.store.settings;
+    this.play = new AppPlayMode(this.body, this.editor.project, {
+      calm: s.calmMode,
+      speed: isTestSpeed(s.testSpeed) ? s.testSpeed : 'normal',
+      captions: s.captions === true,
+    }, {
       onExit: () => this.go({ kind: 'editFromDebug' }),
       onPeek: () => this.showCodePeek(),
       onDebug: (events) => {

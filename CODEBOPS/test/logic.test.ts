@@ -204,6 +204,8 @@ import {
 } from '../src/data/app-lab/creatorRewards';
 import type { MakerRecord } from '../src/data/app-lab/creatorRewards';
 import { isApprovedTheme } from '../src/data/app-lab/approvedAssets';
+// ---- App Lab Phase 14 ----
+import { TEST_SPEEDS, speedFactor, isTestSpeed } from '../src/ui/a11y';
 // ---- App Lab Phase 2 ----
 import {
   initialEditorState, addComponent, removeComponent, moveComponent, addScript, removeScript,
@@ -3313,6 +3315,82 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const src = readFileSync('src/ui/app-lab/creatorCelebration.ts', 'utf8');
     return src.includes('scrim.remove()') && !/setInterval|requestAnimationFrame/.test(src);
   })());
+}
+
+// ============================================================
+// App Lab Phase 14 — getting there for everybody
+// ============================================================
+{
+  const css = readFileSync('src/styles/main.css', 'utf8');
+  const a11y = readFileSync('src/ui/a11y.ts', 'utf8');
+
+  check('there are three watching speeds and one of them is normal',
+    TEST_SPEEDS.length === 3 && TEST_SPEEDS.some((s) => s.id === 'normal'));
+  check('gentle is slower than normal, and quick is faster',
+    speedFactor('gentle') > speedFactor('normal') && speedFactor('quick') < speedFactor('normal'));
+  check('an unknown or missing speed falls back to normal, never to zero',
+    speedFactor(undefined) === 1 && speedFactor('nonsense' as never) === 1);
+  check('no watching speed is fast enough to skip a step',
+    TEST_SPEEDS.every((s) => s.factor >= 0.5));
+  check('speed labels are child words, not numbers',
+    TEST_SPEEDS.every((s) => !/\d|x$|ms|second/i.test(s.label)));
+  check('isTestSpeed only accepts a real speed',
+    isTestSpeed('gentle') && !isTestSpeed('turbo') && !isTestSpeed(undefined));
+
+  check('speech is output only — nothing listens, records, or uploads',
+    !/getUserMedia|MediaRecorder|SpeechRecognition|webkitSpeechRecognition|fetch\(|XMLHttpRequest/
+      .test(a11y));
+  check('speech degrades to nothing when the browser has none',
+    a11y.includes('if (!s) return;') && a11y.includes('speechAvailable'));
+  check('reading aloud is off unless somebody turned it on',
+    a11y.includes('if (!enabled') );
+  check('the live region replaces its message rather than queueing',
+    a11y.includes("region.textContent = ''"));
+
+  check('the accessibility settings are applied on every screen change', (() => {
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    // clearHost runs before every screen is built, so a menu gets the
+    // same calm mode / contrast / handedness a play screen does.
+    const at = app.indexOf('private clearHost');
+    return at > 0 && app.slice(at, at + 700).includes('applyAccessibility');
+  })());
+  check('every accessibility mode has a switch a grown-up can find', (() => {
+    const dlg = readFileSync('src/ui/dialogs.ts', 'utf8');
+    return ['calmMode', 'highContrast', 'leftHanded', 'captions', 'spokenInstructions']
+      .every((k) => dlg.includes(`'${k}'`));
+  })());
+
+  check('there is a screen-reader-only class that really hides on screen',
+    /\.sr-only\s*\{[^}]*clip-path:\s*inset\(50%\)/.test(css));
+  check('App Lab honours calm mode and the OS reduce-motion setting alike',
+    css.includes('.calm-mode .al-collect') && css.includes('prefers-reduced-motion'));
+  check('high contrast reaches the App Lab, not only the play screen',
+    css.includes('body.high-contrast .al-station') && css.includes('body.high-contrast .lib-card'));
+  check('"not yet" is never carried by opacity alone in high contrast',
+    /body\.high-contrast[^{]*\.waiting[^{]*\{[^}]*opacity:\s*1/.test(css));
+  check('the left-handed layout reaches the App Lab too',
+    css.includes('body.left-handed .cr-toolbar') && css.includes('body.left-handed .lib-actions'));
+  check('every App Lab tap target is at least 44px', (() => {
+    // The rule the audit enforces: any App Lab button class that sets its
+    // own size must set a min of 44 (or inherit one that does).
+    const classes = ['.lib-btn', '.speed-btn', '.al-collect'];
+    return classes.every((c) => {
+      const at = css.indexOf(`${c} {`);
+      if (at < 0) return false;
+      const block = css.slice(at, css.indexOf('}', at));
+      return /min-height:\s*44px/.test(block) || /min-\w+:\s*(4[4-9]|[5-9]\d)px/.test(block);
+    });
+  })());
+
+  check('watching speed changes only how long a child looks, never the result', (() => {
+    // The run is computed before any playback, so speed cannot reach it.
+    const pm = readFileSync('src/ui/app-lab/appPlayMode.ts', 'utf8');
+    const runtime = readFileSync('src/creator/miniAppRuntime.ts', 'utf8');
+    return pm.includes('speedFactor(this.options.speed)')
+      && !/speedFactor|TestSpeed|captions/.test(runtime);
+  })());
+  check('a sound always has words available for it',
+    APPROVED_SOUNDS.every((s) => typeof s.label === 'string' && s.label.length > 0));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

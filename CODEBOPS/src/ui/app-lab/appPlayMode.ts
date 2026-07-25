@@ -24,10 +24,21 @@ import { approvedAsset, APP_LAB_THEMES } from '../../data/app-lab/approvedAssets
 import { approvedSound, preparedPhrase } from '../../data/app-lab/approvedSounds';
 import type { PreparedPhraseId } from '../../creator/miniAppTypes';
 import { sceneLayout } from '../../data/app-lab/sceneLayouts';
+import { speedFactor, announce } from '../a11y';
+import type { TestSpeed } from '../a11y';
 
 /** Milliseconds per beat. Calm mode slows everything down together. */
 const BEAT_MS = 260;
 const CALM_BEAT_MS = 420;
+
+/** How a child wants to watch their app run (§14). */
+export interface PlayModeOptions {
+  readonly calm: boolean;
+  /** 'gentle' | 'normal' | 'quick' — from Settings. */
+  readonly speed?: TestSpeed;
+  /** Show the words for every sound the app plays. */
+  readonly captions?: boolean;
+}
 
 export interface PlayModeEvents {
   readonly onExit: () => void;
@@ -58,12 +69,15 @@ export class AppPlayMode {
   /** Approvals already given this run, replayed so the run is reproducible. */
   private approvals: boolean[] = [];
 
+  private readonly calm: boolean;
+
   constructor(
     parent: HTMLElement,
     private readonly project: MiniAppProject,
-    private readonly calm: boolean,
+    private readonly options: PlayModeOptions,
     private readonly events: PlayModeEvents,
   ) {
+    this.calm = options.calm;
     this.state = initialRuntimeState(project);
     this.root = el('div', 'pm-wrap', parent);
     this.build();
@@ -73,7 +87,15 @@ export class AppPlayMode {
     }
   }
 
-  private beat(): number { return this.calm ? CALM_BEAT_MS : BEAT_MS; }
+  /**
+   * One beat, stretched or shortened by the watching-speed setting. Speed
+   * only ever changes how long a child LOOKS at each step — the run
+   * itself is computed before any of this, so nothing about the result
+   * depends on how fast it is played back.
+   */
+  private beat(): number {
+    return Math.round((this.calm ? CALM_BEAT_MS : BEAT_MS) * speedFactor(this.options.speed));
+  }
 
   private theme(): { sky: string } {
     return APP_LAB_THEMES.find((t) => t.id === this.project.themeId) ?? { sky: '#7ec8ff' };
@@ -312,7 +334,13 @@ export class AppPlayMode {
         }, this.beat()));
       }
       this.flash(event);
-      if (event.sound) sharedSfx.play(approvedSound(event.sound)?.voice ?? 'tap');
+      if (event.sound) {
+        sharedSfx.play(approvedSound(event.sound)?.voice ?? 'tap');
+        // A sound nobody can hear should still be readable (§14).
+        const words = approvedSound(event.sound)?.label ?? 'a sound';
+        if (this.options.captions) this.caption(`🔊 ${words}`);
+        announce(`${words} played.`);
+      }
       if (event.outcome.kind !== 'done') {
         this.sawSomethingOdd = true;
         this.note(event.outcome.kind === 'unsupported'
@@ -346,6 +374,13 @@ export class AppPlayMode {
     return new Promise((resolve) => {
       this.timers.push(window.setTimeout(resolve, ms));
     });
+  }
+
+  /** The written form of a sound, for a child who cannot hear it. */
+  private caption(text: string): void {
+    this.root.querySelector('.pm-caption')?.remove();
+    const n = el('div', 'pm-caption', this.root, text);
+    this.timers.push(window.setTimeout(() => n.remove(), Math.max(1400, this.beat() * 5)));
   }
 
   private note(text: string): void {

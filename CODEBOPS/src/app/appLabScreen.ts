@@ -20,6 +20,8 @@ import type { AppKitDefinition } from '../data/app-lab/appLabDefinition';
 import { templatesForType } from '../creator/miniAppTemplateRegistry';
 import { MiniAppStore } from '../storage/miniAppStore';
 import { hasDraft } from '../storage/miniAppDraft';
+import { showSettings } from '../ui/dialogs';
+import { applyAccessibility } from '../ui/a11y';
 import {
   CREATOR_REWARDS, makerRecord, earnedRewards,
 } from '../data/app-lab/creatorRewards';
@@ -59,6 +61,20 @@ export class AppLabScreen {
     const titles = el('div', 'al-titles', header);
     el('h1', undefined, titles, `${APP_LAB_WORLD.glyph} ${APP_LAB_WORLD.name}`);
     el('p', undefined, titles, APP_LAB_WORLD.tagline);
+
+    // Settings used to live only on a play screen's deck, which put calm
+    // mode, contrast, handedness and watching speed out of reach of a
+    // child who came straight to the Lab (§14).
+    const settingsBtn = el('button', 'circle-btn al-settings', header, '⚙️') as HTMLButtonElement;
+    settingsBtn.type = 'button';
+    settingsBtn.setAttribute('aria-label', 'Settings');
+    settingsBtn.addEventListener('click', () => {
+      sharedSfx.play('tap');
+      showSettings(this.root, this.store, sharedSfx, () => {
+        applyAccessibility(this.store.settings);
+        sharedSfx.enabled = this.store.settings.sound;
+      });
+    });
 
     const libBtn = el('button', 'al-library-btn', header) as HTMLButtonElement;
     libBtn.type = 'button';

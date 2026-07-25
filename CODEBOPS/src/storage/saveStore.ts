@@ -27,6 +27,12 @@ export interface SaveData {
     leftHanded: boolean;
     /** Grown-ups may hide Code Peek's JavaScript view (App Lab §20). */
     hideRealCode?: boolean;
+    /** Read instructions aloud on this device — output only (§14). */
+    spokenInstructions?: boolean;
+    /** Show a written caption whenever a sound plays (§14). */
+    captions?: boolean;
+    /** How fast a test run plays: 'gentle' | 'normal' | 'quick' (§14). */
+    testSpeed?: string;
   };
   /** Daily Bop progress. */
   daily: {

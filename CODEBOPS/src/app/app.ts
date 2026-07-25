@@ -30,6 +30,7 @@ import { APP_LAB_WORLD } from '../data/app-lab/appLabDefinition';
 import { garageTotals } from '../data/gearworks/progress';
 import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
+import { applyAccessibility, stopSpeaking } from '../ui/a11y';
 import { JourneyScreen } from './journeyScreen';
 import { AppLabScreen } from './appLabScreen';
 import { AppCreatorScreen } from './appCreatorScreen';
@@ -91,6 +92,11 @@ export class App {
 
   private clearHost(): void {
     this.setNeedsLandscape(false);
+    // Every screen change re-applies the accessibility settings, so calm
+    // mode / high contrast / left-handed reach the App Lab and the menus
+    // too rather than only the play screen that first set them (§14).
+    applyAccessibility(this.store.settings);
+    stopSpeaking();
     this.mascotStops.forEach((s) => s());
     this.mascotStops = [];
     this.gameScreen?.dispose();

@@ -5,6 +5,7 @@ import type { Sfx } from '../audio/sfx';
 import type { SaveStore } from '../storage/saveStore';
 import { showCodePeek } from './codePeek';
 import type { CodePeekInfo } from './codePeek';
+import { TEST_SPEEDS, isTestSpeed, speechAvailable } from './a11y';
 
 function scrim(parent: HTMLElement): HTMLElement {
   return el('div', 'dialog-scrim', parent);
@@ -267,25 +268,61 @@ export function showSettings(
   el('h2', undefined, d, '⚙️ Settings');
 
   const list = el('div', 'settings-list', d);
-  const rows: Array<{ key: 'sound' | 'calmMode' | 'highContrast'; label: string }> = [
+  type ToggleKey = 'sound' | 'calmMode' | 'highContrast' | 'leftHanded'
+    | 'captions' | 'spokenInstructions';
+  const rows: Array<{ key: ToggleKey; label: string; only?: boolean }> = [
     { key: 'sound', label: '🔊 Sound effects' },
     { key: 'calmMode', label: '🍃 Calm mode (softer motion)' },
     { key: 'highContrast', label: '🌗 High contrast' },
+    { key: 'leftHanded', label: '🤚 Left-handed layout' },
+    { key: 'captions', label: '💬 Show words for sounds' },
+    // Reading aloud happens on this device; nothing is recorded or sent.
+    { key: 'spokenInstructions', label: '🗣️ Read instructions aloud', only: speechAvailable() },
   ];
   for (const row of rows) {
+    if (row.only === false) continue;
     const r = el('div', 'setting-row', list);
     el('span', undefined, r, row.label);
     const t = el('button', 'toggle', r) as HTMLButtonElement;
     t.setAttribute('role', 'switch');
     t.setAttribute('aria-label', row.label);
-    t.setAttribute('aria-pressed', String(store.settings[row.key]));
+    t.setAttribute('aria-pressed', String(store.settings[row.key] === true));
     t.addEventListener('click', () => {
-      const next = !store.settings[row.key];
+      const next = store.settings[row.key] !== true;
       store.updateSettings({ [row.key]: next });
       t.setAttribute('aria-pressed', String(next));
       sfx.play('tap');
       onChange();
     });
+  }
+
+  // ---- how fast a test run plays (§14) ----
+  const speedRow = el('div', 'setting-row speed-row', list);
+  el('span', undefined, speedRow, '⏱️ Watching speed');
+  const speeds = el('div', 'speed-picker', speedRow);
+  speeds.setAttribute('role', 'radiogroup');
+  speeds.setAttribute('aria-label', 'Watching speed');
+  const current = isTestSpeed(store.settings.testSpeed) ? store.settings.testSpeed : 'normal';
+  const speedBtns: HTMLButtonElement[] = [];
+  for (const speed of TEST_SPEEDS) {
+    const b = el('button', `speed-btn${speed.id === current ? ' on' : ''}`, speeds) as HTMLButtonElement;
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(speed.id === current));
+    b.setAttribute('aria-label', speed.label);
+    el('span', undefined, b, speed.glyph);
+    el('span', undefined, b, speed.label);
+    b.addEventListener('click', () => {
+      store.updateSettings({ testSpeed: speed.id });
+      speedBtns.forEach((x, i) => {
+        const on = TEST_SPEEDS[i].id === speed.id;
+        x.classList.toggle('on', on);
+        x.setAttribute('aria-checked', String(on));
+      });
+      sfx.play('tap');
+      onChange();
+    });
+    speedBtns.push(b);
   }
 
   const btns = el('div', 'dialog-actions', d);
