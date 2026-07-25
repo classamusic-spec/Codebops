@@ -287,22 +287,34 @@ export class Stage {
     this.stopLoop();
     this.resizeObserver.disconnect();
     document.removeEventListener('visibilitychange', this.onVisibility);
+    // Anything that owns GPU memory, not just meshes. The worlds are full
+    // of THREE.Points — sparkles, petals, bubbles, fireflies, spores — and
+    // a Points is not a Mesh, so every one of them used to survive the
+    // level it belonged to.
     this.scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        obj.geometry.dispose();
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const m of mats) {
-          // Cached toon materials + gradient/shadow textures outlive the
-          // stage — disposing them would poison every later level.
-          if (m.userData?.shared) continue;
-          for (const v of Object.values(m)) {
-            if (v instanceof THREE.Texture && !v.userData?.shared) v.dispose();
-          }
-          m.dispose();
+      const holder = obj as Partial<THREE.Mesh> & THREE.Object3D;
+      if (holder.geometry) holder.geometry.dispose();
+      if (!holder.material) return;
+      const mats = Array.isArray(holder.material) ? holder.material : [holder.material];
+      for (const m of mats) {
+        // Cached toon materials + gradient/shadow textures outlive the
+        // stage — disposing them would poison every later level.
+        if (m.userData?.shared) continue;
+        for (const v of Object.values(m)) {
+          if (v instanceof THREE.Texture && !v.userData?.shared) v.dispose();
         }
+        m.dispose();
       }
     });
+    this.scene.clear();
     this.renderer.dispose();
+    // dispose() frees what Three uploaded; it does NOT release the WebGL
+    // context, which lives on the canvas until something collects it. A
+    // browser allows about sixteen, and this app builds a new stage for
+    // every level a child opens — so without this the console starts
+    // announcing "Too many active WebGL contexts. Oldest context will be
+    // lost", and eventually a level opens to a blank screen.
+    this.renderer.forceContextLoss();
     this.canvas.remove();
   }
 }

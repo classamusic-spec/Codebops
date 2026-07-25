@@ -3509,6 +3509,26 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   // in the type system connects those two facts: a rig update that starts
   // using THREE.Sprite would throw at runtime, on a screen, in front of a
   // child. This is the check that makes that impossible.
+  // A browser allows about sixteen live WebGL contexts and this app builds
+  // a stage per level. renderer.dispose() frees what Three uploaded but
+  // leaves the context attached to the canvas, so without an explicit
+  // release the console starts announcing "Too many active WebGL
+  // contexts" and a later level opens blank.
+  check('the stage releases its WebGL context, not just its uploads', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /this\.renderer\.dispose\(\);/.test(src)
+      && /this\.renderer\.forceContextLoss\(\);/.test(src);
+  })());
+
+  // The worlds are full of THREE.Points — sparkles, petals, bubbles,
+  // fireflies, spores. A Points is not a Mesh, so a teardown that checks
+  // `instanceof THREE.Mesh` frees none of them.
+  check('the stage teardown frees points and lines, not only meshes', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    const teardown = src.slice(src.indexOf('dispose(): void'));
+    return !/instanceof THREE\.Mesh/.test(teardown) && /holder\.geometry/.test(teardown);
+  })());
+
   check('the Three shim covers every symbol the adapter uses', (() => {
     const adapter = readFileSync('src/vendor/codebops-rig/three-adapter.js', 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
