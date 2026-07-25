@@ -5,7 +5,7 @@ import { ALL_LEVELS } from '../data/levels';
 import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { deleteCustomLevel } from '../storage/customLevels';
-import { loadSvg } from '../rendering/spriteCharacter';
+import { loadSvg } from '../rendering/svgAsset';
 import { mountMascot } from '../rendering/mascotRig';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';

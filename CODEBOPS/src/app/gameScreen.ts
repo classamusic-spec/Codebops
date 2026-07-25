@@ -62,6 +62,8 @@ export class GameScreen {
   private predictedSuccess: boolean | null = null;
   private disposers: Array<() => void> = [];
   private playAccum = 0;
+  /** The world's own clock. Stops in calm mode, so the scenery stops. */
+  private ambient = 0;
   /** Agent Academy: the active helper rule + BopLens state. */
   private selectedRule: { trigger: string; action: 'grab' } | null = null;
   private lensGroup: THREE.Group | null = null;
@@ -110,7 +112,7 @@ export class GameScreen {
 
     // --- characters (traced canon SVGs) ---
     this.zip = new SpriteCharacter(
-      { svgUrl: './art/characters/zip/zip.svg', height: 1.78, name: 'zip' },
+      { who: 'zip', height: 1.78, name: 'zip' },
       this.charLayer, this.stage.camera, wrap,
     );
     this.zip.addToScene(this.stage.scene);
@@ -119,7 +121,7 @@ export class GameScreen {
 
     if (this.level.botStart) {
       this.bolt = new SpriteCharacter(
-        { svgUrl: './art/characters/zip/zip.svg', height: 1.62, name: 'bolt', extraClass: 'robot-bop' },
+        { who: 'zip', height: 1.62, name: 'bolt', tint: '#7ee0b8' },
         this.charLayer, this.stage.camera, wrap,
       );
       this.bolt.addToScene(this.stage.scene);
@@ -127,7 +129,7 @@ export class GameScreen {
     }
 
     this.mixy = new SpriteCharacter(
-      { svgUrl: './art/characters/mixy/mixy.svg', height: 1.55, name: 'mixy', mixy: true },
+      { who: 'mixy', height: 1.55, name: 'mixy' },
       this.charLayer, this.stage.camera, wrap,
     );
     this.mixy.addToScene(this.stage.scene);
@@ -239,15 +241,25 @@ export class GameScreen {
 
     // --- tick ---
     const offTick = this.stage.onTick((dt, elapsed) => {
-      // Calm mode stills the wind along with everything else — the world's
-      // update takes the strength rather than each prop checking a setting.
-      this.world.update(dt, elapsed, this.store.settings.calmMode ? 0 : 1);
+      // Calm mode stops the world's AMBIENT CLOCK rather than the wind
+      // alone. Passing windStrength 0 only ever stilled the swaying props
+      // and the butterflies — the clouds still drifted, the gulls still
+      // flapped, the fireflies still pulsed, the beacon still blinked, the
+      // water still scrolled. Every one of those is driven by `elapsed`
+      // or by `+= dt`, so freezing both is what actually makes the
+      // setting true, and it holds for anything added to a world later
+      // without that prop having to remember the rule. The Gearworks
+      // screens already skip their scene update in calm mode; this is the
+      // story worlds catching up.
+      const calm = this.store.settings.calmMode;
+      if (!calm) this.ambient += dt;
+      this.world.update(calm ? 0 : dt, this.ambient, calm ? 0 : 1);
       this.zip.update(dt, elapsed);
       this.bolt?.update(dt, elapsed);
       this.mixy.update(dt, elapsed);
       // BopLens rings breathe so trigger cells feel alive
       if (this.lensGroup) {
-        const pulse = 1 + Math.sin(elapsed * 4) * 0.12;
+        const pulse = calm ? 1 : 1 + Math.sin(elapsed * 4) * 0.12;
         for (const child of this.lensGroup.children) {
           child.scale.setScalar(pulse);
           child.rotation.z = elapsed * 0.9;

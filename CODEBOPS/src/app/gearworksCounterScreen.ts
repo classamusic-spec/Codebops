@@ -96,7 +96,7 @@ export class GearworksCounterScreen {
 
     // --- mascots ---
     this.zip = new SpriteCharacter(
-      { svgUrl: './art/characters/zip/zip.svg', height: 2.35, name: 'zip' },
+      { who: 'zip', height: 2.35, name: 'zip' },
       this.charLayer, this.stage.camera, wrap,
     );
     this.zip.addToScene(this.stage.scene);
@@ -105,7 +105,7 @@ export class GearworksCounterScreen {
     this.addNameChip(this.zip, 'Zip');
 
     this.mixy = new SpriteCharacter(
-      { svgUrl: './art/characters/mixy/mixy.svg', height: 2.1, name: 'mixy', mixy: true },
+      { who: 'mixy', height: 2.1, name: 'mixy' },
       this.charLayer, this.stage.camera, wrap,
     );
     this.mixy.addToScene(this.stage.scene);

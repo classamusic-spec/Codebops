@@ -21,7 +21,7 @@
  */
 import { el } from '../ui/dom';
 import { sharedSfx } from '../audio/sfx';
-import { mountMascot } from '../rendering/mascotRig';
+import { mountMascot, preloadMascot } from '../rendering/mascotRig';
 import type { SaveStore } from '../storage/saveStore';
 import type { LevelDef } from '../data/schemas/level';
 import { ALL_LEVELS } from '../data/levels';
@@ -116,6 +116,8 @@ export class LevelSelectScreen {
   private island!: HTMLElement;
   private disposed = false;
   private mascotStops: Array<() => void> = [];
+  /** Tears down the carousel's resize listener and pending frame. */
+  private railCleanup: (() => void) | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -126,6 +128,13 @@ export class LevelSelectScreen {
 
   enter(): void {
     this.root.classList.add('sel2-screen');
+    // Both bops are about to be needed: whichever level is picked opens
+    // with Zip and Mixy standing in it. Rasterising their layers takes
+    // real time, and a child browsing the island is the moment when
+    // nobody is waiting for anything. Zip warms anyway via the peeker;
+    // Mixy would otherwise land in the middle of a level opening.
+    preloadMascot('zip');
+    preloadMascot('mixy');
     this.worlds = this.buildWorlds();
     // Open on the world holding the next thing to play, so a child who has
     // finished Bubble Bay does not have to find their way back to it.
@@ -313,13 +322,32 @@ export class LevelSelectScreen {
     pips.setAttribute('aria-hidden', 'true');
     const pipEls = world.stones.map(() => el('span', 'sel2-pip', pips));
 
+    /**
+     * Card geometry, measured once.
+     *
+     * This used to be read straight off the elements inside the scroll
+     * handler — offsetLeft and offsetWidth per card, interleaved with
+     * writing a custom property back onto the card just before reading the
+     * next one. Every one of those reads after a write forces the browser
+     * to lay the page out again, so a single swipe on a phone paid for a
+     * dozen synchronous layouts per frame. None of these numbers change
+     * while scrolling, so they are cached and refreshed on resize.
+     */
+    let metrics: Array<{ centre: number; width: number }> = [];
+    let railMid = 0;
+    const measure = (): void => {
+      metrics = cards.map((c) => ({ centre: c.offsetLeft + c.offsetWidth / 2, width: c.offsetWidth }));
+      railMid = rail.clientWidth / 2;
+    };
+    measure();
+
     /** Which card is nearest the middle of the rail right now. */
     const centred = (): number => {
-      const mid = rail.scrollLeft + rail.clientWidth / 2;
+      const mid = rail.scrollLeft + railMid;
       let best = 0;
       let bestGap = Infinity;
-      cards.forEach((c, i) => {
-        const gap = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
+      metrics.forEach((m, i) => {
+        const gap = Math.abs(m.centre - mid);
         if (gap < bestGap) { bestGap = gap; best = i; }
       });
       return best;
@@ -330,9 +358,11 @@ export class LevelSelectScreen {
       // Signed distance from the middle, in card widths. CSS turns this
       // into a rotation and a push back, so the rail reads as a carousel
       // that TURNS rather than a row that slides.
-      const mid = rail.scrollLeft + rail.clientWidth / 2;
+      const mid = rail.scrollLeft + railMid;
       cards.forEach((c, i) => {
-        const d = (c.offsetLeft + c.offsetWidth / 2 - mid) / (c.offsetWidth + 12);
+        const m = metrics[i];
+        if (!m) return;
+        const d = (m.centre - mid) / (m.width + 12);
         const clamped = Math.max(-2.4, Math.min(2.4, d));
         c.style.setProperty('--d', clamped.toFixed(3));
         c.style.setProperty('--ad', Math.abs(clamped).toFixed(3));
@@ -341,6 +371,28 @@ export class LevelSelectScreen {
       prev.disabled = at === 0;
       next.disabled = at === cards.length - 1;
       railWrap.classList.toggle('single', cards.length === 1);
+    };
+
+    /**
+     * Scroll fires far faster than the screen refreshes — on a fast swipe
+     * a phone can deliver several events between two frames, and all but
+     * the last are wasted work on a rail the child never saw in that
+     * state. One rAF per frame, taking the newest scroll position.
+     */
+    let queued = 0;
+    const syncSoon = (): void => {
+      if (queued) return;
+      queued = requestAnimationFrame(() => { queued = 0; if (!this.disposed) sync(); });
+    };
+    const onResize = (): void => { measure(); sync(); };
+    window.addEventListener('resize', onResize);
+    // Picking a different world rebuilds the rail, so the previous one's
+    // listener has to go with it or every world visited leaves one behind.
+    this.railCleanup?.();
+    this.railCleanup = () => {
+      window.removeEventListener('resize', onResize);
+      if (queued) cancelAnimationFrame(queued);
+      queued = 0;
     };
     const goTo = (i: number): void => {
       const card = cards[Math.max(0, Math.min(cards.length - 1, i))];
@@ -352,7 +404,7 @@ export class LevelSelectScreen {
     };
     prev.addEventListener('click', () => { sharedSfx.play('tap'); goTo(centred() - 1); });
     next.addEventListener('click', () => { sharedSfx.play('tap'); goTo(centred() + 1); });
-    rail.addEventListener('scroll', sync, { passive: true });
+    rail.addEventListener('scroll', syncSoon, { passive: true });
 
     // Open on the card that matters: the one to play now, else the first
     // that is not finished, else the beginning.
@@ -366,6 +418,7 @@ export class LevelSelectScreen {
       if (card) {
         rail.scrollLeft = card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2;
       }
+      measure();
       sync();
     }, 0);
   }
@@ -658,6 +711,8 @@ export class LevelSelectScreen {
 
   dispose(): void {
     this.disposed = true;
+    this.railCleanup?.();
+    this.railCleanup = null;
     for (const stop of this.mascotStops) stop();
     this.mascotStops = [];
     this.root.classList.remove('sel2-screen');

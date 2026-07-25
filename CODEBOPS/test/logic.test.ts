@@ -3503,19 +3503,102 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
 
   // A wrapper that edited the vendored files would turn every future
   // update into a merge. The app talks to the rig through one module.
-  check('the app reaches the rig only through the mascot wrapper', (() => {
+  // The adapter takes the Three namespace as an argument, and handing it
+  // the real one costs 168KB of tree-shaking, so spriteCharacter passes a
+  // hand-built object with only the symbols the adapter touches. Nothing
+  // in the type system connects those two facts: a rig update that starts
+  // using THREE.Sprite would throw at runtime, on a screen, in front of a
+  // child. This is the check that makes that impossible.
+  check('the Three shim covers every symbol the adapter uses', (() => {
+    const adapter = readFileSync('src/vendor/codebops-rig/three-adapter.js', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const used = new Set([...adapter.matchAll(/\bTHREE\.([A-Za-z_$][\w$]*)/g)].map((m) => m[1]));
+    const shim = readFileSync('src/rendering/spriteCharacter.ts', 'utf8')
+      .split('THREE_FOR_ADAPTER = {')[1]?.split('}')[0] ?? '';
+    const missing = [...used].filter((n) => !new RegExp(`\\b${n}\\s*:`).test(shim));
+    if (missing.length > 0) console.log('   missing from the shim: ' + missing.join(', '));
+    return used.size >= 6 && missing.length === 0;
+  })());
+
+  // The rig's ear and crest springs are integrated explicitly and are
+  // stiff. Its own loop clamps dt to 0.05; the stage clamps to 0.25, so
+  // driving the rig from the stage without re-clamping diverges the
+  // springs on the first long frame and never recovers.
+  check('the rig is never stepped with a frame longer than it can take', (() => {
+    const src = readFileSync('src/rendering/spriteCharacter.ts', 'utf8');
+    return /this\.rig\.update\(Math\.min\(0\.05,/.test(src);
+  })());
+
+  check('calm mode stops the world clock rather than the wind alone', (() => {
+    const src = readFileSync('src/app/gameScreen.ts', 'utf8');
+    // The ambient clock only advances when calm mode is off, and the
+    // world is stepped with that clock — not the stage's raw elapsed.
+    return /if \(!calm\) this\.ambient \+= dt;/.test(src)
+      && /this\.world\.update\(calm \? 0 : dt, this\.ambient/.test(src);
+  })());
+
+  check('no screen still asks for a character by its old art URL', (() => {
+    const bad: string[] = [];
+    for (const f of readdirSync('src/app').filter((n) => n.endsWith('.ts'))) {
+      const src = readFileSync(`src/app/${f}`, 'utf8');
+      if (/svgUrl|art\/characters\//.test(src)) bad.push(f);
+    }
+    return bad.length === 0;
+  })());
+
+  // A wrapper that edited the vendored files would turn every future
+  // update into a merge. Two modules front the rig and nothing else may
+  // reach past them: mascotRig owns the engine and the character data,
+  // spriteCharacter owns the Three adapter.
+  check('nothing reaches the vendored rig except its two front doors', (() => {
+    const OWNERS: Readonly<Record<string, RegExp>> = {
+      'src/rendering/mascotRig.ts': /codebops-rig\.js|characters\/(zip|mixy)\.js/,
+      'src/rendering/spriteCharacter.ts': /three-adapter\.js|codebops-rig\.js/,
+    };
+    const strays: string[] = [];
+    const walk = (dir: string): void => {
+      for (const f of readdirSync(dir, { withFileTypes: true })) {
+        if (f.name === 'vendor') continue;
+        const path = `${dir}/${f.name}`;
+        if (f.isDirectory()) { walk(path); continue; }
+        if (!path.endsWith('.ts')) continue;
+        const src = readFileSync(path, 'utf8');
+        if (!/vendor\/codebops-rig/.test(src)) continue;
+        const allowed = OWNERS[path];
+        if (!allowed) { strays.push(`${path}: not a front door`); continue; }
+        for (const m of src.matchAll(/vendor\/codebops-rig\/([^'"]+)/g)) {
+          if (!allowed.test(m[1])) strays.push(`${path}: reaches ${m[1]}`);
+        }
+      }
+    };
+    walk('src');
+    if (strays.length > 0) console.log('   ' + strays.join('\n   '));
+    return strays.length === 0;
+  })());
+
+  // Only mascotRig may build a rig, so the shared raster cache cannot be
+  // bypassed. createRig() rasterises 34-41 SVG layers at 2.2x; doing that
+  // per screen is the difference between a level opening and a level
+  // stalling.
+  check('nothing calls createRig directly — rigs come from the cache', (() => {
     const users: string[] = [];
     const walk = (dir: string): void => {
       for (const f of readdirSync(dir, { withFileTypes: true })) {
         if (f.name === 'vendor') continue;
-        const p = `${dir}/${f.name}`;
-        if (f.isDirectory()) walk(p);
-        else if (p.endsWith('.ts') && /vendor\/codebops-rig/.test(readFileSync(p, 'utf8'))) users.push(p);
+        const path = `${dir}/${f.name}`;
+        if (f.isDirectory()) walk(path);
+        else if (path.endsWith('.ts')) {
+          // Comments explain why createRig is avoided; scan code only.
+          const src = readFileSync(path, 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+          if (/\bcreateRig\s*\(/.test(src)) users.push(path);
+        }
       }
     };
     walk('src');
-    return users.length === 1 && users[0] === 'src/rendering/mascotRig.ts';
+    return users.length === 0;
   })());
+
 }
 
 // ============================================================

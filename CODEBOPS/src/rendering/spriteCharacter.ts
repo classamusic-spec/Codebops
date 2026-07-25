@@ -1,210 +1,122 @@
 /**
- * SpriteCharacter — the canon SVG mascots living in the dimensional world.
+ * SpriteCharacter — Zip, Mixy and Bolt standing inside the 3D world.
  *
- * The character is an inline SVG inside a DOM overlay; a hidden 3D anchor
- * tracks its world position, and every frame the sprite is projected onto
- * the screen with correct perspective scale. Because the SVG is real DOM,
- * the traced mascot parts (eyes, lids, mouth, arms, fragments) animate with
- * crisp CSS state changes: blink, look, star-eyes, smiles, surprise,
- * thinking, waving, celebration and Mixy's glitch — the "layered paper"
- * architecture from the art direction, using the traced canon art.
+ * They used to be flat `<div>`s holding an inline SVG, floated over the
+ * canvas by projecting a 3D anchor to screen coordinates every frame. That
+ * looked passable and was wrong in ways a child can feel: the character
+ * could never go behind a tree, never took the world's fog, never scaled
+ * by real perspective (a px-per-unit approximation stood in for it), and
+ * its face was animated by CSS classes toggled on paths that a heuristic
+ * had *guessed* were eyes.
+ *
+ * Now each character is a real object in the scene, built by codebops-rig's
+ * Three adapter: one textured plane per art layer, parented to the rig's
+ * node hierarchy, at z = depth x 0.01. That last part is what makes this
+ * genuinely dimensional rather than a picture on a card — when the head
+ * yaws for a three-quarter turn, the near ear swings wide, the far ear
+ * narrows and the face slides across the skull, because those layers are
+ * actually at different depths.
+ *
+ * What is deliberately NOT 3D: the character faces the camera. The art is
+ * a flat vector illustration and it stays one — no lighting, no tone
+ * mapping, so the Zip in the world is pixel-for-pixel the Zip on the title
+ * screen. The dimension comes from parallax, occlusion, fog and
+ * perspective scale, not from pretending the drawing is a model.
  */
 import * as THREE from 'three';
 import { contactShadowTexture } from './materials/toon';
 import { Tweener } from './tween';
+import { makeRig } from './mascotRig';
+import type { MascotName } from './mascotRig';
+import type { ThreeCharacterView } from '../vendor/codebops-rig/three-adapter.js';
+import type { CharacterRig } from '../vendor/codebops-rig/codebops-rig.js';
 
 export type Mood = 'idle' | 'happy' | 'excited' | 'surprised' | 'thinking';
 export type LookDir = 'left' | 'right' | 'up' | null;
 
 export interface SpriteCharacterOptions {
-  svgUrl: string;
+  /** Which rig to build. Bolt is Zip in a different finish. */
+  who: MascotName;
   /** Character height in world units. */
   height: number;
   name: string;
-  mixy?: boolean;
-  /** Extra CSS class on the sprite element (e.g. 'robot-bop' for Bolt). */
-  extraClass?: string;
+  /** Tint multiplied over the art — Bolt's steel-green finish. */
+  tint?: string;
 }
 
-const svgCache = new Map<string, Promise<string>>();
+/** The adapter's art-unit scale: 1024 art units span 10.24 world units. */
+const ART_SCALE = 0.01;
 
 /**
- * The exported art all uses generic `.cls-0`, `.cls-1`, … class names with
- * per-file colours. We inline several of these SVGs into ONE document
- * (Zip, GlitchBop, the logo), so their <style> blocks would collide and
- * the last one loaded would repaint every other mascot. Scope each file's
- * classes to itself before inlining.
+ * The adapter takes the Three namespace as an argument rather than
+ * importing it, so it works with whatever copy the host app has. Handing
+ * it `import * as THREE` would work — and would cost 168KB, because a
+ * bundler that sees the whole namespace object escape into a function call
+ * can no longer prove which exports are unused and has to keep all of
+ * them. So it gets exactly the eight symbols it touches.
+ *
+ * A test walks the adapter's source for `THREE.x` and fails if this list
+ * has fallen behind it, which is the only way a rig update could break
+ * this quietly.
  */
-function scopeSvgClasses(text: string, url: string): string {
-  if (!text.includes('.cls-')) return text;
-  const tag = `s${Math.abs([...url].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7)).toString(36)}`;
-  return text
-    .replace(/\.cls-(\d+)/g, (_m, n) => `.${tag}-cls${n}`)
-    .replace(/class="([^"]*)"/g, (_m, list: string) =>
-      `class="${list.split(/\s+/).map((c) => (/^cls-\d+$/.test(c) ? `${tag}-cls${c.slice(4)}` : c)).join(' ')}"`);
-}
-
-export function loadSvg(url: string): Promise<string> {
-  let p = svgCache.get(url);
-  if (!p) {
-    p = fetch(url).then((r) => {
-      if (!r.ok) throw new Error(`[CodeBops] Failed to load ${url}`);
-      return r.text();
-    }).then((text) => scopeSvgClasses(text, url));
-    svgCache.set(url, p);
-  }
-  return p;
-}
-
-/** Inline an SVG into a DOM container (shared with title/select screens). */
-export async function inlineSvgInto(container: HTMLElement, url: string): Promise<SVGSVGElement | null> {
-  const text = await loadSvg(url);
-  container.innerHTML = text;
-  const svg = container.querySelector('svg');
-  if (svg) rigMascotParts(svg);
-  return svg;
-}
+const THREE_FOR_ADAPTER = {
+  Object3D: THREE.Object3D,
+  Mesh: THREE.Mesh,
+  PlaneGeometry: THREE.PlaneGeometry,
+  MeshBasicMaterial: THREE.MeshBasicMaterial,
+  CanvasTexture: THREE.CanvasTexture,
+  SRGBColorSpace: THREE.SRGBColorSpace,
+  LinearMipmapLinearFilter: THREE.LinearMipmapLinearFilter,
+  LinearFilter: THREE.LinearFilter,
+} as unknown as typeof THREE;
 
 /**
- * Tag the mascot's face parts so they can be animated.
- *
- * The art is exported as flat, unnamed paths — no ids, no semantic
- * classes — so we identify parts by MEASURING them: each shape's
- * bounding box (normalised against the viewBox) plus its fill. That is
- * far more reliable than reading path data, and it self-corrects if the
- * art is re-exported, since it reasons about where things actually are.
- *
- * Tags applied: cb-eye (whites + pupils), cb-pupil, cb-shine, cb-mouth,
- * cb-ear, cb-crest (tuft / lightning bolt), cb-glitch (GlitchBop's
- * scattered pixels). Anything unrecognised is simply left alone.
+ * Moods map onto the rig's clips. `excited` and `happy` share the happy
+ * clip but not the face, so a celebration reads bigger than a smile.
  */
-export function rigMascotParts(svg: SVGSVGElement): void {
-  if (svg.dataset.cbRigged === '1') return;
-  const vb = svg.viewBox?.baseVal;
-  if (!vb || vb.width <= 0 || vb.height <= 0) return;
-
-  const shapes = Array.from(svg.querySelectorAll<SVGGraphicsElement>('path,circle,ellipse,rect,polygon'));
-  type Part = { el: SVGGraphicsElement; cx: number; cy: number; rw: number; rh: number; rgb: [number, number, number] | null };
-  const parts: Part[] = [];
-  for (const el of shapes) {
-    let bb: DOMRect;
-    try { bb = el.getBBox(); } catch { continue; }          // not rendered yet
-    if (bb.width <= 0 || bb.height <= 0) continue;
-    const fill = getComputedStyle(el).fill;
-    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(fill);
-    parts.push({
-      el,
-      cx: (bb.x + bb.width / 2 - vb.x) / vb.width,
-      cy: (bb.y + bb.height / 2 - vb.y) / vb.height,
-      rw: bb.width / vb.width,
-      rh: bb.height / vb.height,
-      rgb: m ? [+m[1], +m[2], +m[3]] : null,
-    });
-  }
-  if (parts.length === 0) return;
-
-  const isWhite = (p: Part): boolean => !!p.rgb && p.rgb.every((c) => c > 232);
-  const isDark = (p: Part): boolean => !!p.rgb && p.rgb[0] + p.rgb[1] + p.rgb[2] < 260;
-  const isRed = (p: Part): boolean => !!p.rgb && p.rgb[0] > 150 && p.rgb[1] < 120;
-  const offCentre = (p: Part): number => Math.abs(p.cx - 0.5);
-
-  for (const p of parts) {
-    if (p.rw > 0.6) continue;                               // the head/body itself
-
-    // --- eyes: a left/right pair on the face, whites + dark pupils ---
-    if (p.cy > 0.5 && p.cy < 0.84 && offCentre(p) > 0.09 && offCentre(p) < 0.32) {
-      if (p.rw < 0.075 && isWhite(p)) { p.el.classList.add('cb-shine'); continue; }
-      if (isWhite(p) && p.rw > 0.08) { p.el.classList.add('cb-eye', 'cb-eyewhite'); continue; }
-      if (isDark(p) && p.rw > 0.08) { p.el.classList.add('cb-eye', 'cb-pupil'); continue; }
-    }
-    // --- mouth: centred, low on the face ---
-    if (p.cy > 0.70 && offCentre(p) < 0.09 && p.rw < 0.22 && (isRed(p) || isDark(p))) {
-      p.el.classList.add('cb-mouth');
-      continue;
-    }
-    // --- ears: high and wide of the head ---
-    if (p.cy < 0.42 && offCentre(p) > 0.26) {
-      p.el.classList.add('cb-ear', p.cx < 0.5 ? 'cb-ear-l' : 'cb-ear-r');
-      continue;
-    }
-    // --- crest: the tuft / lightning bolt above the face ---
-    if (p.cy < 0.46 && offCentre(p) < 0.2 && p.rw > 0.07) {
-      p.el.classList.add('cb-crest');
-      continue;
-    }
-    // --- GlitchBop's scattered pixels: tiny, saturated, off to the sides ---
-    if (p.rw < 0.07 && p.rh < 0.07 && offCentre(p) > 0.3) {
-      p.el.classList.add('cb-glitch-bit');
-    }
-  }
-
-  // The art has no star-eye artwork, so build it: drop a star over each
-  // pupil, hidden until the mascot is excited.
-  addStarEyes(parts.filter((p) => p.el.classList.contains('cb-pupil')));
-  svg.dataset.cbRigged = '1';
-}
-
-/** Five-pointed star path centred on (cx, cy). */
-function starPath(cx: number, cy: number, r: number): string {
-  const pts: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    const rad = i % 2 === 0 ? r : r * 0.44;
-    const a = -Math.PI / 2 + (i * Math.PI) / 5;
-    pts.push(`${(cx + Math.cos(a) * rad).toFixed(2)},${(cy + Math.sin(a) * rad).toFixed(2)}`);
-  }
-  return `M${pts.join('L')}Z`;
-}
-
-function addStarEyes(pupils: Array<{ el: SVGGraphicsElement }>): void {
-  const NS = 'http://www.w3.org/2000/svg';
-  for (const p of pupils) {
-    let bb: DOMRect;
-    try { bb = p.el.getBBox(); } catch { continue; }
-    const star = document.createElementNS(NS, 'path');
-    star.setAttribute('d', starPath(bb.x + bb.width / 2, bb.y + bb.height / 2, Math.max(bb.width, bb.height) * 0.62));
-    star.setAttribute('fill', '#FFD23E');
-    star.setAttribute('stroke', '#FF9E1B');
-    star.setAttribute('stroke-width', String(Math.max(0.6, bb.width * 0.07)));
-    star.setAttribute('stroke-linejoin', 'round');
-    star.setAttribute('class', 'cb-star');
-    p.el.parentNode?.insertBefore(star, p.el.nextSibling);
-  }
-}
-
-/*
- * There used to be a startMascotLife() here that gave an inlined SVG
- * ambient blinks and glances on the flat screens. codebops-rig does that
- * itself now (see rendering/mascotRig.ts), so it went. Everything left in
- * this file serves SpriteCharacter — the mascots inside the 3D world,
- * which are still inline SVG projected onto the scene.
- */
+const MOOD_FACE = {
+  idle: 'neutral', happy: 'happy', excited: 'happy',
+  surprised: 'surprised', thinking: 'thinking',
+} as const;
 
 const UP = new THREE.Vector3(0, 1, 0);
-// Scratch vectors reused every frame (avoids per-frame GC churn).
+// Scratch objects reused every frame (avoids per-frame GC churn).
 const SCRATCH_A = new THREE.Vector3();
 const SCRATCH_B = new THREE.Vector3();
+const SCRATCH_FWD = new THREE.Vector3();
 
 export class SpriteCharacter {
   readonly root = new THREE.Group();
   readonly carryAnchor = new THREE.Object3D();
   readonly tweener = new Tweener();
-  readonly el: HTMLDivElement;
-  private shadow: THREE.Mesh;
-  private svg: SVGSVGElement | null = null;
-  private bobPhase = Math.random() * Math.PI * 2;
-  private calm = false;
-  /** Idle-hop state: -1 = resting, 0..1 = mid-hop. */
-  private hopT = -1;
-  private hopDur = 0.5;
-  private hopWait = 0.6 + Math.random() * 1.6;
   /**
-   * Each bop hops with its own personality: Zip is a steady, confident
-   * bouncer; GlitchBop is twitchier — shorter gaps, snappier, higher.
+   * Screen-space anchor for the name chip. The character itself is in the
+   * scene now; this element exists only so a DOM label can ride along with
+   * it, which is the one thing the 3D scene cannot do well (crisp text at
+   * any distance, selectable by a screen reader).
    */
-  private hopStyle = { dur: 0.52, height: 0.16, gap: 1.5, jitter: 1.7 };
-  private blinkClock = 1.2 + Math.random() * 2.2;
+  readonly el: HTMLDivElement;
+
+  /** Faces the camera; everything the rig draws hangs under it. */
+  private readonly billboard = new THREE.Group();
+  private readonly shadow: THREE.Mesh;
+  private rig: CharacterRig | null = null;
+  private view: ThreeCharacterView | null = null;
+  private disposed = false;
+  private calm = false;
+  private bobPhase = Math.random() * Math.PI * 2;
+  /**
+   * Seconds of animation still owed. In calm mode the rig is only stepped
+   * while this is positive, which is what turns "damped" into "still":
+   * the character holds a pose until something actually happens to it,
+   * then plays that change through and settles again. Outside calm mode
+   * it is ignored and the rig runs every frame.
+   */
+  private settle = 0;
   private lookClock = 5 + Math.random() * 4;
-  private ready: Promise<void>;
+  /** Art-box width / height, so the label anchor matches the silhouette. */
+  private aspect = 1;
+  private readonly ready: Promise<void>;
 
   constructor(
     private readonly opts: SpriteCharacterOptions,
@@ -213,8 +125,7 @@ export class SpriteCharacter {
     private readonly viewport: HTMLElement,
   ) {
     this.root.name = opts.name;
-    // GlitchBop is the twitchy one — hops more often, snappier and higher.
-    if (opts.mixy) this.hopStyle = { dur: 0.44, height: 0.2, gap: 0.9, jitter: 1.2 };
+    this.root.add(this.billboard);
 
     this.shadow = new THREE.Mesh(
       new THREE.PlaneGeometry(1.25, 1.25),
@@ -227,13 +138,95 @@ export class SpriteCharacter {
     this.root.add(this.carryAnchor);
 
     this.el = document.createElement('div');
-    this.el.className = `char-sprite ${opts.mixy ? 'mixy-sprite' : 'zip-sprite'}${opts.extraClass ? ` ${opts.extraClass}` : ''}`;
+    this.el.className = 'char-label';
+    this.el.dataset.bop = opts.name;
     this.el.setAttribute('aria-hidden', 'true');
     layer.appendChild(this.el);
 
-    this.ready = inlineSvgInto(this.el, opts.svgUrl).then((svg) => {
-      this.svg = svg;
-    });
+    this.ready = this.build();
+  }
+
+  private async build(): Promise<void> {
+    let rig: CharacterRig;
+    let attachThree: typeof import('../vendor/codebops-rig/three-adapter.js').attachThree;
+    try {
+      // renderer 'none': nothing draws to a 2D canvas. The stage's own loop
+      // drives update(), and the adapter turns the pose into scene graph.
+      // The adapter is imported here rather than at the top of the file so
+      // that pulling it in does not drag the rig engine into the main
+      // bundle — the whole point of loading the rig on demand.
+      [rig, { attachThree }] = await Promise.all([
+        makeRig(this.opts.who, { renderer: 'none', autoBlink: true }),
+        import('../vendor/codebops-rig/three-adapter.js'),
+      ]);
+    } catch (err) {
+      // The world is still playable without a face on it. Everything that
+      // moves the character moves this.root, which exists regardless.
+      console.warn(`[CodeBops] ${this.opts.name}'s rig failed to load.`, err);
+      return;
+    }
+    if (this.disposed) { rig.destroy(); return; }
+    rig.setReducedMotion(this.calm);
+    rig.setAutoBlink(!this.calm);
+
+    const view = attachThree(THREE_FOR_ADAPTER, rig);
+    this.fitToHeight(view, rig);
+    this.dressMaterials(view);
+    this.billboard.add(view.root);
+    this.rig = rig;
+    this.view = view;
+    view.sync();
+  }
+
+  /**
+   * Scale and seat the rig so the character is `height` world units tall
+   * and standing ON the ground rather than centred in the air.
+   *
+   * The art box is measured from the rasters actually built, not assumed
+   * from the 1024 artboard: the bops occupy about two thirds of it, so
+   * scaling by the artboard would make every character a third too small.
+   * Effects layers are excluded — a sparkle burst must not shrink him.
+   */
+  private fitToHeight(view: ThreeCharacterView, rig: CharacterRig): void {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const layer of rig.character.layers) {
+      if (layer.group === 'effects' || layer.group === 'glitch') continue;
+      const r = rig.rasters?.[layer.id];
+      if (!r) continue;
+      minX = Math.min(minX, r.box.x); maxX = Math.max(maxX, r.box.x + r.box.w);
+      minY = Math.min(minY, r.box.y); maxY = Math.max(maxY, r.box.y + r.box.h);
+    }
+    if (!Number.isFinite(minY) || maxY <= minY) return;   // nothing rasterised
+
+    this.aspect = (maxX - minX) / (maxY - minY);
+    const scale = this.opts.height / ((maxY - minY) * ART_SCALE);
+    view.root.scale.setScalar(scale);
+    // The adapter maps art (ax, ay) to world ((ax - 512) * S, (512 - ay) * S).
+    // Put the art box's bottom-centre on the group's origin, which is the
+    // point placeAt() drops on the ground.
+    const centreX = ((minX + maxX) / 2 - 512) * ART_SCALE;
+    const bottomY = (512 - maxY) * ART_SCALE;
+    view.root.position.set(-centreX * scale, -bottomY * scale, 0);
+  }
+
+  /**
+   * The adapter draws with depth testing OFF so its own layers can never
+   * z-fight. That also means nothing in the world could ever cover the
+   * character. Testing is switched back on — the layers keep their painter
+   * order through renderOrder and depthWrite stays off, so they still
+   * composite exactly, but now a tree in front of Zip is in front of Zip.
+   */
+  private dressMaterials(view: ThreeCharacterView): void {
+    const tint = this.opts.tint ? new THREE.Color(this.opts.tint) : null;
+    for (const id of Object.keys(view.meshes)) {
+      const mat = view.meshes[id].material as THREE.MeshBasicMaterial;
+      mat.depthTest = true;
+      // Distance haze applies, so a character far up the board sits in the
+      // same air as the scenery around it.
+      mat.fog = true;
+      if (tint) mat.color.copy(tint);
+      mat.needsUpdate = true;
+    }
   }
 
   whenReady(): Promise<void> {
@@ -245,9 +238,25 @@ export class SpriteCharacter {
     scene.add(this.shadow);
   }
 
+  /** Something changed: let the rig animate it through, even in calm mode. */
+  private touch(seconds = 1.2): void {
+    this.settle = Math.max(this.settle, seconds);
+  }
+
   setCalm(calm: boolean): void {
     this.calm = calm;
-    this.el.classList.toggle('calm', calm);
+    this.touch();
+    // The rig's own reduced motion damps locomotion and keeps expression,
+    // which is the right shape. Two things it deliberately keeps are the
+    // twitchiest motions on screen — the blink schedule and the idle eye
+    // saccades — so calm mode stops those as well and leaves a character
+    // that still smiles, frowns and looks surprised when something
+    // happens, but never fidgets. Pausing the rig outright is not an
+    // option: with the clock stopped a face change never finishes its
+    // blend, and the expression would freeze along with everything else.
+    this.rig?.setReducedMotion(calm);
+    this.rig?.setAutoBlink(!calm);
+    if (calm) { this.rig?.look(0, 0); this.rig?.setTurn(0); }
   }
 
   placeAt(pos: THREE.Vector3): void {
@@ -262,32 +271,36 @@ export class SpriteCharacter {
   // ---------- moods & expressions ----------
 
   setMood(mood: Mood): void {
-    const s = this.svg;
-    if (!s) return;
-    s.classList.toggle('excited', mood === 'excited');
-    s.classList.toggle('surprised', mood === 'surprised');
-    s.classList.toggle('thinking', mood === 'thinking');
-    s.classList.toggle('mouth-smile-on', mood === 'happy');
-    this.el.classList.toggle('mood-thinking', mood === 'thinking');
-    this.el.classList.toggle('mood-happy', mood === 'happy');
+    const rig = this.rig;
+    if (!rig) return;
+    this.touch(2.0);
+    rig.setFace(MOOD_FACE[mood]);
+    if (mood === 'thinking') rig.play('thinking');
+    else if (mood === 'surprised') rig.play('surprised');
+    else if (mood === 'excited') rig.play('happy', { restart: true });
+    else if (mood === 'idle') rig.play('idle');
   }
 
+  /**
+   * A glance. The rig moves the eyes AND turns the head — the turn is what
+   * the old CSS could not do, and it is why a bop facing its direction of
+   * travel now reads as facing it rather than squinting that way.
+   */
   look(dir: LookDir): void {
-    const s = this.svg;
-    if (!s) return;
-    s.classList.toggle('look-left', dir === 'left');
-    s.classList.toggle('look-right', dir === 'right');
-    s.classList.toggle('look-up', dir === 'up');
+    const rig = this.rig;
+    if (!rig) return;
+    this.touch();
+    const x = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+    rig.look(x, dir === 'up' ? -0.8 : 0);
+    rig.setTurn(this.calm ? 0 : x * 0.85);
   }
 
   wave(times = 3): void {
-    if (!this.svg || this.calm) return;
-    this.el.classList.remove('waving');
-    // restart the CSS animation
-    void this.el.offsetWidth;
-    this.el.style.setProperty('--wave-count', String(times));
-    this.el.classList.add('waving');
-    window.setTimeout(() => this.el.classList.remove('waving'), times * 560 + 100);
+    if (this.calm) return;
+    // The happy clip is a squash and two hops — the rig's own celebration.
+    this.touch(2.2);
+    this.rig?.play('happy', { restart: true });
+    void times;
   }
 
   // ---------- moves ----------
@@ -295,41 +308,53 @@ export class SpriteCharacter {
   async hopTo(to: THREE.Vector3, duration = 0.34): Promise<void> {
     const from = this.root.position.clone();
     const jump = this.calm ? 0.06 : 0.4;
-    this.el.classList.add('hop');
+    // The clip supplies the air tilt and the landing squash; the tween
+    // supplies the travel. Together they read as one jump.
+    this.touch(duration + 1.4);
+    if (!this.calm) this.rig?.play('hop', { restart: true });
     await this.tweener.tween(duration, (k) => {
       this.root.position.lerpVectors(from, to, k);
       this.root.position.y = THREE.MathUtils.lerp(from.y, to.y, k) + Math.sin(k * Math.PI) * jump;
       this.syncShadow();
     }, 'inOut');
-    this.el.classList.remove('hop');
   }
 
   async bumpShake(): Promise<void> {
     this.flashMood('surprised', 900);
-    this.el.classList.add('bump');
+    this.touch(1.8);
+    this.rig?.play('surprised', { restart: true });
     await new Promise((r) => setTimeout(r, 320));
-    this.el.classList.remove('bump');
   }
 
   async turnWiggle(): Promise<void> {
     if (this.calm) return;
-    this.el.classList.add('turn');
-    await new Promise((r) => setTimeout(r, 300));
-    this.el.classList.remove('turn');
+    const rig = this.rig;
+    if (!rig) return;
+    this.touch(1.0);
+    // A look right, then left, then back: the head genuinely turns, so the
+    // layers slide past each other and it reads as a shake of the head.
+    rig.setTurn(0.9);
+    await new Promise((r) => setTimeout(r, 110));
+    rig.setTurn(-0.9);
+    await new Promise((r) => setTimeout(r, 130));
+    rig.setTurn(0);
+    await new Promise((r) => setTimeout(r, 60));
   }
 
   async celebrate(): Promise<void> {
     this.setMood('excited');
-    this.wave(3);
-    this.el.classList.add('celebrate');
     await new Promise((r) => setTimeout(r, this.calm ? 400 : 1600));
-    this.el.classList.remove('celebrate');
+    this.setMood('idle');
   }
 
   async glitchWobble(duration = 0.8): Promise<void> {
-    this.el.classList.add('glitching');
+    // Mixy has real corruption clips — channel split, chip scatter, a
+    // scanline band. Zip has none, and shouldn't: he does not glitch.
+    const rig = this.rig;
+    this.touch(duration + 1.2);
+    if (rig?.animations.includes('glitch')) rig.play('glitch', { restart: true });
     await new Promise((r) => setTimeout(r, duration * 1000));
-    this.el.classList.remove('glitching');
+    rig?.play('idle');
   }
 
   private moodTimer = 0;
@@ -339,119 +364,94 @@ export class SpriteCharacter {
     this.moodTimer = window.setTimeout(() => this.setMood('idle'), ms);
   }
 
-  /** One blink — and now and then a quick double, which reads as alive. */
-  private blink(): void {
-    const s = this.svg;
-    if (!s || this.calm) return;
-    const once = (delay: number): void => {
-      window.setTimeout(() => {
-        if (!this.svg) return;
-        s.classList.remove('blink');
-        void s.getBoundingClientRect();     // restart the keyframe
-        s.classList.add('blink');
-        window.setTimeout(() => s.classList.remove('blink'), 200);
-      }, delay);
-    };
-    once(0);
-    if (Math.random() < 0.3) once(280);
-  }
-
-  /** Per-frame: project the 3D anchor to screen + idle life. */
+  /**
+   * Per-frame: advance the rig, face the camera, and drag the name chip
+   * along to wherever the character ended up on screen.
+   */
   update(dt: number, elapsed: number): void {
     this.tweener.update(dt);
 
-    // blink + occasional glances
-    this.blinkClock -= dt;
-    if (this.blinkClock <= 0) {
-      this.blink();
-      this.blinkClock = 2.2 + Math.random() * 2.6;
-    }
-    this.lookClock -= dt;
-    if (this.lookClock <= 0) {
+    // Occasional glances, so a resting bop is never a statue. Calm mode
+    // is exactly the case where a statue is what was asked for.
+    if (!this.calm) this.lookClock -= dt;
+    if (this.lookClock <= 0 && !this.calm) {
       const dirs: LookDir[] = ['left', 'right', null, 'up'];
       this.look(dirs[Math.floor(Math.random() * dirs.length)]);
       this.lookClock = 4 + Math.random() * 5;
     }
 
-    if (!this.svg) return;
+    if (this.rig && this.view) {
+      if (this.settle > 0) this.settle -= dt;
+      // Calm mode steps the rig only while a change is still playing out.
+      // Damping alone left the idle float, the breath and the ear sway
+      // running, which measured as much motion with the setting on as
+      // with it off.
+      if (!this.calm || this.settle > 0) {
+        // Clamp exactly as the rig's own loop does. This is not belt and
+        // braces: the ear and crest springs are stiff and integrated
+        // explicitly, so ONE long frame — a level opening while textures
+        // upload, a tab coming back — is enough to make them diverge, and
+        // they never recover. Left unclamped it put Zip's ear rotation at
+        // -649618 radians and hid both ears inside his head.
+        this.rig.update(Math.min(0.05, dt > 0 ? dt : 0));
+        this.view.sync();
+      }
+      // Face the camera. The art is a flat illustration; turning it edge-on
+      // would only ever show it disappearing.
+      this.billboard.quaternion.copy(this.camera.quaternion);
+      // ...and stand a hair proud of the ground, so the bottom row of
+      // pixels never z-fights with the tile the character is standing on.
+      this.camera.getWorldDirection(SCRATCH_FWD);
+      this.billboard.position.copy(SCRATCH_FWD).multiplyScalar(-0.05);
+      // A slow breath on the whole body. The rig breathes the head; this is
+      // the shift of weight underneath it, and calm mode stills it.
+      this.billboard.position.y += this.calm ? 0
+        : Math.sin(elapsed * 2.2 + this.bobPhase) * this.opts.height * 0.012;
+    }
+
+    this.syncLabel();
+  }
+
+  /**
+   * Track the character's screen box with the label anchor.
+   *
+   * The anchor is empty and invisible, and it is kept the size of the
+   * character on purpose: a name chip positions itself against it (bottom
+   * centre, just below the feet), and it is the only handle a test has on
+   * where a character actually ended up on screen now that the character
+   * is pixels in a WebGL canvas rather than an element.
+   */
+  private syncLabel(): void {
     const w = this.viewport.clientWidth;
     const h = this.viewport.clientHeight;
     if (w === 0 || h === 0) return;
 
     const p = SCRATCH_A.copy(this.root.position).project(this.camera);
-    const p2 = SCRATCH_B.copy(this.root.position).add(UP).project(this.camera);
-    if (p.z > 1) {
-      this.el.style.visibility = 'hidden';
-      return;
-    }
+    if (p.z > 1) { this.el.style.visibility = 'hidden'; return; }
     this.el.style.visibility = 'visible';
+    const p2 = SCRATCH_B.copy(this.root.position).add(UP).project(this.camera);
     const sx = (p.x * 0.5 + 0.5) * w;
     const sy = (-p.y * 0.5 + 0.5) * h;
     const sy2 = (-p2.y * 0.5 + 0.5) * h;
     const pxPerUnit = Math.max(1, Math.abs(sy - sy2));
     const pxH = pxPerUnit * this.opts.height;
+    this.el.style.width = `${(pxH * this.aspect).toFixed(1)}px`;
     this.el.style.height = `${pxH.toFixed(1)}px`;
-    const { lift, sqx, sqy } = this.idleHop(dt, elapsed, pxH);
+    // Bottom-centre on the character's feet, which is where the old
+    // sprite element sat and therefore where the chip expects to be.
     this.el.style.transform =
-      `translate(${sx.toFixed(1)}px, ${(sy - lift).toFixed(1)}px) translate(-50%, -100%)`
-      + ` scale(${sqx.toFixed(3)}, ${sqy.toFixed(3)})`;
-  }
-
-  /**
-   * Idle life: a springy little HOP instead of a flat float. The bops are
-   * heads with ears and no legs, so the whole body has to carry the
-   * motion — anticipation squash, a stretch on launch, a floaty apex, then
-   * a landing squash that settles. Between hops they breathe.
-   *
-   * Returns a vertical lift in px plus squash/stretch scales (applied
-   * about the base, so they never look like they leave the ground).
-   */
-  private idleHop(dt: number, elapsed: number, pxH: number): { lift: number; sqx: number; sqy: number } {
-    if (this.calm) return { lift: 0, sqx: 1, sqy: 1 };
-
-    if (this.hopT >= 0) {
-      this.hopT += dt / this.hopDur;
-      if (this.hopT >= 1) { this.hopT = -1; this.hopWait = this.nextHopWait(); }
-    } else {
-      this.hopWait -= dt;
-      if (this.hopWait <= 0) { this.hopT = 0; this.hopDur = this.hopStyle.dur; }
-    }
-
-    // Resting breath — tiny, so the hop reads as the big beat.
-    const breath = Math.sin(elapsed * 2.2 + this.bobPhase) * pxH * 0.012;
-    if (this.hopT < 0) return { lift: breath, sqx: 1, sqy: 1 };
-
-    const t = this.hopT;
-    const A = 0.18;            // anticipation (crouch)
-    const L = 0.30;            // launch
-    const D = 0.82;            // land
-    let lift = 0;
-    let sqy = 1;
-    if (t < A) {                                   // crouch: squash down
-      const k = t / A;
-      sqy = 1 - 0.14 * Math.sin(k * Math.PI * 0.5);
-    } else if (t < D) {                            // airborne arc
-      const k = (t - A) / (D - A);
-      lift = Math.sin(k * Math.PI) * pxH * this.hopStyle.height;
-      // stretch just after launch, neutral at apex, stretch again on fall
-      sqy = t < L ? 1 + 0.12 * (1 - (t - A) / (L - A)) : 1 + 0.06 * Math.abs(Math.cos(k * Math.PI));
-    } else {                                       // landing squash + settle
-      const k = (t - D) / (1 - D);
-      sqy = 1 - 0.16 * Math.sin(k * Math.PI) * (1 - k * 0.4);
-    }
-    // Volume-preserving-ish: widen as it squashes, narrow as it stretches.
-    return { lift: lift + breath * 0.3, sqx: 1 + (1 - sqy) * 0.55, sqy };
-  }
-
-  private nextHopWait(): number {
-    const s = this.hopStyle;
-    return s.gap + Math.random() * s.jitter;
+      `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -100%)`;
   }
 
   dispose(): void {
+    this.disposed = true;
     this.tweener.clear();
     window.clearTimeout(this.moodTimer);
     this.el.remove();
+    this.view?.dispose();
+    this.view = null;
+    this.rig?.destroy();
+    this.rig = null;
     this.shadow.geometry.dispose();
     (this.shadow.material as THREE.Material).dispose();
     this.root.removeFromParent();
