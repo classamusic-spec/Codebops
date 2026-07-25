@@ -23,7 +23,9 @@ export const LEARNING_PHASES: readonly LearningPhase[] = [
 
 export type WorldId =
   | 'sparkle-meadow' | 'bubble-bay' | 'pattern-forest' | 'robot-town'
-  | 'gearworks-garage' | 'agent-academy' | 'imagination-island';
+  | 'gearworks-garage' | 'agent-academy' | 'imagination-island'
+  /** Zip's App Lab — the creative capstone, where concepts get applied. */
+  | 'app-lab';
 
 /** A concrete, observable thing a child does that shows understanding. */
 export interface EvidenceRequirement {

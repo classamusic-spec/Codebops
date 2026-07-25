@@ -8,6 +8,7 @@ import { SaveStore } from '../storage/saveStore';
 import { ALL_LEVELS } from '../data/levels';
 import { loadCustomLevels } from '../storage/customLevels';
 import { buildParentReport } from '../data/curriculum/report';
+import { APP_LAB_ALL_KITS } from '../data/app-lab/appLabDefinition';
 import { sharedSfx } from '../audio/sfx';
 
 /** Worlds a grown-up may open by hand (§7). Ids match the level data. */
@@ -17,6 +18,9 @@ const UNLOCKABLE_WORLDS: ReadonlyArray<{ id: string; emoji: string; name: string
   { id: 'robot-town', emoji: '🤖', name: 'Robot Town' },
   { id: 'gearworks-garage', emoji: '⚙️', name: 'Gearworks Garage' },
   { id: 'agent-academy', emoji: '🎓', name: 'Agent Academy' },
+  // Opens every App Lab station at once, for a child who is ready to
+  // build before the curriculum has recorded every prerequisite.
+  { id: APP_LAB_ALL_KITS, emoji: '🧪', name: 'All App Lab kits' },
 ];
 
 function formatPlaytime(seconds: number): string {

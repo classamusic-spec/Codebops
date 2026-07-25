@@ -168,6 +168,31 @@ import {
 import { evidenceForRun, programObservation } from '../src/data/curriculum/record';
 import { buildParentReport, latestObservation } from '../src/data/curriculum/report';
 import { plainLanguage, javaScriptPreview, conceptSentence, peekForLevel } from '../src/ui/codePeek';
+// ---- Zip's App Lab (Phase 1) ----
+import {
+  MINI_APP_TYPES, flattenCommands, commandDepth, nestedCommands, conditionRefs, triggerRefs,
+} from '../src/creator/miniAppTypes';
+import type { MiniAppCommand, MiniAppTrigger } from '../src/creator/miniAppTypes';
+import { MINI_APP_SCHEMA_VERSION, allComponents, titleText } from '../src/creator/miniAppProject';
+import type { MiniAppProject } from '../src/creator/miniAppProject';
+import {
+  MINI_APP_TEMPLATES, miniAppTemplate, templatesForType, maximumComponentsTotal,
+} from '../src/creator/miniAppTemplateRegistry';
+import { validateMiniAppProject, looksLikeProject } from '../src/creator/miniAppValidator';
+import {
+  MINI_APP_STARTERS, startersForTemplate, duplicateProject,
+} from '../src/creator/miniAppProjectFactory';
+import {
+  initialCreatorState, applyCreatorAction, canApply, showsEditingChrome, showsDebugButton, STEP_MODE,
+} from '../src/creator/miniAppMode';
+import { APP_KITS, appKit, kitAvailability, waitingSentence, nextKit } from '../src/data/app-lab/appLabDefinition';
+import { APPROVED_ASSETS, approvedAsset, isApprovedAsset, APP_LAB_THEMES } from '../src/data/app-lab/approvedAssets';
+import { APPROVED_COMPONENTS, approvedComponent } from '../src/data/app-lab/approvedComponents';
+import { APPROVED_SOUNDS, PREPARED_PHRASES } from '../src/data/app-lab/approvedSounds';
+import { SCENE_LAYOUTS, sceneLayout, layoutHasSlot } from '../src/data/app-lab/sceneLayouts';
+import { TITLE_TOKENS, isTitleToken, tokensInGroup } from '../src/data/app-lab/preparedTitleTokens';
+
+import { readdirSync, readFileSync } from 'node:fs';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1584,6 +1609,393 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('every ladder level is in the Gearworks picker', ladderIds.every((id) => seqIds.has(id)));
   check('every ladder level carries curriculum metadata',
     ladderIds.every((id) => LEVEL_CURRICULUM.some((l) => l.levelId === id)));
+}
+
+// ---------------------------------------------------------------
+// Zip's App Lab — Phase 1: data model, registry, validator, modes
+// ---------------------------------------------------------------
+{
+  console.log("\n-- Zip's App Lab: foundation --");
+  const SEED = { id: 'proj-test', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+
+  // ---- registry shape ----
+  check('there are exactly six app kits', APP_KITS.length === 6);
+  check('every kit has a template', APP_KITS.every((k) => templatesForType(k.type).length > 0));
+  check('every template belongs to a kit',
+    MINI_APP_TEMPLATES.every((t) => APP_KITS.some((k) => k.type === t.type)));
+  check('kit order is 1..6 with no gaps',
+    [...APP_KITS].map((k) => k.order).sort((a, b) => a - b).join(',') === '1,2,3,4,5,6');
+  check('every app type has a kit',
+    MINI_APP_TYPES.every((t) => APP_KITS.some((k) => k.type === t)));
+  check('template limits match the spec table', (() => {
+    const want: Record<string, [number, number, number, number]> = {
+      'tap-react-basic': [1, 5, 4, 6],
+      'sorting-basic': [1, 8, 5, 8],
+      'story-basic': [3, 5, 6, 8],
+      'music-basic': [1, 8, 8, 12],
+      'helper-basic': [1, 8, 6, 10],
+      'mini-game-collect': [1, 10, 8, 10],
+    };
+    return MINI_APP_TEMPLATES.every((t) => {
+      const w = want[t.id];
+      return !!w && t.maximumScenes === w[0] && t.maximumComponentsPerScene === w[1]
+        && t.maximumScripts === w[2] && t.maximumCommandsPerScript === w[3];
+    });
+  })());
+  check('only the Story kit has more than one scene',
+    MINI_APP_TEMPLATES.filter((t) => t.maximumScenes > 1).map((t) => t.type).join() === 'story');
+  check('every template names a real layout',
+    MINI_APP_TEMPLATES.every((t) => sceneLayout(t.layoutTemplateId) !== null));
+  check('every layout has room for its template',
+    MINI_APP_TEMPLATES.every((t) =>
+      (sceneLayout(t.layoutTemplateId)?.slots.length ?? 0) >= t.maximumComponentsPerScene));
+  check('components-total is scenes x per-scene',
+    maximumComponentsTotal(miniAppTemplate('story-basic')!) === 15);
+
+  // ---- allow-lists are closed and coherent ----
+  check('every allowed component is an approved component',
+    MINI_APP_TEMPLATES.every((t) => t.allowedComponents.every((c) => approvedComponent(c) !== null)));
+  check('a kit that allows a condition also allows a branch',
+    MINI_APP_TEMPLATES.every((t) => t.allowedConditions.length === 0
+      || t.allowedCommands.includes('if') || t.allowedCommands.includes('ifElse')
+      || t.allowedCommands.includes('repeatUntil')));
+  check('a kit that allows a branch also allows a question',
+    MINI_APP_TEMPLATES.every((t) =>
+      (!t.allowedCommands.includes('if') && !t.allowedCommands.includes('ifElse')) || t.allowedConditions.length > 0));
+  check('a kit that allows counters also allows a number variable',
+    MINI_APP_TEMPLATES.every((t) => !t.allowedCommands.includes('increaseCounter')
+      || (t.allowedVariables.includes('number') && t.maximumVariables > 0)));
+  check('a kit that allows Call Job also allows jobs',
+    MINI_APP_TEMPLATES.every((t) => !t.allowedCommands.includes('callJob') || t.maximumJobs > 0));
+  check('a kit that allows Change Scene has more than one scene',
+    MINI_APP_TEMPLATES.every((t) => !t.allowedCommands.includes('changeScene') || t.maximumScenes > 1));
+  check('Tap Magic stays flat — no control blocks at all',
+    (() => {
+      const t = miniAppTemplate('tap-react-basic')!;
+      return t.maximumCommandDepth === 1
+        && !t.allowedCommands.includes('if') && !t.allowedCommands.includes('repeatN');
+    })());
+  check('only the Helper kit may ask for approval',
+    MINI_APP_TEMPLATES.filter((t) => t.allowedCommands.includes('askForApproval'))
+      .map((t) => t.type).join() === 'helper');
+
+  // ---- approved shelves ----
+  check('every asset names at least one role', APPROVED_ASSETS.every((a) => a.roles.length > 0));
+  check('every asset has a glyph so nothing renders blank',
+    APPROVED_ASSETS.every((a) => a.glyph.length > 0));
+  check('asset ids are unique',
+    new Set(APPROVED_ASSETS.map((a) => a.id)).size === APPROVED_ASSETS.length);
+  check('only Zip and Mixy claim drawn art',
+    APPROVED_ASSETS.filter((a) => a.svg).map((a) => a.id).sort().join() === 'mixy,zip');
+  check('every component role has at least one asset',
+    APPROVED_COMPONENTS.every((c) => APPROVED_ASSETS.some((a) => a.roles.includes(c.type))));
+  check('there are seven themes, one per world', APP_LAB_THEMES.length === 7);
+  check('sound and phrase ids are unique',
+    new Set(APPROVED_SOUNDS.map((s) => s.id)).size === APPROVED_SOUNDS.length
+    && new Set(PREPARED_PHRASES.map((p) => p.id)).size === PREPARED_PHRASES.length);
+  check('title tokens cover all three groups',
+    (['owner', 'describing', 'thing'] as const).every((g) => tokensInGroup(g).length >= 3));
+  check('layout slot ids are unique within a layout',
+    SCENE_LAYOUTS.every((l) => new Set(l.slots.map((x) => x.id)).size === l.slots.length));
+
+  // ---- starters ----
+  check('there are starters for every template',
+    MINI_APP_TEMPLATES.every((t) => startersForTemplate(t.id).length >= 3));
+  check('starter ids are unique',
+    new Set(MINI_APP_STARTERS.map((s) => s.id)).size === MINI_APP_STARTERS.length);
+  const builtStarters = MINI_APP_STARTERS.map((s) => ({ s, p: s.build(SEED) }));
+  let starterProblems: string[] = [];
+  for (const { s, p } of builtStarters) {
+    const r = validateMiniAppProject(p);
+    if (!r.valid) starterProblems.push(`${s.id}: ${r.issues.map((i) => i.path + ' ' + i.problem).join(' | ')}`);
+  }
+  check('every starter project validates', starterProblems.length === 0);
+  if (starterProblems.length > 0) console.log('   ' + starterProblems.join('\n   '));
+  check('every starter fits its own template limits', builtStarters.every(({ p }) => {
+    const t = miniAppTemplate(p.templateId)!;
+    return p.scenes.length <= t.maximumScenes
+      && p.scenes.every((sc) => sc.components.length <= t.maximumComponentsPerScene)
+      && p.scripts.length <= t.maximumScripts
+      && p.scripts.every((sr) => flattenCommands(sr.commands).length <= t.maximumCommandsPerScript);
+  }));
+  check('every starter ships at least one script to learn from',
+    builtStarters.every(({ p }) => p.scripts.length >= 1));
+  check('every starter declares the ideas it uses',
+    builtStarters.every(({ p }) => p.curriculum.conceptsUsed.length > 0));
+  check('a starter never invents an asset',
+    builtStarters.every(({ p }) => allComponents(p).every((c) => isApprovedAsset(c.assetId))));
+  check('every starter component sits in a slot its layout has',
+    builtStarters.every(({ p }) => p.scenes.every((sc) =>
+      sc.components.every((c) => layoutHasSlot(sc.layoutTemplateId, c.slotId)))));
+  check('every starter component has an accessibility label',
+    builtStarters.every(({ p }) => allComponents(p).every((c) => c.accessibilityLabel.length > 0)));
+  check('starters are deterministic — same seed, same project',
+    JSON.stringify(MINI_APP_STARTERS[0].build(SEED)) === JSON.stringify(MINI_APP_STARTERS[0].build(SEED)));
+  check('only the Helper kit carries a helper brain',
+    builtStarters.every(({ p }) => !p.helper || p.type === 'helper'));
+  check('every helper starter has a goal, a tool and an approval gate',
+    builtStarters.filter(({ p }) => p.type === 'helper').every(({ p }) =>
+      !!p.helper && p.helper.goalId.length > 0 && p.helper.toolIds.length > 0
+      && p.helper.requiresApprovalFor.length > 0));
+
+  // ---- validator rejects everything it should ----
+  const good = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED);
+  check('the reference project is valid', validateMiniAppProject(good).valid);
+
+  const broken = (mutate: (p: MiniAppProject) => MiniAppProject): ReturnType<typeof validateMiniAppProject> =>
+    validateMiniAppProject(mutate(JSON.parse(JSON.stringify(good)) as MiniAppProject));
+
+  check('an unknown schema version is refused',
+    !broken((p) => ({ ...p, schemaVersion: 99 })).valid);
+  check('an unknown template is refused',
+    !broken((p) => ({ ...p, templateId: 'not-a-template' })).valid);
+  check('an unknown theme is refused',
+    !broken((p) => ({ ...p, themeId: 'moon-base' })).valid);
+  check('a typed title is impossible — free text is refused',
+    !broken((p) => ({ ...p, title: { tokens: ['my rude word'] } })).valid);
+  check('too many scenes is refused',
+    !broken((p) => ({ ...p, scenes: [p.scenes[0], { ...p.scenes[0], id: 's2' }] })).valid);
+  check('too many components is refused', !broken((p) => {
+    const extra = Array.from({ length: 12 }, (_, i) => ({
+      ...p.scenes[0].components[0], id: `extra-${i}`, slotId: 'tray-1',
+    }));
+    return { ...p, scenes: [{ ...p.scenes[0], components: extra }] };
+  }).valid);
+  check('an unknown asset is refused',
+    !broken((p) => ({
+      ...p,
+      scenes: [{ ...p.scenes[0], components: [{ ...p.scenes[0].components[0], assetId: 'laser-gun' }, ...p.scenes[0].components.slice(1)] }],
+    })).valid);
+  check('a slot the layout does not have is refused',
+    !broken((p) => ({
+      ...p,
+      scenes: [{ ...p.scenes[0], components: [{ ...p.scenes[0].components[0], slotId: 'nowhere' }, ...p.scenes[0].components.slice(1)] }],
+    })).valid);
+  check('two components in one slot is refused', !broken((p) => {
+    const [a, b, ...rest] = p.scenes[0].components;
+    return { ...p, scenes: [{ ...p.scenes[0], components: [a, { ...b, slotId: a.slotId }, ...rest] }] };
+  }).valid);
+  check('a blank accessibility label is refused',
+    !broken((p) => ({
+      ...p,
+      scenes: [{ ...p.scenes[0], components: [{ ...p.scenes[0].components[0], accessibilityLabel: '  ' }, ...p.scenes[0].components.slice(1)] }],
+    })).valid);
+  check('a script owned by nothing is refused',
+    !broken((p) => ({ ...p, scripts: [{ ...p.scripts[0], ownerId: 'ghost' }] })).valid);
+  check('a trigger this kit does not allow is refused',
+    !broken((p) => ({
+      ...p,
+      scripts: [{ ...p.scripts[0], trigger: { kind: 'onSensorDetected', targetId: p.scripts[0].ownerId } as MiniAppTrigger }],
+    })).valid);
+  check('a command this kit does not allow is refused',
+    !broken((p) => ({
+      ...p,
+      scripts: [{ ...p.scripts[0], commands: [{ kind: 'askForApproval', phrase: 'hello', then: [] } as MiniAppCommand] }],
+    })).valid);
+  check('a command naming an unknown variable is refused',
+    !broken((p) => ({
+      ...p,
+      scripts: [{ ...p.scripts[0], commands: [{ kind: 'increaseCounter', variableId: 'no-such-counter' }] }],
+    })).valid);
+  check('a command naming an unknown component is refused',
+    !broken((p) => ({
+      ...p,
+      scripts: [{ ...p.scripts[0], commands: [{ kind: 'hide', targetId: 'no-such-thing' }] }],
+    })).valid);
+  check('a sound outside the approved shelf is refused',
+    !broken((p) => ({
+      ...p,
+      scripts: [{ ...p.scripts[0], commands: [{ kind: 'playSound', sound: 'airhorn' as never }] }],
+    })).valid);
+  check('a phrase outside the prepared list is refused',
+    !broken((p) => ({
+      ...p,
+      scripts: [{ ...p.scripts[0], commands: [{ kind: 'speakPhrase', targetId: p.scripts[0].ownerId, phrase: 'anything at all' as never }] }],
+    })).valid);
+  check('too many commands in one script is refused', !broken((p) => ({
+    ...p,
+    scripts: [{
+      ...p.scripts[0],
+      commands: Array.from({ length: 20 }, () => ({ kind: 'playSound', sound: 'tap' })) as MiniAppCommand[],
+    }],
+  })).valid);
+  check('nesting deeper than the kit allows is refused', !broken((p) => ({
+    ...p,
+    scripts: [{
+      ...p.scripts[0],
+      commands: [{
+        kind: 'if', test: { kind: 'counterAtLeast', variableId: 'score', value: 1 },
+        then: [{
+          kind: 'if', test: { kind: 'counterAtLeast', variableId: 'score', value: 2 },
+          then: [{
+            kind: 'if', test: { kind: 'counterAtLeast', variableId: 'score', value: 3 },
+            then: [{ kind: 'celebrate' }],
+          }],
+        }],
+      }] as MiniAppCommand[],
+    }],
+  })).valid);
+  check('a goal the kit does not support is refused',
+    !broken((p) => ({ ...p, goal: { ...p.goal, type: 'songPlays' } })).valid);
+  check('a runtime budget above the kit budget is refused',
+    !broken((p) => ({ ...p, runtimeBudget: { ...p.runtimeBudget, maximumSteps: 99_999 } })).valid);
+  check('a project with no declared concepts is refused',
+    !broken((p) => ({ ...p, curriculum: { ...p.curriculum, conceptsUsed: [] } })).valid);
+  check('a helper brain on a non-helper project is refused',
+    !broken((p) => ({
+      ...p,
+      helper: { goalId: 'g', toolIds: [], rules: [], requiresApprovalFor: [] },
+    })).valid);
+
+  check('every rejection carries a child-facing repair line',
+    [
+      broken((p) => ({ ...p, themeId: 'moon-base' })),
+      broken((p) => ({ ...p, scripts: [{ ...p.scripts[0], ownerId: 'ghost' }] })),
+    ].every((r) => !r.valid && typeof r.childMessage === 'string' && r.childMessage.length > 10));
+  check('a rejection never blames the child',
+    !/wrong|invalid|error|bad|failed|you did/i.test(
+      broken((p) => ({ ...p, themeId: 'moon-base' })).childMessage ?? ''));
+  check('every issue names a path a developer can find',
+    broken((p) => ({ ...p, scripts: [{ ...p.scripts[0], ownerId: 'ghost' }] }))
+      .issues.every((i) => i.path.length > 0 && i.problem.length > 0));
+
+  // ---- serialisation ----
+  check('a project round-trips through JSON without loss',
+    JSON.stringify(JSON.parse(JSON.stringify(good))) === JSON.stringify(good));
+  check('a round-tripped project still validates',
+    validateMiniAppProject(JSON.parse(JSON.stringify(good)) as MiniAppProject).valid);
+  check('looksLikeProject catches junk off disk',
+    looksLikeProject(null) !== null && looksLikeProject({}) !== null
+    && looksLikeProject('a string') !== null && looksLikeProject(good) === null);
+  check('the schema version is recorded on every project',
+    builtStarters.every(({ p }) => p.schemaVersion === MINI_APP_SCHEMA_VERSION));
+  check('duplicating a project keeps the content and changes the identity', (() => {
+    const copy = duplicateProject(good, { ...SEED, id: 'proj-copy' }, 2);
+    return copy.id === 'proj-copy' && copy.title.version === 2
+      && JSON.stringify(copy.scripts) === JSON.stringify(good.scripts)
+      && validateMiniAppProject(copy).valid;
+  })());
+  check('a title reads back as words a grown-up can read',
+    titleText({ tokens: ['owner-zip', 'thing-berry', 'thing-game'] }).length > 0);
+
+  // ---- command tree helpers ----
+  const tree: MiniAppCommand[] = [
+    { kind: 'playSound', sound: 'tap' },
+    {
+      kind: 'repeatN', times: 2,
+      body: [{ kind: 'celebrate' }, { kind: 'if', test: { kind: 'basketIsFull', targetId: 'x' }, then: [{ kind: 'showWin' }] }],
+    },
+  ];
+  check('flattenCommands walks the whole tree', flattenCommands(tree).length === 5);
+  check('commandDepth measures nesting', commandDepth(tree) === 3);
+  check('a flat script is depth 1', commandDepth([{ kind: 'celebrate' }]) === 1);
+  check('an empty script is depth 0', commandDepth([]) === 0);
+  check('nestedCommands only looks one level down', nestedCommands(tree[1]).length === 2);
+  check('conditionRefs finds the ids a question mentions',
+    conditionRefs({ kind: 'colorEquals', itemId: 'a', targetId: 'b' }).components.join() === 'a,b'
+    && conditionRefs({ kind: 'counterEquals', variableId: 'v', value: 1 }).variables.join() === 'v');
+  check('triggerRefs finds the ids a trigger mentions',
+    triggerRefs({ kind: 'onTap', targetId: 'a' }).components.join() === 'a'
+    && triggerRefs({ kind: 'onAppStart' }).components.length === 0
+    && triggerRefs({ kind: 'onSceneStart', sceneId: 's1' }).scenes.join() === 's1');
+
+  // ---- Build Mode vs Play Mode ----
+  let st = initialCreatorState();
+  check('the Lab starts in browse mode', st.step === 'lab' && st.mode === 'browse');
+  check('you cannot jump straight to Play Mode', !canApply(st, { kind: 'test' }));
+  st = applyCreatorAction(st, { kind: 'chooseKit' });
+  st = applyCreatorAction(st, { kind: 'chooseTemplate' });
+  check('choosing a template lands in Build Mode', st.step === 'build' && st.mode === 'build');
+  check('Build Mode shows editing chrome', showsEditingChrome(st));
+  st = applyCreatorAction(st, { kind: 'toTeach' });
+  check('teaching behaviour is still Build Mode', st.mode === 'build');
+  st = applyCreatorAction(st, { kind: 'toPredict' });
+  check('prediction comes before the run', st.step === 'predict');
+  st = applyCreatorAction(st, { kind: 'test' });
+  check('testing enters Play Mode', st.step === 'play' && st.mode === 'play');
+  check('Play Mode hides editing chrome', !showsEditingChrome(st));
+  check('the Debug button is hidden until something surprising happens', !showsDebugButton(st));
+  st = applyCreatorAction(st, { kind: 'unexpectedResult' });
+  check('an unexpected result opens Debug', st.step === 'debug');
+  check('Debug counts as Build Mode, not Play', st.mode === 'build');
+  st = applyCreatorAction(st, { kind: 'editFromDebug' });
+  check('editing from Debug returns to teaching', st.step === 'teach');
+  check('an illegal action leaves the state untouched', (() => {
+    const before = applyCreatorAction(initialCreatorState(), { kind: 'chooseKit' });
+    return applyCreatorAction(before, { kind: 'editFromDebug' }) === before;
+  })());
+  check('every step declares exactly one mode',
+    Object.values(STEP_MODE).every((m) => m === 'build' || m === 'play' || m === 'browse'));
+  check('only play is Play Mode',
+    Object.entries(STEP_MODE).filter(([, m]) => m === 'play').map(([k]) => k).join() === 'play');
+
+  // ---- kit unlocking is gentle ----
+  const noEvidence: EvidenceEvent[] = [];
+  const tapKit = appKit('tap-magic')!;
+  check('no kit is open on a blank save',
+    APP_KITS.every((k) => !kitAvailability(k, noEvidence).unlocked));
+  check('a grown-up can open every kit by hand',
+    APP_KITS.every((k) => kitAvailability(k, noEvidence, true).unlocked));
+  const metSeqEvents: EvidenceEvent[] = [
+    { stage: 'sequence', requirement: 'seq-order', phase: 'discover', levelId: 'sm-1', note: 'n' },
+    { stage: 'events', requirement: 'evt-trigger', phase: 'discover', levelId: 'sm-2', note: 'n' },
+  ];
+  check('Tap Magic opens once its ideas have merely been MET',
+    kitAvailability(tapKit, metSeqEvents).unlocked);
+  check('a kit whose ideas are not met yet stays shut',
+    !kitAvailability(appKit('helper-builder')!, metSeqEvents).unlocked);
+  check('a locked kit says what is coming, never what is missing', (() => {
+    const av = kitAvailability(appKit('helper-builder')!, metSeqEvents);
+    const line = waitingSentence(av.waitingOn);
+    return line.length > 0 && !/need|must|cannot|locked|fail/i.test(line);
+  })());
+  check('every kit prerequisite is a real curriculum stage',
+    APP_KITS.every((k) => k.prerequisites.every((p) => CURRICULUM_STAGES.some((s) => s.id === p))));
+  check('a kit only requires ideas its template actually teaches',
+    APP_KITS.every((k) => {
+      const taught = templatesForType(k.type)[0]?.conceptsTaught ?? [];
+      return k.prerequisites.every((p) => taught.includes(p));
+    }));
+  check('kit prerequisites match the template registry',
+    APP_KITS.every((k) => {
+      const t = templatesForType(k.type)[0];
+      return !!t && [...k.prerequisites].sort().join() === [...t.curriculumPrerequisites].sort().join();
+    }));
+  check('the next kit is the first still-locked one in order',
+    nextKit(noEvidence)?.id === 'tap-magic'
+    && nextKit(metSeqEvents)?.id === 'sort-and-match');
+  check('nothing is next once a grown-up opens everything',
+    nextKit(noEvidence, true) === null);
+
+  // ---- safety: nothing in the model can carry code ----
+  check('no starter contains a raw script, url or handler string', (() => {
+    const json = JSON.stringify(builtStarters.map(({ p }) => p));
+    return !/<script|javascript:|https?:\/\/|function\s*\(|=>|eval\(/i.test(json);
+  })());
+  check('the only asset paths are the two local character SVGs',
+    APPROVED_ASSETS.filter((a) => a.svg).every((a) => a.svg!.startsWith('./art/')));
+
+  // The creator must stay pure: no rendering, no DOM, no storage, and
+  // nothing that could execute a string. Checked against the real files.
+  {
+    const dir = readdirSync('src/creator').filter((f) => f.endsWith('.ts'));
+    check('the creator tree has files to check', dir.length >= 6);
+    const offenders: string[] = [];
+    for (const f of dir) {
+      // Scan code only — a comment that mentions Date.now() is fine, and
+      // in fact this file's own header explains why it does not call it.
+      const src = readFileSync(`src/creator/${f}`, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      if (/from '(three|\.\.\/rendering|\.\.\/ui|\.\.\/engine|\.\.\/storage)/.test(src)) offenders.push(`${f}: imports rendering/DOM/storage`);
+      if (/\bdocument\b|\bwindow\b|localStorage|indexedDB/.test(src)) offenders.push(`${f}: touches the DOM or storage`);
+      if (/\beval\(|new Function|innerHTML|setTimeout\(\s*['"]/.test(src)) offenders.push(`${f}: can execute a string`);
+      if (/Date\.now\(|Math\.random\(/.test(src)) offenders.push(`${f}: is not deterministic`);
+    }
+    check('the creator is pure, deterministic and cannot execute a string',
+      offenders.length === 0);
+    if (offenders.length > 0) console.log('   ' + offenders.join('\n   '));
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

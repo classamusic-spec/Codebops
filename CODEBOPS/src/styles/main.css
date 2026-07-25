@@ -2610,6 +2610,179 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .camp-world.on .cw-state { background: #7ee79b; color: #0b2415; }
 
 /* ============================================================
+   Zip's App Lab — the creator's workshop wall (App Lab §9.1)
+   A bright invention studio: six glowing stations, Zip beside the
+   one that is next, and a locked station that still says what it
+   will be about.
+   ============================================================ */
+.wp-applab { background: linear-gradient(180deg, #2f4a86, #23315e); }
+.applab-row { background: linear-gradient(180deg, #3a6ad0, #2a4da0); }
+.applab-row .li-leaf { filter: none; }
+.applab-pill {
+  background: linear-gradient(180deg, #8fe3ff, #4fb8e8); color: #0b2340;
+  font-size: 11px; white-space: nowrap;
+}
+
+.applab-screen {
+  position: relative; overflow-y: auto;
+  padding: max(14px, var(--sat)) max(14px, var(--sar)) 24px max(14px, var(--sal));
+  /* One gradient over the whole box, so a short page has no seam where
+     the content happens to stop. */
+  min-height: 100%;
+  background: radial-gradient(130% 90% at 50% 0%, #35529a 0%, #1f2a52 55%, #151d3a 100%);
+  background-attachment: local;
+}
+
+.al-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.al-titles { flex: 1; min-width: 190px; }
+.al-titles h1 {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: clamp(22px, 3vw, 34px); margin: 0;
+}
+.al-titles p {
+  color: #9fe0ff; font-weight: 800; margin: 2px 0 0;
+  font-size: clamp(12px, 1.5vw, 16px); letter-spacing: .4px;
+}
+
+.al-library-btn {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font: inherit;
+  background: linear-gradient(180deg, #6f5cd8, #5040b0);
+  border: 3px solid rgba(255,255,255,.2); border-radius: 999px;
+  padding: 8px 14px; color: #fff; font-weight: 800; font-size: 13px;
+  box-shadow: 0 4px 0 rgba(13,20,55,.5);
+}
+.al-library-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(13,20,55,.5); }
+.al-lib-count {
+  background: rgba(255,255,255,.22); border-radius: 999px; padding: 1px 8px; font-size: 12px;
+}
+
+.al-draft-note {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  background: rgba(255,207,62,.16); border: 2px solid rgba(255,207,62,.45);
+  border-radius: var(--r-lg); padding: 8px 12px;
+  color: #ffe9a8; font-weight: 800; font-size: 13px;
+}
+
+/* ---- the station wall ---- */
+.al-wall {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-bottom: 18px;
+}
+.al-station {
+  position: relative; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.04));
+  border: 3px solid rgba(255,255,255,.16); border-radius: var(--r-xl);
+  padding: 14px 12px 12px; text-align: center;
+  animation: alStationIn .42s var(--ease-bounce) backwards;
+  animation-delay: calc(var(--i) * 0.05s);
+}
+@keyframes alStationIn { from { opacity: 0; transform: translateY(12px) scale(.94); } }
+.al-station.locked { opacity: .62; }
+.al-station.up-next {
+  border-color: #8fe3ff;
+  box-shadow: 0 0 20px rgba(143,227,255,.35);
+}
+.al-station.shake { animation: shake .42s ease; }
+
+.al-station-badge {
+  position: relative; width: 68px; height: 68px; margin: 0 auto 9px;
+  border-radius: 22px; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 32%, rgba(255,255,255,.28), rgba(13,20,55,.42));
+  border: 3px solid rgba(255,255,255,.2);
+}
+.al-station.up-next .al-station-badge {
+  border-color: #8fe3ff;
+  background: radial-gradient(circle at 50% 32%, #d8f4ff, #6fc4ea);
+}
+.al-station-glyph { font-size: 34px; line-height: 1; }
+.al-station-lock { position: absolute; bottom: -6px; right: -6px; font-size: 19px; }
+.al-station-next { position: absolute; top: -9px; right: -8px; font-size: 19px; }
+
+.al-station-name {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: 15px; line-height: 1.15;
+}
+.al-station-blurb {
+  color: #c3d4ff; font-size: 11.5px; line-height: 1.3;
+  margin: 4px 0 7px; min-height: 30px;
+}
+
+.al-station-concepts { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.al-concept-chip {
+  background: rgba(143,227,255,.16); color: #9fe0ff; border-radius: 999px;
+  padding: 2px 7px; font-size: 9.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+
+.al-station-foot {
+  margin-top: auto; padding-top: 9px;
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+}
+.al-station-saved { color: #9fb4e8; font-size: 10.5px; font-weight: 800; }
+.al-station-open {
+  cursor: pointer; font: inherit;
+  background: linear-gradient(180deg, #4fd07a, #27a758);
+  border: 3px solid rgba(255,255,255,.22); border-radius: 999px;
+  padding: 7px 18px; color: #fff; font-family: var(--font-display);
+  font-weight: 800; font-size: 13px; letter-spacing: .5px;
+  box-shadow: 0 4px 0 rgba(13,20,55,.45);
+}
+.al-station-open:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(13,20,55,.45); }
+.al-station-open.locked { background: linear-gradient(180deg, #6a7290, #4c5372); }
+
+/* ---- Zip beside the wall ---- */
+.al-zip {
+  order: 3; margin-left: auto; align-self: flex-end;
+  width: clamp(64px, 9vw, 104px); pointer-events: none;
+  opacity: 0; transition: opacity .4s ease;
+}
+.al-zip.ready { opacity: 1; }
+.al-zip svg { width: 100%; height: auto; display: block; }
+
+.al-foot {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  min-height: 56px;
+}
+.al-foot-note { color: #8fa3d8; font-size: 11.5px; font-weight: 700; }
+
+.al-toast { z-index: 40; }
+
+/* Narrow phones: two stations per row, and Zip steps out of the way. */
+@media (max-width: 620px) {
+  .applab-screen { padding-left: max(10px, var(--sal)); padding-right: max(10px, var(--sar)); }
+  .al-wall { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .al-station { padding: 10px 8px 9px; border-width: 2px; }
+  .al-station-badge { width: 52px; height: 52px; border-radius: 16px; margin-bottom: 7px; }
+  .al-station-glyph { font-size: 26px; }
+  .al-station-name { font-size: 13px; }
+  .al-station-blurb { font-size: 10.5px; min-height: 26px; }
+  .al-concept-chip { font-size: 8.5px; padding: 1px 6px; }
+  .al-zip { width: 58px; }
+}
+
+/* Landscape phones: three across, shorter cards, Zip tucked small. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .applab-screen { padding-top: max(8px, var(--sat)); }
+  .al-header { margin-bottom: 9px; }
+  .al-wall { gap: 8px; margin-bottom: 10px; }
+  .al-station { padding: 9px 8px 8px; }
+  .al-station-badge { width: 48px; height: 48px; border-radius: 15px; margin-bottom: 6px; }
+  .al-station-glyph { font-size: 24px; }
+  .al-station-name { font-size: 12.5px; }
+  .al-station-blurb { font-size: 10px; min-height: 24px; margin: 3px 0 5px; }
+  .al-station-concepts { display: none; }
+  .al-station-open { padding: 5px 14px; font-size: 12px; }
+  .al-zip { width: 62px; }
+  .al-foot { min-height: 0; }
+}
+
+/* Reduced motion: stations appear rather than bounce in. */
+@media (prefers-reduced-motion: reduce) {
+  .al-station { animation: none; }
+}
+.calm-mode .al-station { animation: none; }
+
+/* ============================================================
    Landscape phones — hand the screen back to the toy.
    The camera now frames into the space chrome leaves, so every
    pixel we save here becomes a bigger machine.

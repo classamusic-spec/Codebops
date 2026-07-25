@@ -26,10 +26,12 @@ import { GearworksPaintScreen } from './gearworksPaintScreen';
 import { GearworksStoryScreen } from './gearworksStoryScreen';
 import { GearworksMakerScreen } from './gearworksMakerScreen';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
+import { APP_LAB_WORLD } from '../data/app-lab/appLabDefinition';
 import { garageTotals } from '../data/gearworks/progress';
 import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
 import { JourneyScreen } from './journeyScreen';
+import { AppLabScreen } from './appLabScreen';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
   'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
@@ -58,6 +60,7 @@ export class App {
   private garden: GardenScreen | null = null;
   private trophy: GearworksTrophyScreen | null = null;
   private journey: JourneyScreen | null = null;
+  private appLab: AppLabScreen | null = null;
   private editor: EditorScreen | null = null;
   private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | GearworksMakerScreen | null = null;
   private store = new SaveStore();
@@ -92,6 +95,8 @@ export class App {
     this.trophy = null;
     this.journey?.dispose();
     this.journey = null;
+    this.appLab?.dispose();
+    this.appLab = null;
     this.editor?.dispose();
     this.editor = null;
     this.gearworks?.dispose();
@@ -359,6 +364,28 @@ export class App {
       });
     }
 
+    // --- Zip's App Lab — the creative capstone ---
+    {
+      const lab = el('div', 'world-panel wp-applab', wrap);
+      const labTitle = el('div', 'world-title', lab);
+      el('span', 'wemoji', labTitle, APP_LAB_WORLD.glyph);
+      el('span', undefined, labTitle, APP_LAB_WORLD.name);
+      el('span', 'gw-new-badge', labTitle, 'NEW!');
+      const labList = el('div', 'level-list', lab);
+      const row = el('button', 'level-item applab-row', labList) as HTMLButtonElement;
+      row.type = 'button';
+      row.setAttribute('aria-label', "Open Zip's App Lab");
+      const num = el('span', 'li-num gw-num', row);
+      el('span', 'li-num-text', num, '★');
+      el('span', 'li-leaf', num, '🧪');
+      el('span', 'li-emoji', row, '🛠️');
+      const mid = el('span', 'li-name', row, 'Build your own app');
+      mid.title = APP_LAB_WORLD.tagline;
+      const right = el('span', 'li-right', row);
+      el('span', 'stars-pill applab-pill', right, APP_LAB_WORLD.tagline);
+      row.addEventListener('click', () => { sharedSfx.play('bop'); this.showAppLab(); });
+    }
+
     // --- Imagination Island ---
     const customs = loadCustomLevels();
     const section = el('div', 'world-panel wp-island', wrap);
@@ -494,6 +521,20 @@ export class App {
       onBack: () => this.showSelect(),
     });
     this.trophy.enter();
+  }
+
+  // ---------- Zip's App Lab ----------
+
+  private showAppLab(): void {
+    this.clearHost();
+    this.store = new SaveStore(); // read the evidence that unlocks kits
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-applab';
+    this.appLab = new AppLabScreen(screen, this.store, {
+      onBack: () => this.showSelect(),
+      onOpenJourney: () => this.showJourney(),
+    });
+    this.appLab.enter();
   }
 
   // ---------- learning garden (curriculum map) ----------
