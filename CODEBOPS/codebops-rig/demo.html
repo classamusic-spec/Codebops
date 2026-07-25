@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codebops-rig — Zip &amp; Mixy</title>
+<style>
+  body{margin:0;background:#f5f3fb;font:14px system-ui,sans-serif;color:#1e0f55;
+       display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px}
+  #stage{width:min(440px,84vw);aspect-ratio:1;display:block;cursor:pointer}
+  .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:620px}
+  button{font:inherit;padding:9px 15px;border-radius:10px;border:1px solid #cbbde8;
+         background:#fff;color:#1e0f55;cursor:pointer;min-height:42px}
+  button:hover{background:#efe8ff} button.on{background:#8834f4;color:#fff;border-color:#8834f4}
+  label{display:flex;align-items:center;gap:8px} input[type=range]{width:200px}
+</style></head><body>
+<div class="row" id="who"></div>
+<canvas id="stage"></canvas>
+<div class="row" id="anims"></div>
+<label>Turn <input id="turn" type="range" min="-1" max="1" step="0.01" value="0"></label>
+
+<script type="module">
+import { createRig } from './codebops-rig.js';
+import ZIP  from './characters/zip.js';
+import MIXY from './characters/mixy.js';
+
+const canvas = document.getElementById('stage');
+const CHARS = { zip: ZIP, mixy: MIXY };
+let rig = null;
+
+async function load(id){
+  if(rig) rig.destroy();
+  rig = await createRig(CHARS[id], { canvas, autoBlink: true });
+  rig.followPointer(canvas).start();
+  buildAnimButtons();
+  document.querySelectorAll('#who button').forEach(b=>b.classList.toggle('on', b.dataset.id===id));
+  document.getElementById('turn').value = '0';
+}
+
+function buildAnimButtons(){
+  const box = document.getElementById('anims');
+  box.innerHTML = '';
+  for(const name of rig.animations){
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.onclick = ()=> rig.play(name, { restart:true });
+    box.append(b);
+  }
+  const bl = document.createElement('button');
+  bl.textContent = 'blink'; bl.onclick = ()=> rig.blink();
+  box.append(bl);
+}
+
+for(const id of Object.keys(CHARS)){
+  const b = document.createElement('button');
+  b.textContent = CHARS[id].name; b.dataset.id = id;
+  b.onclick = ()=> load(id);
+  document.getElementById('who').append(b);
+}
+
+new ResizeObserver(()=> rig && rig.resize()).observe(canvas);
+document.getElementById('turn').oninput = e => rig.setTurn(+e.target.value);
+canvas.onclick    = ()=> rig.play('happy', { restart:true });
+canvas.ondblclick = ()=> rig.hop();
+
+await load('zip');
+</script>
+</body></html>

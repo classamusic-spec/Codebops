@@ -1,0 +1,22 @@
+{
+  "name": "codebops-rig",
+  "version": "1.1.0",
+  "description": "Layered vector character rigs for the CodeBops mascots Zip and Mixy. Zero dependencies.",
+  "type": "module",
+  "main": "codebops-rig.js",
+  "module": "codebops-rig.js",
+  "types": "codebops-rig.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": "./codebops-rig.js",
+    "./characters/zip": "./characters/zip.js",
+    "./characters/mixy": "./characters/mixy.js",
+    "./three-adapter": "./three-adapter.js",
+    "./atlas/zip": "./atlas/zip-atlas.json",
+    "./atlas/mixy": "./atlas/mixy-atlas.json"
+  },
+  "files": ["codebops-rig.js", "codebops-rig.d.ts", "three-adapter.js", "characters", "atlas"],
+  "keywords": ["character", "rig", "animation", "svg", "canvas", "mascot", "sprite"],
+  "license": "UNLICENSED",
+  "private": true
+}
