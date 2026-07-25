@@ -4,7 +4,7 @@
  */
 import { el } from '../ui/dom';
 import { SaveStore } from '../storage/saveStore';
-import { inlineSvgInto, startMascotLife } from '../rendering/spriteCharacter';
+import { mountMascot } from '../rendering/mascotRig';
 import { sharedSfx } from '../audio/sfx';
 
 const FLOWERS = ['🌸', '🌼', '🌷', '🌻', '🌹', '💐', '🪻', '🌺'];
@@ -50,14 +50,14 @@ export class GardenScreen {
     el('div', 'garden-count', header, `🌼 ${totalStars + golden} flowers`);
 
     // Mascots enjoying the garden
-    const zipBox = el('div', 'garden-mascot zip', screen);
-    void inlineSvgInto(zipBox, './art/characters/zip/zip.svg').then((svg) => {
-      if (svg) this.stops.push(startMascotLife(svg));
-    });
-    const mixyBox = el('div', 'garden-mascot mixy', screen);
-    void inlineSvgInto(mixyBox, './art/characters/mixy/mixy.svg').then((svg) => {
-      if (svg) this.stops.push(startMascotLife(svg));
-    });
+    const calm = this.store.settings.calmMode;
+    for (const [who, cls] of [['zip', 'zip'], ['mixy', 'mixy']] as const) {
+      const box = el('div', `garden-mascot ${cls}`, screen);
+      box.setAttribute('role', 'img');
+      box.setAttribute('aria-label', who === 'zip' ? 'Zip' : 'Mixy');
+      const mascot = mountMascot(box, who, { calm, followPointer: true });
+      this.stops.push(() => mascot.destroy());
+    }
 
     // Flower field — deterministic positions, swaying gently
     const field = el('div', 'garden-field', screen);

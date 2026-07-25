@@ -3460,6 +3460,65 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
 }
 
 // ============================================================
+// Vendored code — the character rig
+// ============================================================
+{
+  // src/vendor holds third-party code copied in verbatim, so ESLint skips
+  // it and no reviewer reads it line by line on an update. That is exactly
+  // why the safety boundary has to be a test: an update that started
+  // executing strings or calling home would otherwise land unnoticed.
+  const vendorFiles = [
+    ...readdirSync('src/vendor/codebops-rig').map((f) => `src/vendor/codebops-rig/${f}`),
+    ...readdirSync('src/vendor/codebops-rig/characters')
+      .map((f) => `src/vendor/codebops-rig/characters/${f}`),
+  ].filter((f) => f.endsWith('.js'));
+  const vendor = new Map(vendorFiles.map((f) => [f, readFileSync(f, 'utf8')]));
+
+  check('the rig ships as more than one file', vendor.size >= 3);
+
+  check('the rig never runs a string as code', [...vendor]
+    .filter(([, s]) => /\beval\(|new Function\(|document\.write|setTimeout\(\s*['"`]/.test(s))
+    .length === 0);
+
+  check('the rig never reaches the network', [...vendor]
+    .filter(([, s]) => /\bfetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/.test(s))
+    .length === 0);
+
+  // The one innerHTML in the rig writes bundled artwork into an offscreen
+  // SVG probe to measure a layer's bounding box. Nothing a child typed can
+  // reach it — but it is the sort of line that must stay accounted for, so
+  // this pins it to that single call site.
+  check('the only markup the rig inserts is its own bundled art', (() => {
+    const sites: string[] = [];
+    for (const [file, src] of vendor) {
+      for (const m of src.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)) sites.push(`${file}: ${m[1].trim()}`);
+      if (/insertAdjacentHTML|\.outerHTML\s*=/.test(src)) sites.push(`${file}: outerHTML`);
+    }
+    return sites.length === 1
+      && sites[0] === 'src/vendor/codebops-rig/codebops-rig.js: character.defs + layer.svg';
+  })());
+
+  check('the rig names no external address',
+    [...vendor].filter(([, s]) => /https?:\/\/(?!www\.w3\.org)/.test(s)).length === 0);
+
+  // A wrapper that edited the vendored files would turn every future
+  // update into a merge. The app talks to the rig through one module.
+  check('the app reaches the rig only through the mascot wrapper', (() => {
+    const users: string[] = [];
+    const walk = (dir: string): void => {
+      for (const f of readdirSync(dir, { withFileTypes: true })) {
+        if (f.name === 'vendor') continue;
+        const p = `${dir}/${f.name}`;
+        if (f.isDirectory()) walk(p);
+        else if (p.endsWith('.ts') && /vendor\/codebops-rig/.test(readFileSync(p, 'utf8'))) users.push(p);
+      }
+    };
+    walk('src');
+    return users.length === 1 && users[0] === 'src/rendering/mascotRig.ts';
+  })());
+}
+
+// ============================================================
 // Pick a Level — one island at a time
 // ============================================================
 {

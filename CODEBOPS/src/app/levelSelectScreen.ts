@@ -21,7 +21,7 @@
  */
 import { el } from '../ui/dom';
 import { sharedSfx } from '../audio/sfx';
-import { inlineSvgInto } from '../rendering/spriteCharacter';
+import { mountMascot } from '../rendering/mascotRig';
 import type { SaveStore } from '../storage/saveStore';
 import type { LevelDef } from '../data/schemas/level';
 import { ALL_LEVELS } from '../data/levels';
@@ -423,11 +423,11 @@ export class LevelSelectScreen {
       locked ? '🔒 Not yet' : (stone.state === 'done' ? '↻ Play again' : '▶ Play'));
 
     if (stone.state === 'next') {
+      // Zip stands beside the orb that is next, and hops when it is picked.
       const zip = el('span', 'sel2-zip', cell);
       zip.setAttribute('aria-hidden', 'true');
-      void inlineSvgInto(zip, './art/characters/zip/zip.svg').then((svg) => {
-        if (!this.disposed && svg) zip.classList.add('ready');
-      });
+      const mascot = mountMascot(zip, 'zip', { calm: this.store.settings.calmMode });
+      this.mascotStops.push(() => mascot.destroy());
     }
 
     if (stone.onPlay) {

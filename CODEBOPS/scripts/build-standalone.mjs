@@ -6,14 +6,20 @@
  * registry, shim `fetch` to serve those SVGs, and sweep <img>/mask URLs that
  * point at ./art so they resolve to the embedded copies.
  *
- * Run after `npm run build`:  node scripts/build-standalone.mjs
+ * Run via `npm run build:standalone`, which builds dist-standalone/ first.
+ * That build folds the lazily-loaded character rig back into the entry
+ * chunk — on file:// a dynamic import has nothing to fetch from, so a
+ * split build would boot with no mascots and no error worth the name.
  */
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const dist = join(root, 'dist');
+const dist = join(root, 'dist-standalone');
+if (!existsSync(dist)) {
+  throw new Error('Run `npm run build:standalone` — dist-standalone/ is missing.');
+}
 
 // Take the entry names from the built index.html, never by scanning the
 // directory: a stale bundle left over from an earlier build sorts first
@@ -22,10 +28,13 @@ const indexHtml = readFileSync(join(dist, 'index.html'), 'utf8');
 const jsName = indexHtml.match(/assets\/([^"']+\.js)/)?.[1];
 const cssName = indexHtml.match(/assets\/([^"']+\.css)/)?.[1];
 if (!jsName || !cssName) throw new Error('Build first: dist/index.html names no bundle.');
+// Nothing else may be in there. A leftover chunk would mean the build did
+// not actually inline its dynamic imports, and the file would ship a
+// mascot the browser can never load.
 const assets = readdirSync(join(dist, 'assets'));
-const stale = assets.filter((f) => f !== jsName && f !== cssName);
-if (stale.length > 0) {
-  console.warn(`[standalone] ignoring ${stale.length} stale asset(s) in dist/assets: ${stale.join(', ')}`);
+const extra = assets.filter((f) => f !== jsName && f !== cssName);
+if (extra.length > 0) {
+  throw new Error(`[standalone] ${extra.length} un-inlined chunk(s): ${extra.join(', ')}`);
 }
 
 const js = readFileSync(join(dist, 'assets', jsName), 'utf8');

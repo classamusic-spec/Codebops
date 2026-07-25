@@ -12,7 +12,7 @@
 import { el } from '../ui/dom';
 import { SaveStore } from '../storage/saveStore';
 import { sharedSfx } from '../audio/sfx';
-import { inlineSvgInto } from '../rendering/spriteCharacter';
+import { mountMascot } from '../rendering/mascotRig';
 import {
   APP_LAB_WORLD, APP_KITS, APP_LAB_ALL_KITS, kitAvailability, waitingSentence, nextKit,
 } from '../data/app-lab/appLabDefinition';
@@ -172,10 +172,10 @@ export class AppLabScreen {
     const zipBox = el('div', 'al-zip', foot);
     zipBox.setAttribute('role', 'img');
     zipBox.setAttribute('aria-label', 'Zip');
-    void inlineSvgInto(zipBox, './art/characters/zip/zip.svg').then((svg) => {
-      if (this.disposed || !svg) return;
-      zipBox.classList.add('ready');
+    const zipMascot = mountMascot(zipBox, 'zip', {
+      calm: this.store.settings.calmMode, followPointer: true,
     });
+    this.mascotStops.push(() => zipMascot.destroy());
     void this.library.isDurable().then(async (durable) => {
       if (this.disposed) return;
       const n = await this.library.count();

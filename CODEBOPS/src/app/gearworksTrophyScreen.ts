@@ -8,7 +8,7 @@
 import { el } from '../ui/dom';
 import { SaveStore } from '../storage/saveStore';
 import { sharedSfx } from '../audio/sfx';
-import { inlineSvgInto, startMascotLife } from '../rendering/spriteCharacter';
+import { mountMascot } from '../rendering/mascotRig';
 import { spawnConfetti } from '../ui/dialogs';
 import { GEARWORKS_CONCEPTS, conceptProgress, garageTotals } from '../data/gearworks/progress';
 
@@ -16,7 +16,6 @@ export class GearworksTrophyScreen {
   private stops: Array<() => void> = [];
   private timers: number[] = [];
   /** The mascot SVG loads async — if we're gone by then, don't start it. */
-  private disposed = false;
 
   constructor(
     private readonly root: HTMLElement,
@@ -53,13 +52,12 @@ export class GearworksTrophyScreen {
     if (totals.allComplete) {
       const dip = el('div', 'gw-tr-diploma', screen);
       const mascot = el('div', 'gw-tr-dip-mascot', dip);
-      void inlineSvgInto(mascot, './art/characters/zip/zip.svg').then((svg) => {
-        if (!svg) return;
-        // Navigating away mid-load must not start (or orphan) the
-        // self-re-arming blink/glance timers.
-        if (this.disposed) return;
-        this.stops.push(startMascotLife(svg));
+      // Zip celebrates on the diploma. The handle's own destroy() covers
+      // navigating away mid-load, so there is nothing to guard here.
+      const zip = mountMascot(mascot, 'zip', {
+        calm: this.store.settings.calmMode, start: 'happy',
       });
+      this.stops.push(() => zip.destroy());
       const dtext = el('div', 'gw-tr-dip-text', dip);
       el('div', 'gw-tr-dip-kicker', dtext, 'GEARWORKS GARAGE');
       el('div', 'gw-tr-dip-title', dtext, 'Master Inventor Diploma');
@@ -90,7 +88,6 @@ export class GearworksTrophyScreen {
   }
 
   dispose(): void {
-    this.disposed = true;
     this.timers.forEach((t) => window.clearTimeout(t));
     this.timers = [];
     this.stops.forEach((s) => s());

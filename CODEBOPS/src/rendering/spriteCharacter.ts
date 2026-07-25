@@ -171,30 +171,13 @@ function addStarEyes(pupils: Array<{ el: SVGGraphicsElement }>): void {
   }
 }
 
-/**
- * Give an inlined mascot SVG ambient life (blink + glances) outside the
- * 3D world — used on the title screen. Returns a stop function.
+/*
+ * There used to be a startMascotLife() here that gave an inlined SVG
+ * ambient blinks and glances on the flat screens. codebops-rig does that
+ * itself now (see rendering/mascotRig.ts), so it went. Everything left in
+ * this file serves SpriteCharacter — the mascots inside the 3D world,
+ * which are still inline SVG projected onto the scene.
  */
-export function startMascotLife(svg: SVGSVGElement): () => void {
-  let alive = true;
-  const blink = (): void => {
-    if (!alive) return;
-    svg.classList.add('blink');
-    window.setTimeout(() => svg.classList.remove('blink'), 150);
-    window.setTimeout(blink, 1800 + Math.random() * 2600);
-  };
-  const glance = (): void => {
-    if (!alive) return;
-    svg.classList.remove('look-left', 'look-right', 'look-up');
-    const dirs = ['look-left', 'look-right', 'look-up', ''];
-    const pick = dirs[Math.floor(Math.random() * dirs.length)];
-    if (pick) svg.classList.add(pick);
-    window.setTimeout(glance, 3200 + Math.random() * 3600);
-  };
-  window.setTimeout(blink, 900 + Math.random() * 1200);
-  window.setTimeout(glance, 2200);
-  return () => { alive = false; };
-}
 
 const UP = new THREE.Vector3(0, 1, 0);
 // Scratch vectors reused every frame (avoids per-frame GC churn).

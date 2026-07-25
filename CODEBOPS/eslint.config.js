@@ -14,7 +14,10 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'public/**', 'scripts/**', '*.html'] },
+  // src/vendor holds third-party code copied in verbatim. Linting it would
+  // pressure us to edit it, which would turn every future update into a
+  // merge instead of a re-copy.
+  { ignores: ['dist/**', 'node_modules/**', 'public/**', 'scripts/**', '*.html', 'src/vendor/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

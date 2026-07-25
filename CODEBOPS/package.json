@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:logic": "esbuild test/logic.test.ts --bundle --platform=node --outfile=/tmp/logic-test.cjs && node /tmp/logic-test.cjs",
-    "build:standalone": "vite build && node scripts/build-standalone.mjs",
+    "build:standalone": "vite build --config vite.standalone.config.js && node scripts/build-standalone.mjs",
     "lint": "eslint src test"
   },
   "dependencies": {

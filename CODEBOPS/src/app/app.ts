@@ -5,7 +5,8 @@ import { ALL_LEVELS } from '../data/levels';
 import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { deleteCustomLevel } from '../storage/customLevels';
-import { inlineSvgInto, startMascotLife, loadSvg } from '../rendering/spriteCharacter';
+import { loadSvg } from '../rendering/spriteCharacter';
+import { mountMascot } from '../rendering/mascotRig';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
@@ -144,15 +145,20 @@ export class App {
     const flowers = ['🌸', '🌼', '🌺', '🌻'];
     flowers.forEach((f, i) => el('span', `title-flower f${i}`, ground, f));
 
-    // Live traced mascots (blinking + glancing)
-    const zipBox = el('div', 'title-mascot zip', screen);
-    void inlineSvgInto(zipBox, './art/characters/zip/zip.svg').then((svg) => {
-      if (svg) this.mascotStops.push(startMascotLife(svg));
-    });
-    const mixyBox = el('div', 'title-mascot mixy', screen);
-    void inlineSvgInto(mixyBox, './art/characters/mixy/mixy.svg').then((svg) => {
-      if (svg) this.mascotStops.push(startMascotLife(svg));
-    });
+    // Live rigged mascots: they idle, breathe, blink on a seeded schedule
+    // and watch the pointer. Tapping one makes it hop.
+    const calm = this.store.settings.calmMode;
+    for (const [who, cls] of [['zip', 'zip'], ['mixy', 'mixy']] as const) {
+      const box = el('div', `title-mascot ${cls}`, screen);
+      box.setAttribute('role', 'img');
+      box.setAttribute('aria-label', who === 'zip' ? 'Zip' : 'Mixy');
+      const mascot = mountMascot(box, who, { calm, followPointer: true });
+      box.addEventListener('click', () => {
+        sharedSfx.play('hop');
+        mascot.play('happy');
+      });
+      this.mascotStops.push(() => mascot.destroy());
+    }
 
     const card = el('div', 'title-card', screen);
     // Official CodeBops logo mark, animated: drop-bounce in, idle rock,

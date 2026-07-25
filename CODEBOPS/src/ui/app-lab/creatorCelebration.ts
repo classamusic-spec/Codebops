@@ -13,7 +13,7 @@
  */
 import { el } from '../dom';
 import { sharedSfx } from '../../audio/sfx';
-import { inlineSvgInto } from '../../rendering/spriteCharacter';
+import { mountMascot } from '../../rendering/mascotRig';
 import type { CreatorReward } from '../../data/app-lab/creatorRewards';
 
 const HEADLINE: Readonly<Record<CreatorReward['kind'], string>> = {
@@ -29,9 +29,9 @@ function headlineFor(rewards: readonly CreatorReward[]): string {
   return kinds.size === 1 ? HEADLINE[rewards[0].kind] : 'Look what you made!';
 }
 
-const CHEER: Readonly<Record<'zip' | 'mixy', { name: string; svg: string; line: string }>> = {
-  zip: { name: 'Zip', svg: './art/characters/zip/zip.svg', line: 'Zip is doing a little hop.' },
-  mixy: { name: 'Mixy', svg: './art/characters/mixy/mixy.svg', line: 'Mixy is very pleased.' },
+const CHEER: Readonly<Record<'zip' | 'mixy', { name: string; line: string }>> = {
+  zip: { name: 'Zip', line: 'Zip is doing a little hop.' },
+  mixy: { name: 'Mixy', line: 'Mixy is very pleased.' },
 };
 
 /**
@@ -58,7 +58,11 @@ export function showCreatorCelebration(
   const mascot = el('div', 'cc-mascot', dlg);
   mascot.setAttribute('role', 'img');
   mascot.setAttribute('aria-label', cheer.name);
-  void inlineSvgInto(mascot, cheer.svg).then((svg) => { if (svg) mascot.classList.add('ready'); });
+  // The cheering character actually cheers: a one-shot happy clip that
+  // settles back to idle on its own.
+  const rig = mountMascot(mascot, rewards[0].cheeredBy, {
+    calm: opts.calmMode === true, start: 'happy', face: 'happy',
+  });
 
   el('h2', 'cc-headline', dlg, headline);
 
@@ -77,6 +81,7 @@ export function showCreatorCelebration(
   const done = el('button', 'btn-play small', dlg, '🎉 Yay!') as HTMLButtonElement;
   done.type = 'button';
   const close = (): void => {
+    rig.destroy();
     scrim.remove();
     opts.onClose?.();
   };
