@@ -6,6 +6,7 @@ import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { deleteCustomLevel } from '../storage/customLevels';
 import { loadSvg } from '../rendering/svgAsset';
+import { SPLASH_FLOWERS, flowerSvg } from '../ui/splashFlora';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
@@ -162,8 +163,12 @@ export class App {
       el('div', 'tree-leaf l3', tree);
     }
     for (const cls of ['b1', 'b2', 'b3', 'b4']) el('div', `title-bush ${cls}`, ground);
-    const flowers = ['🌸', '🌼', '🌺', '🌻'];
-    flowers.forEach((f, i) => el('span', `title-flower f${i}`, ground, f));
+    // Drawn flowers, not emoji: the same navy outline as the wordmark, and
+    // each one sways on its own stem at its own speed.
+    SPLASH_FLOWERS.forEach((style, i) => {
+      const f = el('div', `title-flower f${i}`, ground);
+      f.innerHTML = flowerSvg(style, i);
+    });
 
     const card = el('div', 'title-card', screen);
     // The logo is the hero now — the mascots used to flank it and on a
@@ -190,10 +195,26 @@ export class App {
     // Words and buttons in one group, so a short landscape phone can put
     // them beside the logo instead of stacking everything off the bottom.
     const actions = el('div', 'title-actions', card);
+    // The line used to sit in a cream pill, which read as a label stuck
+    // onto the art rather than part of it. White on the sky, with the
+    // wordmark's own navy outline holding it legible.
+    const TAGLINE = ['Teach tiny helpers.', 'Build big ideas.'];
     const tag = el('div', 'title-tag', actions);
-    el('span', 'tag-star', tag, '⭐');
-    el('span', undefined, tag, 'Teach tiny helpers. Build big ideas.');
-    el('span', 'tag-star', tag, '⭐');
+    tag.setAttribute('role', 'text');
+    tag.setAttribute('aria-label', TAGLINE.join(' '));
+    // One element per SENTENCE, each a row of words. Where there is room
+    // the two sit side by side; where there is not they wrap — and
+    // because the sentence is the unit that wraps, the break always
+    // falls between the two thoughts instead of inside one of them.
+    let n = 0;
+    for (const sentence of TAGLINE) {
+      const line = el('span', 'tag-line', tag);
+      for (const word of sentence.split(' ')) {
+        const w = el('span', 'tag-word', line, word);
+        w.setAttribute('aria-hidden', 'true');
+        w.style.setProperty('--i', String(n++));
+      }
+    }
     const play = el('button', 'btn-play', actions);
     play.type = 'button';
     play.setAttribute('aria-label', 'Play CodeBops');
@@ -205,19 +226,11 @@ export class App {
       this.showSelect();
     });
 
-    // Bop Garden entry
-    const garden = el('button', 'garden-btn', actions);
-    garden.type = 'button';
-    el('span', undefined, garden, '🌻');
-    el('span', undefined, garden, 'My Garden');
-    garden.addEventListener('click', () => this.showGarden());
-
-    // Learning Garden — the child-facing curriculum map (§9)
-    const journey = el('button', 'garden-btn journey-btn', actions);
-    journey.type = 'button';
-    el('span', undefined, journey, '🌱');
-    el('span', undefined, journey, 'Big Ideas');
-    journey.addEventListener('click', () => { sharedSfx.play('bop'); this.showJourney(); });
+    // My Garden and Big Ideas used to sit under Play. Three stacked
+    // buttons made the splash a menu, and neither is where a child goes
+    // first — Play is. Both are still one tap away from where they
+    // belong: the Garden from the star pill on the island header, Big
+    // Ideas from the App Lab's own footer.
 
     // Grown-Up Campfire (hold-to-open gate, bottom corner)
     createCampfireGate(screen, () => {

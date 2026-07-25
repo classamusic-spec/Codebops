@@ -3514,6 +3514,38 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   // leaves the context attached to the canvas, so without an explicit
   // release the console starts announcing "Too many active WebGL
   // contexts" and a later level opens blank.
+  // ---- the splash ----
+  // Play is the only button on it now. That is only safe while the two
+  // it replaced still have a door somewhere else: the Garden opens from
+  // the island header, Big Ideas from the App Lab's footer. If either
+  // loses its entry point, the screen becomes unreachable and nothing
+  // else in the codebase would notice.
+  check('the Garden and Big Ideas are still reachable without the splash', (() => {
+    const select = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+    const lab = readFileSync('src/app/appLabScreen.ts', 'utf8');
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    return /garden-pill/.test(select) && /this\.events\.onGarden\(\)/.test(select)
+      && /onOpenJourney\?\.\(\)/.test(lab)
+      && /onGarden: \(\) => this\.showGarden\(\)/.test(app)
+      && /onOpenJourney: \(\) => this\.showJourney\(\)/.test(app);
+  })());
+
+  // Emoji render in a different art style on every platform, so a splash
+  // built from them looks like four illustrators disagreeing. The flowers
+  // are drawn to match the wordmark instead.
+  check('the splash draws its flowers rather than borrowing the platform\'s', (() => {
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    const splash = app.slice(app.indexOf('private showTitle'), app.indexOf('// ---------- level select'));
+    // Sparkles are still emoji on purpose — they are specks, not artwork.
+    return /flowerSvg\(/.test(splash) && !/[\u{1F330}-\u{1F33F}]/u.test(splash);
+  })());
+
+  check('every splash flower has petals, a heart and a stem', (() => {
+    const src = readFileSync('src/ui/splashFlora.ts', 'utf8');
+    return /SPLASH_FLOWERS/.test(src)
+      && /<ellipse/.test(src) && /<circle/.test(src) && /stroke-linecap="round"/.test(src);
+  })());
+
   check('the stage releases its WebGL context, not just its uploads', (() => {
     const src = readFileSync('src/engine/stage.ts', 'utf8');
     return /this\.renderer\.dispose\(\);/.test(src)

@@ -69,13 +69,6 @@ button { font-family: inherit; border: 0; cursor: pointer; }
   animation: rise-in .7s var(--ease-out) both .15s;
 }
 @keyframes rise-in { from { opacity: 0; transform: translateY(34px) scale(.96) } to { opacity: 1; transform: none } }
-.title-logo { font-family: var(--font-display); font-weight: 700; font-size: clamp(44px, 8vw, 96px); letter-spacing: 1px; filter: drop-shadow(0 6px 0 var(--ink-line)) drop-shadow(0 14px 30px rgba(0,0,0,.35)); }
-.title-logo span { color: var(--c); display: inline-block; animation: boot-bob 2.4s ease-in-out infinite; animation-delay: calc(var(--i) * 90ms); }
-.title-tag {
-  font-weight: 800; color: var(--ink-800); background: var(--cream);
-  padding: 8px 22px; border-radius: var(--r-pill); font-size: clamp(14px, 1.8vw, 20px);
-  box-shadow: 0 4px 0 var(--cream-deep), var(--shadow-soft);
-}
 .btn-play {
   display: flex; align-items: center; gap: 14px;
   font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 3.4vw, 40px);
@@ -1313,8 +1306,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .celeb-stars .star { font-size: 44px; }
 
   /* --- title screen: mascots peek from the edges, never cover the logo --- */
-  .title-logo { font-size: clamp(38px, 11vw, 56px); }
-  .title-tag { font-size: 13px; padding: 7px 16px; }
+  .title-tag { font-size: 14px; }
   .btn-play { font-size: 24px; padding: 14px 42px; }
 
   /* --- select screen --- */
@@ -1668,7 +1660,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
    ============================================================ */
 
 /* ---------- shared: chunky outlined display text ---------- */
-.outline-text, .title-logo span, .select-header h1, .world-title {
+.outline-text, .select-header h1, .world-title {
   -webkit-text-stroke: 0;
 }
 
@@ -1838,16 +1830,29 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.1); opacity: 1; } 100% { transform: none; }
 }
 
+/* Drawn flowers. Each grows from its own foot, then sways there — the
+   stem pivots at the base, and the head counter-rotates a little behind
+   it so the bloom lags the stalk the way a real one does. */
 .title-flower {
-  position: absolute; font-size: 26px; transform-origin: 50% 100%;
-  filter: drop-shadow(0 3px 3px rgba(20,60,20,.3));
-  animation: bush-pop .5s var(--ease-bounce) both,
+  position: absolute; transform-origin: 50% 100%;
+  filter: drop-shadow(0 4px 4px rgba(20,60,20,.32));
+  animation: flower-grow .62s var(--ease-bounce) both,
              flower-sway 3.6s ease-in-out infinite alternate;
 }
-.title-flower.f0 { left: 5%;   bottom: 4%;  font-size: 34px; animation-delay: 1.46s, 2.1s; }
-.title-flower.f1 { left: 14%;  bottom: 10%; animation-delay: 1.52s, 2.3s; }
-.title-flower.f2 { right: 16%; bottom: 8%;  animation-delay: 1.58s, 2.5s; }
-.title-flower.f3 { right: 5%;  bottom: 3%;  font-size: 32px; animation-delay: 1.64s, 2.7s; }
+.title-flower svg { display: block; width: 100%; height: auto; }
+.title-flower .sf-head { transform-origin: 50px 46px; animation: flower-nod 3.6s ease-in-out infinite alternate; }
+@keyframes flower-grow {
+  0%   { transform: scaleY(0) scaleX(.5) rotate(0deg); opacity: 0; }
+  62%  { transform: scaleY(1.14) scaleX(1.05); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes flower-sway { from { transform: rotate(-4.5deg); } to { transform: rotate(4.5deg); } }
+@keyframes flower-nod  { from { transform: rotate(3deg); }    to { transform: rotate(-3deg); } }
+.title-flower.f0 { left: 4%;   bottom: 3%;  width: clamp(58px, 7.6vw, 96px); animation-delay: 1.46s, 2.10s; }
+.title-flower.f1 { left: 16%;  bottom: 10%; width: clamp(46px, 6vw, 76px); animation-delay: 1.53s, 2.35s; }
+.title-flower.f2 { right: 19%; bottom: 10%; width: clamp(46px, 6vw, 76px); animation-delay: 1.60s, 2.60s; }
+.title-flower.f3 { right: 9%;  bottom: 3%;  width: clamp(58px, 7.6vw, 94px); animation-delay: 1.67s, 2.15s; }
+.title-flower.f4 { left: 46%;  bottom: 1%;  width: clamp(42px, 5.2vw, 66px); animation-delay: 1.74s, 2.85s; }
 
 /* ---- the card: logo hero, then the words, then the buttons ---- */
 .title-screen .title-card {
@@ -1897,11 +1902,41 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   0%, 62% { background-position: 150% 0; } 88%, 100% { background-position: -60% 0; }
 }
 
-.title-tag { animation: rise-in .6s var(--ease-out) 2.0s both; }
-.title-screen .btn-play { animation: rise-in .6s var(--ease-bounce) 2.15s both; }
-.title-screen .garden-btn { animation: rise-in .5s var(--ease-out) 2.3s both; }
-.title-screen .journey-btn { animation-delay: 2.4s; }
+/* No pill. White words with the wordmark's navy outline around them, so
+   they belong to the same drawing as the logo instead of sitting on a
+   label stuck over it. They arrive one word at a time. */
+.title-tag {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: .05em .42em;
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: clamp(17px, 4.2vw, 30px); letter-spacing: .3px;
+  text-align: center; max-width: min(92vw, 640px);
+  text-shadow:
+    -3px -3px 0 var(--ink-line), 3px -3px 0 var(--ink-line),
+    -3px 3px 0 var(--ink-line), 3px 3px 0 var(--ink-line),
+    -3px 0 0 var(--ink-line), 3px 0 0 var(--ink-line),
+    0 -3px 0 var(--ink-line), 0 3px 0 var(--ink-line),
+    0 6px 14px rgba(13,20,55,.45);
+}
+.title-tag .tag-line { display: flex; gap: 0 .34em; }
+.title-tag .tag-word {
+  display: inline-block;
+  animation: word-in .5s var(--ease-bounce) both;
+  animation-delay: calc(1.95s + var(--i) * 90ms);
+}
+@keyframes word-in {
+  0%   { opacity: 0; transform: translateY(18px) scale(.86); }
+  100% { opacity: 1; transform: none; }
+}
+.title-screen .btn-play { animation: rise-in .62s var(--ease-bounce) 2.42s both; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(26px) scale(.94); } to { opacity: 1; transform: none; } }
+
+/* Tall portrait: bring the horizon up. With only one button under the
+   logo there is a lot of sky between it and the hills, and a phone held
+   upright is where that gap is widest. */
+@media (max-aspect-ratio: 3/4) {
+  .title-ground { height: 52%; }
+  .title-tag { font-size: clamp(18px, 4.6vw, 30px); }
+}
 
 /* Wide screens: the logo sits in the middle of the sky, so move the sun
    out from behind it. The rays then sweep across the whole scene from a
@@ -1922,7 +1957,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   }
   .title-logo-art { width: min(46vw, 430px); }
   .title-actions { gap: 8px; }
-  .title-tag { font-size: 12.5px; padding: 6px 14px; }
+  .title-tag { font-size: 14px; }
   .title-screen .btn-play { padding: 12px 44px; font-size: 27px; }
   .title-sun { left: 71%; top: 34%; width: min(74vh, 250px); height: min(74vh, 250px); }
   .title-tree.t5, .title-cloud.c3, .title-cloud.c4 { display: none; }
@@ -1936,37 +1971,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .title-screen, .title-screen * { animation: none !important; }
 }
 
-/* Logo — chunky white "Code" + candy "Bops" with glyph o's */
-.title-logo {
-  display: flex; align-items: baseline;
-  font-family: var(--font-display); font-weight: 700;
-  font-size: clamp(46px, 9vw, 108px); letter-spacing: 0;
-  filter: drop-shadow(0 10px 24px rgba(13,20,55,.4));
-}
-.title-logo span {
-  color: var(--c); display: inline-block; line-height: 1;
-  text-shadow:
-    -4px -4px 0 var(--ink-line), 4px -4px 0 var(--ink-line),
-    -4px 4px 0 var(--ink-line), 4px 4px 0 var(--ink-line),
-    -4px 0 0 var(--ink-line), 4px 0 0 var(--ink-line),
-    0 -4px 0 var(--ink-line), 0 4px 0 var(--ink-line),
-    0 8px 0 var(--ink-line);
-  animation: boot-bob 2.6s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 100ms);
-}
-.title-logo .logo-glyph { text-shadow: none; align-self: center; }
-.title-logo .logo-glyph svg { display: block; height: .84em; width: auto; filter: drop-shadow(0 6px 0 rgba(13,20,55,.9)); }
-.title-logo .logo-zip svg { height: 1.02em; margin: 0 -0.02em; transform: translateY(.06em); }
-.title-logo .logo-play svg { transform: translateY(.05em); }
 
-.title-tag {
-  display: flex; align-items: center; gap: 10px;
-  font-weight: 900; color: #2d3670; background: linear-gradient(180deg, #fffdf4, var(--cream));
-  padding: 10px 24px; border-radius: var(--r-pill); font-size: clamp(14px, 1.9vw, 21px);
-  border: 3px solid #fff;
-  box-shadow: 0 5px 0 #e8cf9e, 0 12px 26px rgba(13,20,55,.28);
-}
-.title-tag .tag-star { font-size: .85em; filter: saturate(.9); }
 
 /* ---------- Shiny-toy buttons ---------- */
 .btn-play {
@@ -2178,7 +2183,6 @@ button.stars-pill:active { transform: translateY(3px); }
   .li-num-text { font-size: 19px; }
   .li-emoji { font-size: 28px; width: 38px; }
   .li-stars { font-size: 17px; }
-  .title-logo { font-size: clamp(40px, 12vw, 64px); }
   .title-spark { font-size: 16px; }
   .title-cloud.c3, .title-cloud.c4 { display: none; }
 }
