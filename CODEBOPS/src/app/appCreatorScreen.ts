@@ -32,6 +32,9 @@ import { SceneBuilder } from '../ui/app-lab/sceneBuilder';
 import { LogicBuilder } from '../ui/app-lab/logicBuilder';
 import { PredictionPanel } from '../ui/app-lab/predictionPanel';
 import { AppPlayMode } from '../ui/app-lab/appPlayMode';
+import { AppDebugMode } from '../ui/app-lab/appDebugMode';
+import { AppCodePeekPanel } from '../ui/app-lab/appCodePeekPanel';
+import type { MiniAppExecutionEvent } from '../creator/miniAppRuntime';
 import type { CreatorState } from '../creator/miniAppMode';
 import { initialCreatorState, applyCreatorAction, showsEditingChrome } from '../creator/miniAppMode';
 import { APP_LAB_THEMES } from '../data/app-lab/approvedAssets';
@@ -66,6 +69,9 @@ export class AppCreatorScreen {
   private logicBuilder: LogicBuilder | null = null;
   private prediction: PredictionPanel | null = null;
   private play: AppPlayMode | null = null;
+  private debug: AppDebugMode | null = null;
+  /** The last run, kept so Debug Mode can read it without re-running. */
+  private lastRun: readonly MiniAppExecutionEvent[] = [];
 
   constructor(
     private readonly root: HTMLElement,
@@ -143,6 +149,7 @@ export class AppCreatorScreen {
     this.logicBuilder?.dispose(); this.logicBuilder = null;
     this.prediction?.dispose(); this.prediction = null;
     this.play?.dispose(); this.play = null;
+    this.debug?.dispose(); this.debug = null;
     this.body.innerHTML = '';
     const subtitle = document.getElementById('cr-subtitle');
 
@@ -211,7 +218,7 @@ export class AppCreatorScreen {
       }
       case 'debug': {
         if (subtitle) subtitle.textContent = 'What happened?';
-        this.renderDebugSoon();
+        this.renderDebug();
         break;
       }
       default:
@@ -253,30 +260,37 @@ export class AppCreatorScreen {
 
     this.play = new AppPlayMode(this.body, this.editor.project, this.store.settings.calmMode, {
       onExit: () => this.go({ kind: 'editFromDebug' }),
-      onDebug: () => {
-        // Phase 9 opens the full Think Trail here; until then the state
-        // machine still moves, so Debug is genuinely a different place.
+      onPeek: () => this.showCodePeek(),
+      onDebug: (events) => {
+        this.lastRun = events;
         this.go({ kind: 'unexpectedResult' });
       },
-      onRan: ({ triggered }) => { if (triggered) this.ranSuccessfully = true; },
+      onRan: ({ events, triggered }) => {
+        this.lastRun = events;
+        if (triggered) this.ranSuccessfully = true;
+      },
     });
   }
 
-  /** Debug Mode: Phase 9 fills this in; the door is real, the room is not yet. */
-  private renderDebugSoon(): void {
-    const wrap = el('div', 'cr-play-soon', this.body);
-    el('div', 'cr-play-glyph', wrap, '🔍');
-    el('h2', undefined, wrap, 'Let us look at what happened');
-    el('p', undefined, wrap,
-      'The step-by-step Think Trail for your own apps opens in a later part of the Lab. '
-      + 'For now, go back and change one thing, then try it again.');
-    const row = el('div', 'cr-play-actions', wrap);
-    const backBtn = el('button', 'mini-btn purple', row, '← Change something') as HTMLButtonElement;
-    backBtn.type = 'button';
-    backBtn.addEventListener('click', () => { sharedSfx.play('tap'); this.go({ kind: 'editFromDebug' }); });
-    const again = el('button', 'btn-play small', row, 'Try it again ▶') as HTMLButtonElement;
-    again.type = 'button';
-    again.addEventListener('click', () => { sharedSfx.play('bop'); this.go({ kind: 'test' }); });
+  /** Code Peek on the child's own app (spec §20). */
+  private showCodePeek(): void {
+    if (!this.editor) return;
+    new AppCodePeekPanel(this.root, this.editor.project, {
+      showJavaScript: this.store.settings.hideRealCode !== true,
+      onClose: () => { /* the panel removes itself */ },
+    });
+  }
+
+  /** Debug Mode: the child's own run, step by step. */
+  private renderDebug(): void {
+    if (!this.editor) return;
+    this.debug = new AppDebugMode(this.body, this.editor.project, this.lastRun, {
+      onEdit: () => this.go({ kind: 'editFromDebug' }),
+      onRunAgain: () => this.go({ kind: 'test' }),
+    });
+    const peek = el('button', 'mini-btn dbg-peek', this.body, '🔍 See it as code') as HTMLButtonElement;
+    peek.type = 'button';
+    peek.addEventListener('click', () => { sharedSfx.play('tap'); this.showCodePeek(); });
   }
 
   // ---------------- toolbar ----------------

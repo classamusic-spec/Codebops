@@ -31,6 +31,8 @@ const CALM_BEAT_MS = 420;
 
 export interface PlayModeEvents {
   readonly onExit: () => void;
+  /** Opens Code Peek on the app the child is playing. */
+  readonly onPeek?: () => void;
   /** Offered once something surprising has happened (spec §8.2). */
   readonly onDebug: (events: readonly MiniAppExecutionEvent[]) => void;
   /** Reports each finished run, so the screen can record evidence later. */
@@ -88,6 +90,13 @@ export class AppPlayMode {
     restart.type = 'button';
     restart.setAttribute('aria-label', 'Start the app again');
     restart.addEventListener('click', () => this.restart());
+
+    if (this.events.onPeek) {
+      const peek = el('button', 'pm-peek', bar, '🔍 Code Peek') as HTMLButtonElement;
+      peek.type = 'button';
+      peek.setAttribute('aria-label', 'See your app as real code');
+      peek.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onPeek?.(); });
+    }
 
     this.stage = el('div', 'pm-stage', this.root);
     this.stage.style.background = this.theme().sky;
@@ -345,19 +354,28 @@ export class AppPlayMode {
     this.timers.push(window.setTimeout(() => n.remove(), 2600));
   }
 
-  /** The Debug door appears only once something surprising has happened. */
+  /**
+   * The Debug door opens after any run that did something — not only after
+   * a surprise. Taking the else branch of a rule is a perfectly correct
+   * outcome, so gating on "something odd" left the door shut through most
+   * of normal play, and "what happened?" is a good question either way.
+   * A surprise still makes the door glow.
+   */
   private renderBar(): void {
     const bar = this.root.querySelector('.pm-bar');
     if (!bar) return;
     const existing = bar.querySelector('.pm-debug');
-    if (!this.sawSomethingOdd) { existing?.remove(); return; }
-    if (existing) return;
-    const debug = el('button', 'pm-debug', bar as HTMLElement, '🔍 What happened?') as HTMLButtonElement;
+    if (this.lastEvents.length === 0) { existing?.remove(); return; }
+    const debug = (existing as HTMLButtonElement | null)
+      ?? (el('button', 'pm-debug', bar as HTMLElement, '🔍 What happened?') as HTMLButtonElement);
     debug.type = 'button';
-    debug.addEventListener('click', () => {
-      sharedSfx.play('tap');
-      this.events.onDebug(this.lastEvents);
-    });
+    debug.classList.toggle('notice', this.sawSomethingOdd);
+    if (!existing) {
+      debug.addEventListener('click', () => {
+        sharedSfx.play('tap');
+        this.events.onDebug(this.lastEvents);
+      });
+    }
   }
 
   private restart(): void {

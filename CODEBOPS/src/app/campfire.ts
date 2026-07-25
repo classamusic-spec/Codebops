@@ -107,6 +107,30 @@ export function showCampfire(parent: HTMLElement, store: SaveStore, onReset: () 
     }
   }
 
+  // ---- Code Peek: grown-ups may hide the JavaScript view (App Lab §20) ----
+  el('h3', undefined, dlg, 'Code Peek');
+  el('p', 'camp-note', dlg,
+    'Code Peek shows a child their own app as words, and optionally as real JavaScript. '
+    + 'Hiding the code view keeps the plain-language one.');
+  {
+    const row = el('div', 'camp-world-row', dlg);
+    const btn = el('button', `camp-world${store.settings.hideRealCode ? '' : ' on'}`, row) as HTMLButtonElement;
+    btn.type = 'button';
+    btn.setAttribute('role', 'switch');
+    btn.setAttribute('aria-checked', String(!store.settings.hideRealCode));
+    el('span', 'cw-emoji', btn, '{ }');
+    el('span', 'cw-name', btn, 'Show real code');
+    const pill = el('span', 'cw-state', btn, store.settings.hideRealCode ? 'Hidden' : 'Shown');
+    btn.addEventListener('click', () => {
+      const nowHidden = store.settings.hideRealCode !== true;
+      store.updateSettings({ hideRealCode: nowHidden });
+      btn.classList.toggle('on', !nowHidden);
+      btn.setAttribute('aria-checked', String(!nowHidden));
+      pill.textContent = nowHidden ? 'Hidden' : 'Shown';
+      sharedSfx.play('tap');
+    });
+  }
+
   // ---- Open a world by hand (addendum §7) ----
   el('h3', undefined, dlg, 'Open a world');
   el('p', 'camp-note', dlg,

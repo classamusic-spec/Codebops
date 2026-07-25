@@ -209,6 +209,11 @@ import {
 import type { MiniAppRuntimeSnapshot } from '../src/creator/miniAppRuntime';
 import { evaluateCondition, UNTIL_ROUNDS_CAP } from '../src/creator/miniAppRuntime';
 import { DROP_TARGET_REF } from '../src/creator/miniAppTypes';
+// ---- App Lab Phases 9-10 ----
+import { trailLines } from '../src/ui/app-lab/appDebugMode';
+import {
+  plainLanguageProject, plainLanguageScript, javaScriptProject, translatableCommandKinds,
+} from '../src/creator/miniAppCodePeek';
 
 import { readdirSync, readFileSync } from 'node:fs';
 
@@ -2889,6 +2894,153 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
       const r = run(p, { kind: 'appStart' }, undefined, { approvals: [true, true] });
       return r.stepsUsed <= p.runtimeBudget.maximumSteps;
     }));
+}
+
+// ---------------------------------------------------------------
+// App Lab Phases 9-10: Think Trail, Glitch Replay, Code Peek
+// ---------------------------------------------------------------
+{
+  console.log("\n-- Zip's App Lab: debugging and Code Peek --");
+  const SEED9 = { id: 'p9', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+  const flower9 = MINI_APP_STARTERS.find((s) => s.id === 'blooming-flower')!.build(SEED9);
+  const sorter9 = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED9);
+  const music9 = MINI_APP_STARTERS.find((s) => s.id === 'four-beat-loop')!.build(SEED9);
+  const helper9 = MINI_APP_STARTERS.find((s) => s.id === 'feed-the-pet')!.build(SEED9);
+  const NOW9 = 1_700_000_003_000;
+
+  // ---- Think Trail ----
+  {
+    const r = run(flower9, { kind: 'tap', componentId: 'flower' });
+    const lines = trailLines(flower9, r.events);
+    check('the trail has one line per step', lines.length === r.events.length);
+    check('every line says what it saw, chose and what happened',
+      lines.every((l) => l.saw.length > 5 && l.chose.length > 2 && l.happened.length > 5));
+    check('the trail names the trigger the child actually wrote',
+      lines[0].saw === 'When Flower is tapped');
+    check('the trail describes the real change, not the command name',
+      lines[0].happened === 'Flower became blooming.');
+    check('a step that did something is marked ok',
+      lines.every((l) => l.verdict === 'ok'));
+    check('an empty run makes an empty trail', trailLines(flower9, []).length === 0);
+  }
+  check('a question adds an "I checked" line, and a plain step does not', (() => {
+    const r = run(sorter9, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' });
+    const lines = trailLines(sorter9, r.events);
+    return lines.some((l) => l.checked !== undefined) && lines.some((l) => l.checked === undefined);
+  })());
+  check('a question that came out no says NO, not yes', (() => {
+    const wrong = trailLines(sorter9, run(sorter9, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-blue' }).events);
+    const right = trailLines(sorter9, run(sorter9, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' }).events);
+    return wrong[0].checked === 'The answer was no.'
+      && right[0].checked === 'The answer was yes.';
+  })());
+  check('the branch a run took is recorded on the event itself', (() => {
+    const r = run(sorter9, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-blue' });
+    return r.events[0].branchTaken === 'no';
+  })());
+  check('a counter change is reported with both numbers', (() => {
+    const r = run(sorter9, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' });
+    return trailLines(sorter9, r.events).some((l) => /from 0 to 1/.test(l.happened));
+  })());
+  check('the trail never uses the words of a failure screen', (() => {
+    const r = run(sorter9, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-blue' });
+    const text = trailLines(sorter9, r.events).map((l) => `${l.saw} ${l.chose} ${l.happened}`).join(' ');
+    return !/wrong|fail|error|bad|game over|lost/i.test(text);
+  })());
+  check('every starter can be told as a trail without a gap',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED9);
+      const r = run(p, { kind: 'appStart' }, undefined, { approvals: [true, true] });
+      return trailLines(p, r.events).every((l) => l.happened !== '' && l.chose !== '');
+    }));
+
+  // ---- Code Peek: plain language ----
+  {
+    const plain = plainLanguageScript(flower9, flower9.scripts[0]);
+    check('plain language opens with the trigger',
+      plain[0] === 'When Flower is tapped:');
+    check('plain language indents the steps under it',
+      plain[1].startsWith('  ') && plain[1].includes('blooms'));
+    check('a project with no scripts says so plainly',
+      plainLanguageProject({ ...flower9, scripts: [] })[0].includes('not been taught'));
+  }
+  check('an If-Else reads as If / Otherwise', (() => {
+    const lines = plainLanguageScript(sorter9, sorter9.scripts[0]);
+    return lines.some((l) => l.trim().startsWith('If ')) && lines.some((l) => l.trim() === 'Otherwise:');
+  })());
+  check('a loop reads as Repeat N times', (() => {
+    const lines = plainLanguageScript(music9, music9.scripts[0]);
+    return lines.some((l) => l.trim() === 'Repeat 2 times:');
+  })());
+  check('"where it landed" reads as words, never as an id', (() => {
+    const lines = plainLanguageScript(sorter9, sorter9.scripts[0]).join(' ');
+    return lines.includes('where it landed') && !lines.includes('@dropped-on');
+  })());
+  check('an Ask First reads as asking first', (() => {
+    const lines = plainLanguageScript(helper9, helper9.scripts[1]).join(' ');
+    return /Ask first/.test(lines);
+  })());
+
+  // ---- Code Peek: JavaScript ----
+  {
+    const js = javaScriptProject(flower9).join('\n');
+    check('the JavaScript view hangs the code off the real trigger',
+      js.includes('flower.onTap(() => {'));
+    check('the JavaScript view uses the thing\'s name, not its id',
+      js.includes('flower.setState("blooming");') && !js.includes('script-1'));
+    check('the JavaScript view closes what it opens',
+      (js.match(/\{/g) ?? []).length === (js.match(/\}/g) ?? []).length);
+  }
+  check('an If-Else becomes a real if/else', (() => {
+    const js = javaScriptProject(sorter9).join('\n');
+    return js.includes('} else {') && js.includes('if (');
+  })());
+  check('a loop becomes a real for loop',
+    javaScriptProject(music9).join('\n').includes('for (let i = 0; i < 2; i++) {'));
+  check('a saved job becomes a function that is then called', (() => {
+    const withJob = {
+      ...music9,
+      jobs: [{
+        id: 'chorus', iconId: 'x', title: { tokens: ['thing-song'] },
+        commands: [{ kind: 'playSound' as const, sound: 'drum' as const }],
+      }],
+      scripts: [{
+        id: 'x', ownerId: 'play', trigger: { kind: 'onTap' as const, targetId: 'play' },
+        commands: [{ kind: 'callJob' as const, jobId: 'chorus' }],
+      }],
+    };
+    const js = javaScriptProject(withJob).join('\n');
+    return js.includes('function song() {') && js.includes('song();');
+  })());
+  check('an app with nothing taught produces a comment, not fake code',
+    javaScriptProject({ ...flower9, scripts: [] })[0].startsWith('//'));
+  check('the JavaScript view never invents a step it cannot translate', (() => {
+    // Every command kind any kit allows must be in the translatable set,
+    // or a step would silently vanish and the code would stop matching.
+    const translatable = new Set(translatableCommandKinds());
+    const allowed = new Set<string>();
+    for (const t of MINI_APP_TEMPLATES) for (const k of t.allowedCommands) allowed.add(k);
+    return [...allowed].every((k) => translatable.has(k));
+  })());
+  check('every starter translates to code with no empty lines in the middle',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED9);
+      const js = javaScriptProject(p);
+      return js.length > 0 && js.every((line) => typeof line === 'string');
+    }));
+  check('the code a child sees matches the app they built', (() => {
+    // Add a step, and the code must gain exactly that step.
+    const before = javaScriptProject(flower9).join('\n');
+    const ed = appendCommand(
+      initialEditorState(flower9), 'script-1', { kind: 'hide', targetId: 'flower' }, NOW9).state;
+    const after = javaScriptProject(ed.project).join('\n');
+    return !before.includes('flower.hide();') && after.includes('flower.hide();');
+  })());
+  check('Code Peek is pure — it reads the project and nothing else', (() => {
+    const src = readFileSync('src/creator/miniAppCodePeek.ts', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    return !/\bdocument\b|\bwindow\b|localStorage|eval\(|new Function/.test(src);
+  })());
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

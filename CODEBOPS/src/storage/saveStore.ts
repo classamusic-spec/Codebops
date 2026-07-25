@@ -25,6 +25,8 @@ export interface SaveData {
     calmMode: boolean;
     highContrast: boolean;
     leftHanded: boolean;
+    /** Grown-ups may hide Code Peek's JavaScript view (App Lab §20). */
+    hideRealCode?: boolean;
   };
   /** Daily Bop progress. */
   daily: {

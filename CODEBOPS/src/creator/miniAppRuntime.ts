@@ -100,6 +100,12 @@ export interface MiniAppExecutionEvent {
   readonly sound?: ApprovedSoundId;
   /** How deep in the trigger chain this ran — 0 is the child's own tap. */
   readonly chainDepth: number;
+  /**
+   * For a question: which way it went. An If-Else always succeeds, so
+   * without this the Think Trail would have to guess — and it would guess
+   * wrong every time the else branch ran.
+   */
+  readonly branchTaken?: 'yes' | 'no';
 }
 
 export type TriggerCause =
@@ -467,7 +473,7 @@ export function run(
   /** Record one executed command. */
   const emit = (
     script: MiniAppScript, command: MiniAppCommand, before: MiniAppRuntimeSnapshot,
-    out: StepOutput, depth: number,
+    out: StepOutput, depth: number, branchTaken?: 'yes' | 'no',
   ): void => {
     steps += 1;
     events.push({
@@ -481,6 +487,7 @@ export function run(
       holdBeats: out.holdBeats,
       ...(out.sound ? { sound: out.sound } : {}),
       chainDepth: depth,
+      ...(branchTaken ? { branchTaken } : {}),
     });
     if (out.sent && budget.maximumMessagesPerStep > 0) {
       queue.push({ cause: { kind: 'message', message: out.sent }, depth: depth + 1 });
@@ -512,13 +519,14 @@ export function run(
             next: state,
             outcome: holds ? DONE : { kind: 'noChange', why: 'the answer was no, so it skipped ahead' },
             holdBeats: 1,
-          }, depth);
+          }, depth, holds ? 'yes' : 'no');
           if (holds && !execute(command.then, script, depth)) return false;
           break;
         }
         case 'ifElse': {
           const holds = evaluateCondition(project, state, command.test, dropContext);
-          emit(script, command, before, { next: state, outcome: DONE, holdBeats: 1 }, depth);
+          emit(script, command, before,
+            { next: state, outcome: DONE, holdBeats: 1 }, depth, holds ? 'yes' : 'no');
           const branch = holds ? command.then : command.otherwise;
           if (!execute(branch, script, depth)) return false;
           break;
