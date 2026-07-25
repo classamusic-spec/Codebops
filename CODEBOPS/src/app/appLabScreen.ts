@@ -20,6 +20,9 @@ import type { AppKitDefinition } from '../data/app-lab/appLabDefinition';
 import { templatesForType } from '../creator/miniAppTemplateRegistry';
 import { MiniAppStore } from '../storage/miniAppStore';
 import { hasDraft } from '../storage/miniAppDraft';
+import {
+  CREATOR_REWARDS, makerRecord, earnedRewards,
+} from '../data/app-lab/creatorRewards';
 
 export interface AppLabEvents {
   readonly onBack: () => void;
@@ -132,6 +135,14 @@ export class AppLabScreen {
       }
     });
 
+    // ---- the maker's shelf: badges earned, decorations hung up (§13) ----
+    const shelf = el('div', 'al-shelf', screen);
+    shelf.hidden = true;
+    void this.library.list().then((saved) => {
+      if (this.disposed) return;
+      this.renderShelf(shelf, makerRecord(log, saved));
+    });
+
     // ---- footer: where the ideas live, with Zip standing alongside ----
     const foot = el('div', 'al-foot', screen);
     const journey = el('button', 'mini-btn purple', foot, '🌱 My Big Ideas') as HTMLButtonElement;
@@ -158,6 +169,45 @@ export class AppLabScreen {
         ? 'Your apps are saved on this device only.'
         : 'Saving is unavailable in this browser — apps will not be kept.';
     });
+  }
+
+  /**
+   * Badges, decorations and skies a child has collected (§13). Things not
+   * yet earned are shown too — dimmed, with the invitation that opens
+   * them — because a shelf with room on it is an idea, not a scoreboard.
+   * There is no count, no fraction and no "x of y" anywhere.
+   */
+  private renderShelf(shelf: HTMLElement, record: ReturnType<typeof makerRecord>): void {
+    const earned = new Set(earnedRewards(record).map((r) => r.id));
+    if (earned.size === 0) return; // nothing to show a brand-new maker yet
+    shelf.hidden = false;
+
+    const head = el('div', 'al-shelf-head', shelf);
+    el('span', undefined, head, '🏅');
+    el('span', undefined, head, 'Things you have collected');
+
+    const row = el('div', 'al-shelf-row', shelf);
+    CREATOR_REWARDS.forEach((reward, i) => {
+      const got = earned.has(reward.id);
+      const item = el('div', `al-collect${got ? '' : ' waiting'}`, row);
+      item.style.setProperty('--i', String(i));
+      item.setAttribute('role', 'img');
+      item.setAttribute('aria-label', got
+        ? `${reward.name} — earned. ${reward.childLine}`
+        : `${reward.name} — ${reward.invitation}`);
+      el('span', 'al-collect-glyph', item, got ? reward.glyph : '·');
+      el('span', 'al-collect-name', item, reward.name);
+      // The tooltip is the invitation, so hovering never reads as a telling-off.
+      item.title = got ? reward.childLine : reward.invitation;
+    });
+
+    // Decorations actually get hung on the wall, not just listed.
+    const decor = earnedRewards(record).filter((r) => r.kind === 'decoration');
+    if (decor.length > 0) {
+      const hung = el('div', 'al-decor', shelf);
+      hung.setAttribute('aria-hidden', 'true');
+      for (const d of decor) el('span', 'al-decor-item', hung, d.glyph);
+    }
   }
 
   private toast(text: string): void {

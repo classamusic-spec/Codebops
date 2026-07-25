@@ -2792,11 +2792,99 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .al-foot { min-height: 0; }
 }
 
+/* ---- the maker's shelf: badges, decorations, skies (App Lab §13) ---- */
+.al-shelf {
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.12);
+  border-radius: var(--r-xl); padding: 10px 12px; margin-bottom: 14px;
+}
+.al-shelf-head {
+  display: flex; align-items: center; gap: 7px; margin-bottom: 8px;
+  color: #ffd97a; font-weight: 800; font-size: 12.5px; letter-spacing: .4px;
+}
+.al-shelf-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.al-collect {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 74px; padding: 7px 6px;
+  background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.05));
+  border: 2px solid rgba(255,217,122,.4); border-radius: var(--r-lg);
+  animation: alCollectIn .38s var(--ease-bounce) backwards;
+  animation-delay: calc(var(--i) * 0.035s);
+}
+@keyframes alCollectIn { from { opacity: 0; transform: scale(.8); } }
+/* Not earned yet is quiet and inviting — never a red X, never a count. */
+.al-collect.waiting {
+  background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1);
+  border-style: dashed; opacity: .5; animation: none;
+}
+.al-collect-glyph { font-size: 22px; line-height: 1.1; }
+.al-collect.waiting .al-collect-glyph { color: #7f8fc0; }
+.al-collect-name {
+  color: #cfe4ff; font-weight: 800; font-size: 10px; text-align: center; line-height: 1.15;
+}
+.al-decor { display: flex; gap: 12px; justify-content: center; margin-top: 9px; font-size: 22px; }
+.al-decor-item { animation: alDecorSway 3.4s ease-in-out infinite; }
+@keyframes alDecorSway { 50% { transform: translateY(-3px) rotate(-4deg); } }
+
+/* ---- a sky that is not open yet (§13) ---- */
+.tp-theme.waiting { opacity: .55; border-style: dashed; }
+
 /* Reduced motion: stations appear rather than bounce in. */
 @media (prefers-reduced-motion: reduce) {
-  .al-station { animation: none; }
+  .al-station, .al-collect { animation: none; }
+  .al-decor-item { animation: none; }
 }
-.calm-mode .al-station { animation: none; }
+.calm-mode .al-station, .calm-mode .al-collect { animation: none; }
+.calm-mode .al-decor-item { animation: none; }
+
+/* ============================================================
+   Creator celebration — Zip cheers making, Mixy cheers fixing (§13)
+   ============================================================ */
+.dialog.cc { align-items: stretch; text-align: center; max-width: 460px; }
+.cc-mascot { width: 108px; height: 108px; margin: 0 auto; opacity: 0; }
+.cc-mascot.ready { opacity: 1; animation: ccPop .5s var(--ease-bounce); }
+.cc-mascot svg { width: 100%; height: 100%; }
+@keyframes ccPop { from { transform: scale(.6) rotate(-8deg); } }
+.cc-headline {
+  font-family: var(--font-display); font-weight: 800; color: #ffd97a;
+  font-size: clamp(19px, 2.6vw, 26px); margin: 4px 0 2px;
+}
+.cc-list { display: flex; flex-direction: column; gap: 8px; }
+.cc-row {
+  display: flex; align-items: center; gap: 11px; text-align: left;
+  background: rgba(255,255,255,.09); border: 2px solid rgba(255,217,122,.4);
+  border-radius: var(--r-lg); padding: 9px 12px;
+  animation: ccRowIn .4s var(--ease-bounce) backwards;
+  animation-delay: calc(0.12s + var(--i) * 0.1s);
+}
+@keyframes ccRowIn { from { opacity: 0; transform: translateX(-14px); } }
+.cc-glyph { font-size: 30px; line-height: 1; flex: 0 0 auto; }
+.cc-words { min-width: 0; }
+.cc-name { color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 15px; }
+.cc-line { color: #cfe4ff; font-weight: 700; font-size: 12.5px; line-height: 1.35; }
+.cc-cheer { color: #9fe0ff; font-weight: 800; font-size: 12.5px; margin: 2px 0 0; }
+/* Calm mode: everything arrives, nothing bounces. */
+.dialog.cc.calm .cc-mascot, .dialog.cc.calm .cc-row { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .cc-mascot, .cc-row { animation: none !important; }
+}
+
+/* ---- frames on the cards in My Apps (§13) ---- */
+.lib-card.frame-gold, .lib-card.frame-rainbow { position: relative; }
+.lib-card.frame-gold { border-color: rgba(255,207,62,.55); }
+.lib-card.frame-rainbow {
+  border-color: transparent;
+  background:
+    linear-gradient(180deg, rgba(30,40,86,.96), rgba(22,30,66,.96)) padding-box,
+    linear-gradient(120deg, #ff8fb1, #ffd97a, #7ee79b, #8fe3ff, #b48ce8) border-box;
+}
+/* The idea a single app shows, as a tint on its picture. */
+.lib-card.frame-careful .lib-shot { box-shadow: inset 0 0 0 3px rgba(180,140,232,.75); }
+.lib-card.frame-job .lib-shot { box-shadow: inset 0 0 0 3px rgba(255,207,62,.75); }
+.lib-card.frame-signal .lib-shot { box-shadow: inset 0 0 0 3px rgba(143,227,255,.75); }
+.lib-card.frame-twoway .lib-shot { box-shadow: inset 0 0 0 3px rgba(126,231,155,.75); }
+.lib-card.frame-loop .lib-shot { box-shadow: inset 0 0 0 3px rgba(255,143,177,.75); }
+.lib-card.frame-count .lib-shot { box-shadow: inset 0 0 0 3px rgba(255,180,110,.75); }
+.lib-chip.idea { background: rgba(255,217,122,.2); color: #ffe9a8; }
 
 /* ============================================================
    App Library — the shelf of finished apps (App Lab §9.8, §21)

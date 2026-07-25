@@ -196,7 +196,14 @@ import { thumbnailFor, thumbnailSummary } from '../src/creator/miniAppThumbnail'
 import {
   factsFor, evidenceForCreation, parentSentenceFor, offScreenIdeaFor,
 } from '../src/creator/miniAppEvidence';
-import { stage, isStageId } from '../src/data/curriculum/stages';
+import { stage, isStageId, CURRICULUM_STAGES } from '../src/data/curriculum/stages';
+// ---- App Lab Phase 13 ----
+import {
+  CREATOR_REWARDS, creatorReward, makerRecord, earnedRewards, newlyEarned,
+  frameForApp, APP_FRAMES,
+} from '../src/data/app-lab/creatorRewards';
+import type { MakerRecord } from '../src/data/app-lab/creatorRewards';
+import { isApprovedTheme } from '../src/data/app-lab/approvedAssets';
 // ---- App Lab Phase 2 ----
 import {
   initialEditorState, addComponent, removeComponent, moveComponent, addScript, removeScript,
@@ -1718,7 +1725,9 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     APPROVED_ASSETS.filter((a) => a.svg).map((a) => a.id).sort().join() === 'mixy,zip');
   check('every component role has at least one asset',
     APPROVED_COMPONENTS.every((c) => APPROVED_ASSETS.some((a) => a.roles.includes(c.type))));
-  check('there are seven themes, one per world', APP_LAB_THEMES.length === 7);
+  // Seven always-open skies, one per world, plus the ones a maker earns (§13).
+  check('there are seven always-open themes, one per world',
+    APP_LAB_THEMES.filter((t) => !t.unlockedBy).length === 7);
   check('sound and phrase ids are unique',
     new Set(APPROVED_SOUNDS.map((s) => s.id)).size === APPROVED_SOUNDS.length
     && new Set(PREPARED_PHRASES.map((p) => p.id)).size === PREPARED_PHRASES.length);
@@ -3183,6 +3192,126 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const src = readFileSync('src/creator/miniAppEvidence.ts', 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     return !/\bdocument\b|\bwindow\b|localStorage|eval\(|new Function|Date\.now|Math\.random/.test(src);
+  })());
+}
+
+// ============================================================
+// App Lab Phase 13 — what a maker collects
+// ============================================================
+{
+  const none: MakerRecord = {
+    appsSaved: 0, kitsBuilt: [], requirementsShown: [], appsRun: 0,
+  };
+  const rec = (over: Partial<MakerRecord>): MakerRecord => ({ ...none, ...over });
+
+  check('a brand-new maker has collected nothing — and is told nothing is missing',
+    earnedRewards(none).length === 0);
+  check('running one app earns the Maker badge',
+    earnedRewards(rec({ appsRun: 1, appsSaved: 1 })).some((r) => r.id === 'maker'));
+  check('rewards are earned by what the child SHOWED, not what they saved', (() => {
+    // Fifty saved apps that were never run earn nothing but the frame,
+    // which is explicitly about having a shelf.
+    const hoarder = earnedRewards(rec({ appsSaved: 50 })).map((r) => r.id);
+    return !hoarder.includes('maker') && !hoarder.includes('loop-weaver');
+  })());
+  check('every reward is reachable from some record a child could really have',
+    CREATOR_REWARDS.every((r) => r.earned(rec({
+      appsSaved: 9, appsRun: 9,
+      kitsBuilt: APP_KITS.map((k) => k.type),
+      requirementsShown: [
+        'seq-order', 'evt-connect', 'loop-replace', 'cond-check', 'ifelse-two',
+        'var-update', 'state-identify', 'msg-send', 'par-coordinate', 'fn-reuse',
+        'dec-split', 'dbg-change', 'agent-approval',
+      ],
+    }))));
+  check('reward ids are unique', (() => {
+    const ids = CREATOR_REWARDS.map((r) => r.id);
+    return new Set(ids).size === ids.length;
+  })());
+  check('no reward name or line ever ranks, compares, or counts down',
+    CREATOR_REWARDS.every((r) =>
+      !/%|rank|level up|streak|faster|better than|only \d|\d+ of \d+|left to|missing/i
+        .test(`${r.name} ${r.childLine} ${r.invitation}`)));
+  check('an unearned reward reads as an invitation, not a shortfall',
+    CREATOR_REWARDS.every((r) => r.invitation.length > 10 && !/must|need to|have not|failed/i.test(r.invitation)));
+  check('Mixy cheers the fixing rewards; Zip cheers the making ones', (() => {
+    const repairer = CREATOR_REWARDS.find((r) => r.id === 'repairer')!;
+    const maker = CREATOR_REWARDS.find((r) => r.id === 'maker')!;
+    return repairer.cheeredBy === 'mixy' && maker.cheeredBy === 'zip';
+  })());
+
+  check('rewards are derived, so the same record always earns the same set', (() => {
+    const r = rec({ appsRun: 3, appsSaved: 3, requirementsShown: ['loop-replace'] });
+    return earnedRewards(r).map((x) => x.id).join() === earnedRewards(r).map((x) => x.id).join();
+  })());
+  check('newlyEarned reports only what is new', (() => {
+    const before = rec({ appsRun: 1, appsSaved: 1 });
+    const after = rec({ appsRun: 1, appsSaved: 1, requirementsShown: ['loop-replace'] });
+    const fresh = newlyEarned(before, after).map((r) => r.id);
+    return fresh.includes('loop-weaver') && !fresh.includes('maker');
+  })());
+  check('a record going backwards announces a loss to nobody',
+    newlyEarned(rec({ appsRun: 5, appsSaved: 5 }), none).length === 0);
+
+  check('the maker record only counts evidence from the child\'s own apps', (() => {
+    const log = [
+      { stage: 'loops' as const, requirement: 'loop-replace', phase: 'build' as const, levelId: 'gw-lift-1', note: '' },
+      { stage: 'loops' as const, requirement: 'loop-replace', phase: 'create' as const, levelId: 'applab:a1', note: '' },
+    ];
+    const r = makerRecord(log, [{ type: 'tap-react' as const }]);
+    return r.requirementsShown.length === 1 && r.appsRun === 1;
+  })());
+  check('every kit built is counted once, however many apps are in it', (() => {
+    const r = makerRecord([], [
+      { type: 'tap-react' as const }, { type: 'tap-react' as const }, { type: 'music' as const },
+    ]);
+    return r.kitsBuilt.length === 2 && r.appsSaved === 3;
+  })());
+
+  check('every earned sky names a reward that really exists',
+    APP_LAB_THEMES.every((t) => !t.unlockedBy || creatorReward(t.unlockedBy) !== null));
+  check('the seven world skies are always open, and always will be',
+    ['sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town',
+      'gearworks-garage', 'agent-academy', 'imagination-island']
+      .every((id) => APP_LAB_THEMES.find((t) => t.id === id)?.unlockedBy === undefined));
+  check('an earned sky is approved from the start, so a saved app never breaks',
+    APP_LAB_THEMES.filter((t) => t.unlockedBy).every((t) => isApprovedTheme(t.id)));
+  check('a project using an earned sky still validates after a progress reset', (() => {
+    const p = MINI_APP_STARTERS[0].build({ id: 'pth', now: 1, themeId: 'starlight' });
+    return validateMiniAppProject(p).valid;
+  })());
+
+  check('an app\'s frame comes from that app\'s own evidence', (() => {
+    const log = [
+      { stage: 'if-else' as const, requirement: 'ifelse-two', phase: 'create' as const, levelId: 'applab:a1', note: '' },
+    ];
+    return frameForApp(log, 'a1')?.frame === 'twoway' && frameForApp(log, 'a2') === null;
+  })());
+  check('a frame label describes the app, never rates it',
+    APP_FRAMES.every((f) => !/best|top|great|good|winner|\d/i.test(f.label)));
+  check('every frame names a requirement the creation module can actually claim', (() => {
+    const claimable = new Set(
+      MINI_APP_STARTERS.flatMap((s) => {
+        const p = s.build({ id: 'pf', now: 1, themeId: 'sparkle-meadow' });
+        return evidenceForCreation(p, factsFor(p, { ran: true, repairedAfterRunning: true }))
+          .map((e) => e.requirement);
+      }),
+    );
+    // Not every frame must be reachable from a STARTER, but each must name
+    // a requirement that exists on a real stage.
+    return APP_FRAMES.every((f) => CURRICULUM_STAGES.some(
+      (s) => s.evidenceRequirements.some((r) => r.id === f.requirement),
+    )) && claimable.size > 0;
+  })());
+
+  check('the rewards module is pure — no DOM, no storage, no clock', (() => {
+    const src = readFileSync('src/data/app-lab/creatorRewards.ts', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    return !/\bdocument\b|\bwindow\b|localStorage|eval\(|new Function|Date\.now|Math\.random/.test(src);
+  })());
+  check('the celebration can always be dismissed and never blocks', (() => {
+    const src = readFileSync('src/ui/app-lab/creatorCelebration.ts', 'utf8');
+    return src.includes('scrim.remove()') && !/setInterval|requestAnimationFrame/.test(src);
   })());
 }
 

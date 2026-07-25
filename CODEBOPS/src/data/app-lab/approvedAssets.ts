@@ -117,6 +117,12 @@ export interface AppLabTheme {
   readonly glyph: string;
   /** Sky/backdrop colour, from the locked palette. */
   readonly sky: string;
+  /**
+   * A reward id from creatorRewards that opens this sky (§13). The seven
+   * world skies have none and are always there — earning a new one only
+   * ever ADDS to the shelf, it never takes a sky away.
+   */
+  readonly unlockedBy?: string;
 }
 
 export const APP_LAB_THEMES: readonly AppLabTheme[] = [
@@ -127,6 +133,11 @@ export const APP_LAB_THEMES: readonly AppLabTheme[] = [
   { id: 'gearworks-garage', label: 'Gearworks Garage', glyph: '⚙️', sky: '#2a2158' },
   { id: 'agent-academy', label: 'Agent Academy', glyph: '🎓', sky: '#b48ce8' },
   { id: 'imagination-island', label: 'Imagination Island', glyph: '🏝️', sky: '#ffc46b' },
+  // ---- earned skies (§13). Approved from the start, so an app saved
+  // with one still validates even if progress is later reset. ----
+  { id: 'starlight', label: 'Starlight', glyph: '🌙', sky: '#3b3f8f', unlockedBy: 'theme-starlight' },
+  { id: 'candy-lane', label: 'Candy Lane', glyph: '🍬', sky: '#ffb3d9', unlockedBy: 'theme-candy-lane' },
+  { id: 'deep-sea', label: 'Deep Sea', glyph: '🌊', sky: '#1f6f8f', unlockedBy: 'theme-deep-sea' },
 ];
 
 export function isApprovedTheme(id: string): boolean {

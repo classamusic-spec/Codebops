@@ -41,6 +41,8 @@ import { initialCreatorState, applyCreatorAction, showsEditingChrome } from '../
 import { APP_LAB_THEMES } from '../data/app-lab/approvedAssets';
 import { sceneName } from '../creator/miniAppChoices';
 import { factsFor, evidenceForCreation } from '../creator/miniAppEvidence';
+import { makerRecord, newlyEarned, earnedRewards } from '../data/app-lab/creatorRewards';
+import { showCreatorCelebration } from '../ui/app-lab/creatorCelebration';
 
 export interface AppCreatorEvents {
   readonly onExitToLab: () => void;
@@ -69,6 +71,8 @@ export class AppCreatorScreen {
   private disposed = false;
   /** True when this app was opened from the library, not a station. */
   private fromLibrary = false;
+  /** Earned reward ids, for the extra skies. Null until the library loads. */
+  private earnedRewardIds: readonly string[] | null = null;
 
   private body!: HTMLElement;
   private stepBar!: HTMLElement;
@@ -177,10 +181,23 @@ export class AppCreatorScreen {
       case 'template': {
         if (!this.kit) { this.exit(); return; }
         if (subtitle) subtitle.textContent = 'Pick something to start with.';
-        new TemplatePicker(this.body, this.kit, {
+        const picker = new TemplatePicker(this.body, this.kit, {
           onPick: (starter, themeId) => this.startFrom(starter, themeId),
           onBack: () => this.exit(),
-        }).render();
+          earnedRewardIds: this.earnedRewardIds ?? [],
+          onLockedTheme: (invitation) => showToast(this.root, `🔒 ${invitation}`),
+        });
+        picker.render();
+        // The earned skies need the library, which is async; re-render the
+        // picker once we know, rather than making the child wait for it.
+        if (this.earnedRewardIds === null) {
+          void this.library.list().then((saved) => {
+            if (this.disposed || this.creator.step !== 'template') return;
+            this.earnedRewardIds = earnedRewards(makerRecord(this.store.evidence, saved))
+              .map((r) => r.id);
+            this.renderBody();
+          });
+        }
         break;
       }
       case 'build': {
@@ -419,13 +436,21 @@ export class AppCreatorScreen {
       showToast(this.root, check.childMessage ?? 'Let us tidy this up before saving.');
       return;
     }
+    // Rewards are derived from the evidence log, so read the maker record
+    // either side of the write and celebrate exactly the difference (§13).
+    const before = makerRecord(this.store.evidence, await this.library.list());
     const outcome = await this.library.save(project);
     if (this.disposed) return;
     if (outcome.ok) {
       sharedSfx.play('star');
       clearDraft();
       this.recordCreationEvidence();
+      const after = makerRecord(this.store.evidence, await this.library.list());
+      if (this.disposed) return;
       showToast(this.root, `💾 Saved "${titleText(project.title)}" to My Apps!`);
+      showCreatorCelebration(this.root, newlyEarned(before, after), {
+        calmMode: this.store.settings.calmMode,
+      });
     } else {
       sharedSfx.play('bump');
       showToast(this.root, outcome.childMessage ?? 'That could not be saved right now.');

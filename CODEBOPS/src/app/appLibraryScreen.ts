@@ -21,6 +21,8 @@ import { appKitForType } from '../data/app-lab/appLabDefinition';
 import { APP_LAB_THEMES } from '../data/app-lab/approvedAssets';
 import { TITLE_TOKENS, tokensInGroup, titleToken } from '../data/app-lab/preparedTitleTokens';
 import { duplicateProject } from '../creator/miniAppProjectFactory';
+import { SaveStore } from '../storage/saveStore';
+import { makerRecord, earnedRewards, frameForApp } from '../data/app-lab/creatorRewards';
 
 export interface AppLibraryEvents {
   readonly onBack: () => void;
@@ -32,9 +34,13 @@ let dupCounter = 0;
 
 export class AppLibraryScreen {
   private readonly store = new MiniAppStore();
+  /** The evidence log, for the frames a card wears (§13). */
+  private readonly progress = new SaveStore();
   private disposed = false;
   private grid!: HTMLElement;
   private emptyNote!: HTMLElement;
+  /** Card decoration earned across all apps — '' until the list loads. */
+  private cardStyle = '';
 
   constructor(
     private readonly root: HTMLElement,
@@ -66,15 +72,25 @@ export class AppLibraryScreen {
   private async refresh(): Promise<void> {
     const list = await this.store.list();
     if (this.disposed) return;
+    // A frame earned across the whole shelf dresses every card the same —
+    // there is deliberately no "best app", only apps.
+    const frames = earnedRewards(makerRecord(this.progress.evidence, list))
+      .filter((r) => r.kind === 'frame');
+    this.cardStyle = frames.length > 0 ? ` ${frames[frames.length - 1].id}` : '';
     this.grid.innerHTML = '';
     this.emptyNote.hidden = list.length > 0;
     for (const summary of list) this.renderCard(summary);
   }
 
   private renderCard(summary: MiniAppSummary): void {
-    const card = el('div', `lib-card${summary.needsRepair ? ' needs-repair' : ''}`, this.grid);
+    const card = el('div',
+      `lib-card${summary.needsRepair ? ' needs-repair' : ''}${this.cardStyle}`, this.grid);
     const kit = appKitForType(summary.type);
     const theme = APP_LAB_THEMES.find((t) => t.id === summary.themeId);
+    // The badge on a card names the biggest idea THIS app shows — never a
+    // rank; two apps wearing the same one is a fine outcome.
+    const frame = frameForApp(this.progress.evidence, summary.id);
+    if (frame) card.classList.add(`frame-${frame.frame}`);
 
     const shot = el('div', 'lib-shot', card);
     shot.setAttribute('role', 'img');
@@ -89,6 +105,7 @@ export class AppLibraryScreen {
     const chips = el('div', 'lib-chips', meta);
     el('span', 'lib-chip', chips, `${kit?.glyph ?? '🧪'} ${kit?.name ?? summary.type}`);
     if (theme) el('span', 'lib-chip', chips, `${theme.glyph} ${theme.label}`);
+    if (frame) el('span', 'lib-chip idea', chips, `✨ ${frame.label}`);
     const sub = el('div', 'lib-sub', meta, '');
 
     if (summary.needsRepair) {

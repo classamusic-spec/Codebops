@@ -13,10 +13,20 @@ import { templatesForType } from '../../creator/miniAppTemplateRegistry';
 import { startersForTemplate } from '../../creator/miniAppProjectFactory';
 import type { StarterDefinition } from '../../creator/miniAppProjectFactory';
 import { APP_LAB_THEMES } from '../../data/app-lab/approvedAssets';
+import { creatorReward } from '../../data/app-lab/creatorRewards';
+
+/** The child-facing sentence that says how a sky opens. */
+function themeInvitation(rewardId: string | undefined): string {
+  return creatorReward(rewardId ?? '')?.invitation ?? 'This sky opens later.';
+}
 
 export interface TemplatePickerEvents {
   readonly onPick: (starter: StarterDefinition, themeId: string) => void;
   readonly onBack: () => void;
+  /** Reward ids the child has earned, for the extra skies (§13). */
+  readonly earnedRewardIds?: readonly string[];
+  /** Explains a sky that is not open yet, rather than doing nothing. */
+  readonly onLockedTheme?: (invitation: string) => void;
 }
 
 export class TemplatePicker {
@@ -27,6 +37,12 @@ export class TemplatePicker {
     private readonly kit: AppKitDefinition,
     private readonly events: TemplatePickerEvents,
   ) {}
+
+  /** The seven world skies are always open; earned ones need their reward. */
+  private themeOpen(theme: { readonly unlockedBy?: string }): boolean {
+    if (!theme.unlockedBy) return true;
+    return (this.events.earnedRewardIds ?? []).includes(theme.unlockedBy);
+  }
 
   render(): void {
     const wrap = el('div', 'tp-wrap', this.parent);
@@ -47,14 +63,24 @@ export class TemplatePicker {
     themes.setAttribute('aria-label', 'Choose a place');
     const themeBtns: HTMLButtonElement[] = [];
     for (const theme of APP_LAB_THEMES) {
-      const b = el('button', `tp-theme${theme.id === this.themeId ? ' on' : ''}`, themes) as HTMLButtonElement;
+      const open = this.themeOpen(theme);
+      const b = el('button',
+        `tp-theme${theme.id === this.themeId ? ' on' : ''}${open ? '' : ' waiting'}`,
+        themes) as HTMLButtonElement;
       b.type = 'button';
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-checked', String(theme.id === this.themeId));
-      b.setAttribute('aria-label', theme.label);
-      el('span', 'tp-theme-glyph', b, theme.glyph);
+      b.setAttribute('aria-label', open ? theme.label : `${theme.label} — not open yet`);
+      el('span', 'tp-theme-glyph', b, open ? theme.glyph : '🔒');
       el('span', 'tp-theme-name', b, theme.label);
       b.addEventListener('click', () => {
+        if (!open) {
+          // A sky that is not open yet explains itself rather than doing
+          // nothing — the same shape as a locked station.
+          sharedSfx.play('bump');
+          this.events.onLockedTheme?.(themeInvitation(theme.unlockedBy));
+          return;
+        }
         sharedSfx.play('tap');
         this.themeId = theme.id;
         themeBtns.forEach((x, i) => {
