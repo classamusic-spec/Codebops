@@ -327,7 +327,17 @@ export class LevelSelectScreen {
     const sync = (): void => {
       const at = centred();
       pipEls.forEach((p, i) => p.classList.toggle('on', i === at));
-      cards.forEach((c, i) => c.classList.toggle('focused', i === at));
+      // Signed distance from the middle, in card widths. CSS turns this
+      // into a rotation and a push back, so the rail reads as a carousel
+      // that TURNS rather than a row that slides.
+      const mid = rail.scrollLeft + rail.clientWidth / 2;
+      cards.forEach((c, i) => {
+        const d = (c.offsetLeft + c.offsetWidth / 2 - mid) / (c.offsetWidth + 12);
+        const clamped = Math.max(-2.4, Math.min(2.4, d));
+        c.style.setProperty('--d', clamped.toFixed(3));
+        c.style.setProperty('--ad', Math.abs(clamped).toFixed(3));
+        c.classList.toggle('focused', i === at);
+      });
       prev.disabled = at === 0;
       next.disabled = at === cards.length - 1;
       railWrap.classList.toggle('single', cards.length === 1);
@@ -360,7 +370,15 @@ export class LevelSelectScreen {
     }, 0);
   }
 
-  /** One big level card, the width of most of the screen. */
+  /**
+   * One level, as a free-floating orb.
+   *
+   * There is no card. The panel that used to sit behind the icon was doing
+   * nothing but drawing a box around it, and a box inside a box inside the
+   * island read as packaging rather than as a thing to pick up. The orb
+   * carries the art, the shadow beneath it carries the weight, and the
+   * name, stars and action float underneath with nothing around them.
+   */
   private renderCard(cell: HTMLElement, stone: TrailStone): void {
     const locked = stone.state === 'locked' || stone.state === 'soon';
     const btn = el('button', `sel2-stone sel2-card st-${stone.state}`, cell) as HTMLButtonElement;
@@ -369,15 +387,28 @@ export class LevelSelectScreen {
     btn.setAttribute('aria-label', stone.showStars && stone.stars > 0
       ? `${named}, ${stone.stars} of 3 stars` : named);
 
-    const top = el('span', 'sel2-card-top', btn);
-    el('span', 'sel2-badge', top, stone.badge);
-    if (stone.state === 'done') el('span', 'sel2-card-tick', top, '✓ Done');
-    if (stone.state === 'next') el('span', 'sel2-flag', top, 'Play next!');
+    // ---- the orb ----
+    const stack = el('span', 'sel2-orb-stack', btn);
+    const orb = el('span', 'sel2-orb', stack);
+    el('span', 'sel2-orb-gloss', orb);
+    el('span', 'sel2-disc-glyph', orb, stone.emoji);
+    if (locked) el('span', 'sel2-stone-lock', orb, '🔒');
+    el('span', 'sel2-badge', orb, stone.badge);
+    if (stone.state === 'done') el('span', 'sel2-card-tick', orb, '✓');
+    // Three sparks that orbit the focused orb. Decorative only.
+    if (!locked) {
+      const spin = el('span', 'sel2-orbit', stack);
+      spin.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < 3; i += 1) {
+        const spark = el('span', `sel2-spark s${i}`, spin, '✦');
+        spark.style.setProperty('--i', String(i));
+      }
+    }
+    // The contact shadow is what sells "floating" — without it an orb is
+    // just a circle sitting on a background.
+    el('span', 'sel2-orb-shadow', stack);
 
-    const art = el('span', 'sel2-art', btn);
-    el('span', 'sel2-art-glow', art);
-    el('span', 'sel2-disc-glyph', art, stone.emoji);
-    if (locked) el('span', 'sel2-stone-lock', art, '🔒');
+    if (stone.state === 'next') el('span', 'sel2-flag', btn, 'Play next!');
 
     el('span', 'sel2-stone-name', btn, stone.label);
     if (stone.note) {
@@ -387,8 +418,7 @@ export class LevelSelectScreen {
       for (let s = 0; s < 3; s += 1) el('span', s < stone.stars ? 'on' : '', row, '★');
     }
 
-    // The action reads as a label on the card rather than a second button:
-    // the whole card is the tap target, which is what a small hand wants.
+    // The whole orb is the tap target; this reads as its label.
     el('span', `sel2-go${locked ? ' locked' : ''}`, btn,
       locked ? '🔒 Not yet' : (stone.state === 'done' ? '↻ Play again' : '▶ Play'));
 
