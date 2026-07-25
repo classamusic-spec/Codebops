@@ -891,11 +891,10 @@ svg .cb-glitch-bit { animation: cb-glitch-bit 3.6s steps(1, end) infinite; }
 
 /* ---- the island itself ---- */
 .sel2-island {
-  position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto;
-  -webkit-overflow-scrolling: touch; touch-action: pan-y;
+  position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   border: 4px solid rgba(255,255,255,.5); border-bottom: none;
-  padding: 14px 12px max(20px, var(--sab));
+  padding: 12px 0 max(10px, var(--sab));
   animation: sel2IslandIn .34s var(--ease-out);
   /* A column, so a short world can centre its stones instead of leaving a
      field of empty colour under them on a big screen. */
@@ -933,8 +932,8 @@ svg .cb-glitch-bit { animation: cb-glitch-bit 3.6s steps(1, end) infinite; }
 
 .sel2-island-head {
   position: relative; z-index: 1; flex: 0 0 auto;
-  display: flex; align-items: center; gap: 11px; margin-bottom: 12px;
-}
+  display: flex; align-items: center; gap: 11px;
+  margin: 0 16px 8px; }
 .sel2-island-glyph {
   font-size: 32px; line-height: 1; flex: 0 0 auto;
   filter: drop-shadow(0 3px 0 rgba(20,32,80,.28));
@@ -949,161 +948,253 @@ svg .cb-glitch-bit { animation: cb-glitch-bit 3.6s steps(1, end) infinite; }
 }
 .sel2-empty { color: #fff; font-weight: 800; text-align: center; padding: 24px 0; }
 
-/* ---- stepping stones ---- */
-.sel2-stones {
-  position: relative; z-index: 1;
-  display: grid; gap: 18px 8px;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  /* Capped and centred: on a wide screen a handful of stones should be a
-     tidy cluster, not five lonely discs strung across a football pitch. */
-  width: 100%; max-width: 620px; margin: 0 auto;
-  flex: 1 1 auto; align-content: center;
+/* ---- the swipeable rail of big level cards ---- */
+.sel2-rail-wrap { position: relative; z-index: 1; flex: 1 1 auto; min-height: 0; display: flex; }
+.sel2-rail {
+  flex: 1 1 auto; display: flex; align-items: center; gap: 12px;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  /* Side padding equal to the gutter beside a centred card, so the first
+     and last cards can sit in the middle like every other one. */
+  padding: 6px max(14px, calc(50% - 152px));
 }
-.sel2-cell {
-  position: relative; display: flex; justify-content: center;
-  /* Room above for the "Play!" flag, so it never sits on the badge. */
-  padding-top: 12px;
-  animation: sel2StoneIn .4s var(--ease-bounce) backwards;
-  animation-delay: calc(var(--i) * 0.035s);
-}
-@keyframes sel2StoneIn { from { opacity: 0; transform: scale(.8) translateY(10px); } }
+.sel2-rail::-webkit-scrollbar { display: none; }
 
-.sel2-stone {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  width: 100%; cursor: pointer; font: inherit; background: none; border: none;
-  padding: 0; min-height: 44px;
+.sel2-cell {
+  position: relative; flex: 0 0 auto; scroll-snap-align: center;
+  width: min(76vw, 288px);
+  /* Fill the island rather than floating in the middle of it. Capped so a
+     tall tablet does not get one enormous card. */
+  height: min(100%, 500px);
+  animation: sel2CardIn .42s var(--ease-bounce) backwards;
+  animation-delay: calc(var(--i) * 0.04s);
 }
-.sel2-disc {
-  position: relative; width: 74px; height: 74px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 28%, #fff9ec, #ffe0a8);
-  border: 4px solid #fff;
-  box-shadow: 0 6px 0 rgba(20,32,80,.34), inset 0 -7px 14px rgba(190,130,40,.22);
-  transition: transform var(--dur-fast) var(--ease-bounce);
+@keyframes sel2CardIn { from { opacity: 0; transform: scale(.92); } }
+
+.sel2-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 100%; height: 100%; cursor: pointer; font: inherit; text-align: center;
+  padding: 16px 14px 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.14));
+  border: 4px solid rgba(255,255,255,.6); border-radius: 30px;
+  box-shadow: 0 10px 0 rgba(20,32,80,.24), 0 14px 30px rgba(10,20,50,.28);
+  /* Off-centre cards sit back a little, so the middle one reads as the
+     one you are looking at without a word of explanation. */
+  transform: scale(.9); opacity: .72;
+  transition: transform var(--dur-med) var(--ease-bounce), opacity var(--dur-med),
+    box-shadow var(--dur-med);
 }
-.sel2-stone:active .sel2-disc { transform: translateY(3px); box-shadow: 0 3px 0 rgba(20,32,80,.34); }
-.sel2-disc-glyph { font-size: 33px; line-height: 1; }
+.sel2-cell.focused .sel2-card { transform: none; opacity: 1; }
+.sel2-card:active { transform: scale(.97) translateY(3px); box-shadow: 0 5px 0 rgba(20,32,80,.24); }
+
+.sel2-card-top {
+  display: flex; align-items: center; gap: 7px; min-height: 28px;
+  width: 100%; justify-content: center;
+}
 .sel2-badge {
-  position: absolute; top: -6px; left: -6px; min-width: 26px; height: 26px;
-  padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  min-width: 30px; height: 30px; padding: 0 8px; border-radius: 999px;
+  display: grid; place-items: center;
   background: linear-gradient(180deg, #7ee79b, #3fae66); color: #06280f;
-  border: 3px solid #fff; font-weight: 800; font-size: 12px;
+  border: 3px solid #fff; font-weight: 800; font-size: 13px;
   box-shadow: 0 2px 0 rgba(20,32,80,.3);
 }
+.sel2-card-tick {
+  background: linear-gradient(180deg, #7ee79b, #3fae66); color: #fff;
+  border: 3px solid #fff; border-radius: 999px; padding: 2px 11px;
+  font-weight: 800; font-size: 11.5px; box-shadow: 0 2px 0 rgba(20,32,80,.3);
+}
+.sel2-flag {
+  background: linear-gradient(180deg, #ffd95e, #f0a81e); color: #4a2c00;
+  border: 3px solid #fff; border-radius: 999px; padding: 2px 11px;
+  font-family: var(--font-display); font-weight: 800; font-size: 11.5px;
+  box-shadow: 0 3px 0 rgba(20,32,80,.3); white-space: nowrap;
+}
+
+/* The art: one big glyph on a soft glow, which is the whole point of
+   making these cards large in the first place. */
+.sel2-art {
+  position: relative; width: 100%; flex: 1 1 auto; min-height: 90px;
+  display: grid; place-items: center; margin: 2px 0 4px;
+  border-radius: 24px;
+  background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.6), rgba(255,255,255,.12));
+  box-shadow: inset 0 -8px 18px rgba(20,32,80,.12);
+}
+.sel2-art-glow {
+  position: absolute; width: 78%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.85), transparent 70%);
+}
+/* The glyph IS the art. It was sitting small in the middle of a big empty
+   panel, which is the opposite of premium — it should fill the frame. */
+.sel2-disc-glyph {
+  /* Tracks whichever runs out first, the card's width or the screen's
+     height, so it fills the frame on a phone and on a tablet alike. */
+  position: relative; font-size: clamp(64px, min(38vw, 27vh), 152px); line-height: 1;
+  filter: drop-shadow(0 6px 0 rgba(20,32,80,.22));
+}
+.sel2-stone-lock {
+  position: absolute; right: 12px; bottom: 10px; width: 34px; height: 34px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: #fff6e3; border: 3px solid #fff; font-size: 16px;
+  box-shadow: 0 3px 0 rgba(42,24,69,.28);
+}
+
 .sel2-stone-name {
   color: #fff; font-family: var(--font-display); font-weight: 800;
-  font-size: 12.5px; line-height: 1.2; text-align: center;
-  text-shadow: 0 2px 0 rgba(20,32,80,.4);
+  font-size: clamp(15px, 4.4vw, 20px); line-height: 1.15;
+  text-shadow: 0 3px 0 rgba(20,32,80,.42);
 }
-.sel2-stone-note { color: rgba(255,255,255,.88); font-weight: 800; font-size: 10.5px; text-align: center; }
-.sel2-stone-stars { display: flex; gap: 2px; font-size: 13px; color: rgba(255,255,255,.42); }
-.sel2-stone-stars .on { color: var(--yellow); text-shadow: 0 0 8px rgba(255,210,62,.8); }
+.sel2-stone-note { color: rgba(255,255,255,.9); font-weight: 800; font-size: 12px; }
+.sel2-stone-stars { display: flex; gap: 4px; font-size: 19px; color: rgba(255,255,255,.4); }
+.sel2-stone-stars .on { color: var(--yellow); text-shadow: 0 0 10px rgba(255,210,62,.85); }
 
-/* done: a green tick and a calmer disc, so finished reads as finished */
-.sel2-stone.st-done .sel2-disc {
-  background: radial-gradient(circle at 50% 28%, #f2fff5, #cdefd6);
+/* The action, as a label on the card. The whole card is the tap target,
+   which is what a small hand actually wants. */
+.sel2-go {
+  margin-top: 4px; width: 100%; min-height: 44px;
+  display: grid; place-items: center;
+  background: linear-gradient(180deg, #7ee79b, #3fae66); color: #06280f;
+  border: 3px solid #fff; border-radius: 999px;
+  font-family: var(--font-display); font-weight: 800; font-size: 15px;
+  box-shadow: 0 4px 0 rgba(20,32,80,.3);
 }
-.sel2-stone-tick {
-  position: absolute; right: -5px; bottom: -3px; width: 26px; height: 26px;
-  border-radius: 50%; display: grid; place-items: center;
-  background: linear-gradient(180deg, #7ee79b, #3fae66); color: #fff;
-  border: 3px solid #fff; font-weight: 800; font-size: 13px;
+.sel2-go.locked {
+  background: linear-gradient(180deg, #e6ebf7, #bcc5db); color: #46527a;
 }
 
-/* next: the one thing to do now — a pulsing ring, a flag, and Zip */
-.sel2-stone.st-next .sel2-disc {
+.sel2-card.st-done { background: linear-gradient(180deg, rgba(210,255,224,.36), rgba(255,255,255,.14)); }
+.sel2-card.st-next {
   border-color: #ffe9a8;
-  box-shadow: 0 6px 0 rgba(20,32,80,.34), 0 0 0 5px rgba(255,233,168,.5), 0 0 26px rgba(255,220,120,.7);
-  animation: sel2Bob 1.9s ease-in-out infinite;
+  box-shadow: 0 10px 0 rgba(20,32,80,.24), 0 0 0 5px rgba(255,233,168,.42),
+    0 14px 34px rgba(255,200,90,.4);
 }
+.sel2-cell.focused .sel2-card.st-next { animation: sel2Bob 2.2s ease-in-out infinite; }
 @keyframes sel2Bob { 50% { transform: translateY(-5px); } }
-.sel2-flag {
-  position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
-  background: linear-gradient(180deg, #ffd95e, #f0a81e); color: #4a2c00;
-  border: 3px solid #fff; border-radius: 999px; padding: 1px 10px;
-  font-family: var(--font-display); font-weight: 800; font-size: 11px;
-  box-shadow: 0 3px 0 rgba(20,32,80,.3); z-index: 3; white-space: nowrap;
+.sel2-card.st-locked, .sel2-card.st-soon {
+  background: linear-gradient(180deg, rgba(230,236,250,.3), rgba(255,255,255,.1));
 }
+.sel2-card.st-locked .sel2-disc-glyph,
+.sel2-card.st-soon .sel2-disc-glyph { filter: grayscale(.85); opacity: .6; }
+.sel2-card.st-locked .sel2-badge, .sel2-card.st-soon .sel2-badge {
+  background: linear-gradient(180deg, #b9c2d8, #8b95b4); color: #f4f7ff;
+}
+.sel2-card.shake { animation: shake .42s ease; }
+
 .sel2-zip {
-  position: absolute; right: -2px; top: 30px; width: 40px; height: 40px;
-  opacity: 0; transition: opacity var(--dur-med); pointer-events: none; z-index: 2;
+  position: absolute; right: -16px; top: 44px; width: 52px; height: 52px;
+  opacity: 0; transition: opacity var(--dur-med); pointer-events: none; z-index: 3;
 }
 .sel2-zip.ready { opacity: 1; animation: sel2ZipPeek 2.6s ease-in-out infinite; }
 .sel2-zip svg { width: 100%; height: 100%; }
-@keyframes sel2ZipPeek { 50% { transform: translateY(-4px) rotate(-6deg); } }
+@keyframes sel2ZipPeek { 50% { transform: translateY(-5px) rotate(-7deg); } }
 
-/* locked / soon: quiet, never a scolding, and still tappable */
-.sel2-stone.st-locked .sel2-disc, .sel2-stone.st-soon .sel2-disc {
-  background: radial-gradient(circle at 50% 28%, #eef1f8, #c3cbdd);
-  box-shadow: 0 5px 0 rgba(20,32,80,.26), inset 0 -6px 12px rgba(60,70,110,.2);
-}
-.sel2-stone.st-locked .sel2-disc-glyph,
-.sel2-stone.st-soon .sel2-disc-glyph { filter: grayscale(.85); opacity: .55; }
-.sel2-stone.st-locked .sel2-badge, .sel2-stone.st-soon .sel2-badge {
-  background: linear-gradient(180deg, #b9c2d8, #8b95b4); color: #f4f7ff;
-}
-.sel2-stone.st-locked .sel2-stone-name,
-.sel2-stone.st-soon .sel2-stone-name { color: rgba(255,255,255,.72); }
-.sel2-stone-lock {
-  position: absolute; right: -5px; bottom: -3px; width: 26px; height: 26px;
-  border-radius: 50%; display: grid; place-items: center;
-  background: #fff6e3; border: 3px solid #fff; font-size: 13px;
-  box-shadow: 0 2px 0 rgba(42,24,69,.28);
-}
-.sel2-stone.shake { animation: shake .42s ease; }
-
-/* deleting a level the child built */
 .sel2-stone-del {
-  position: absolute; top: -6px; right: 2px; width: 28px; height: 28px;
-  border-radius: 50%; cursor: pointer; font: inherit; z-index: 3;
+  position: absolute; top: -4px; right: -4px; width: 36px; height: 36px;
+  border-radius: 50%; cursor: pointer; font: inherit; z-index: 4;
   background: linear-gradient(180deg, #ff8f8f, #d84343); color: #fff;
-  border: 3px solid #fff; font-weight: 800; font-size: 12px;
-  display: grid; place-items: center; box-shadow: 0 2px 0 rgba(20,32,80,.3);
+  border: 3px solid #fff; font-weight: 800; font-size: 14px;
+  display: grid; place-items: center; box-shadow: 0 3px 0 rgba(20,32,80,.3);
 }
+
+/* ---- arrows and position dots ---- */
+.sel2-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
+  width: 46px; height: 46px; min-height: 44px; border-radius: 50%;
+  cursor: pointer; font: inherit; display: grid; place-items: center;
+  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(226,236,255,.92));
+  border: 3px solid #fff; color: #1c3468; font-size: 26px; font-weight: 800;
+  box-shadow: 0 4px 0 rgba(20,32,80,.3);
+  transition: opacity var(--dur-fast);
+}
+.sel2-arrow.prev { left: 2px; }
+.sel2-arrow.next { right: 2px; }
+.sel2-arrow:disabled { opacity: 0; pointer-events: none; }
+.sel2-rail-wrap.single .sel2-arrow { display: none; }
+
+.sel2-pips {
+  position: relative; z-index: 1; flex: 0 0 auto;
+  display: flex; justify-content: center; gap: 6px; padding: 8px 0 4px;
+}
+.sel2-pip {
+  width: 8px; height: 8px; border-radius: 999px;
+  background: rgba(255,255,255,.42);
+  transition: width var(--dur-med), background var(--dur-med);
+}
+.sel2-pip.on { width: 22px; background: #fff; }
 
 .sel2-toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 20; }
 
-/* Wider screens: bigger stones, more per row, roomier chrome. */
+/* Wider screens: bigger cards, a couple of neighbours peeking in. */
 @media (min-width: 760px) {
   .sel2-screen { padding-left: max(20px, var(--sal)); padding-right: max(20px, var(--sar)); }
-  .sel2-stones { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 22px 14px; max-width: 700px; }
-  .sel2-disc { width: 86px; height: 86px; }
-  .sel2-disc-glyph { font-size: 38px; }
-  .sel2-stone-name { font-size: 13.5px; }
+  .sel2-cell { width: 330px; height: min(100%, 540px); }
+  .sel2-rail { gap: 20px; padding: 10px max(20px, calc(50% - 175px)); }
+  .sel2-card { padding: 20px 18px 18px; }
   .sel2-med { width: 96px; }
   .sel2-med-disc { width: 70px; height: 70px; }
   .sel2-med-glyph { font-size: 33px; }
   .sel2-med-name { font-size: 11.5px; }
-  .sel2-island { padding: 18px 20px max(24px, var(--sab)); }
+  .sel2-arrow { width: 54px; height: 54px; font-size: 30px; }
+  .sel2-arrow.prev { left: 10px; }
+  .sel2-arrow.next { right: 10px; }
 }
 
-/* Short landscape: the banner and strip give up height, stones stay big. */
-@media (max-height: 540px) and (orientation: landscape) {
-  .sel2-daily { padding: 5px 12px; margin-bottom: 6px; }
+/* Short landscape: the chrome gives up height, the card stays the hero. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .sel2-daily { padding: 4px 12px; margin-bottom: 5px; }
   .sd-sub { display: none; }
-  .sel2-strip { padding-bottom: 6px; }
-  .sel2-med { width: 74px; }
-  .sel2-med-disc { width: 50px; height: 50px; border-width: 3px; }
-  .sel2-med-glyph { font-size: 24px; }
-  .sel2-island-head { margin-bottom: 8px; }
+  .sel2-strip { padding-bottom: 5px; }
+  .sel2-med { width: 70px; }
+  .sel2-med-disc { width: 46px; height: 46px; border-width: 3px; }
+  .sel2-med-glyph { font-size: 22px; }
+  .sel2-med-name { font-size: 9.5px; }
+  .sel2-med-stars { display: none; }
+  .sel2-island-head { margin-bottom: 6px; }
   .sel2-island-titles p { display: none; }
+  .sel2-island-titles h2 { font-size: 17px; }
+  .sel2-island-glyph { font-size: 24px; }
+  /* A short card lays out side by side instead of stacking. */
+  .sel2-cell { width: min(64vw, 340px); }
+  .sel2-card {
+    display: grid; grid-template-columns: 96px 1fr; grid-template-rows: auto auto auto;
+    align-items: center; gap: 2px 12px; text-align: left; padding: 10px 14px;
+  }
+  .sel2-card-top { grid-column: 2; justify-content: flex-start; min-height: 0; }
+  .sel2-cell { height: auto; align-self: center; }
+  .sel2-card { height: auto; }
+  .sel2-art { grid-row: 1 / 4; grid-column: 1; width: 96px; height: 96px; flex: none; min-height: 0; margin: 0; }
+  .sel2-disc-glyph { font-size: 46px; }
+  .sel2-stone-name { grid-column: 2; font-size: 15px; }
+  .sel2-stone-stars, .sel2-stone-note { grid-column: 2; }
+  .sel2-go { grid-column: 2; margin-top: 4px; }
+  .sel2-pips { padding: 4px 0 2px; }
+  .sel2-zip { width: 40px; height: 40px; bottom: 6px; right: -10px; }
 }
 
-/* Calm mode and reduce-motion: everything arrives, nothing loops. */
+/* Calm mode and reduce-motion: everything arrives, nothing loops, and a
+   swipe jumps rather than glides. */
 @media (prefers-reduced-motion: reduce) {
   .sel2-cell, .sel2-island, .sel2-leaf, .sel2-zip.ready { animation: none !important; }
-  .sel2-stone.st-next .sel2-disc { animation: none; }
+  .sel2-cell.focused .sel2-card.st-next { animation: none; }
+  .sel2-rail { scroll-behavior: auto; }
 }
 .calm-mode .sel2-cell, .calm-mode .sel2-leaf, .calm-mode .sel2-zip.ready { animation: none; }
-.calm-mode .sel2-stone.st-next .sel2-disc { animation: none; }
+.calm-mode .sel2-cell.focused .sel2-card.st-next { animation: none; }
+/* Calm mode also drops the shrink on the off-centre cards, so nothing
+   changes size as a child swipes. */
+.calm-mode .sel2-card { transform: none; opacity: .9; }
 
 /* High contrast: edges everywhere, and "not yet" carried by more than grey. */
-body.high-contrast .sel2-med-disc, body.high-contrast .sel2-disc,
-body.high-contrast .sel2-daily, body.high-contrast .sel2-island { border-color: #fff; }
+body.high-contrast .sel2-med-disc, body.high-contrast .sel2-card,
+body.high-contrast .sel2-daily, body.high-contrast .sel2-island,
+body.high-contrast .sel2-arrow, body.high-contrast .sel2-go { border-color: #fff; }
 body.high-contrast .sel2-med-name, body.high-contrast .sel2-stone-name,
 body.high-contrast .sel2-island-titles p, body.high-contrast .sel2-stone-note { color: #fff; }
-body.high-contrast .sel2-stone.st-locked .sel2-disc,
-body.high-contrast .sel2-stone.st-soon .sel2-disc { border-style: dashed; }
+body.high-contrast .sel2-card.st-locked, body.high-contrast .sel2-card.st-soon {
+  border-style: dashed;
+}
+body.high-contrast .sel2-card { opacity: 1; }
 body.high-contrast .sel2-med.locked .sel2-med-disc { filter: none; border-style: dashed; }
 
 /* Left-handed: the header controls flip, the stones do not (reading order

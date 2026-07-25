@@ -278,34 +278,106 @@ export class LevelSelectScreen {
     el('h2', undefined, titles, world.name);
     el('p', undefined, titles, world.tagline);
 
-    const stones = el('div', 'sel2-stones', this.island);
-    world.stones.forEach((stone, i) => {
-      const cell = el('div', 'sel2-cell', stones);
-      cell.style.setProperty('--i', String(i));
-      this.renderStone(cell, stone);
-    });
-
     if (world.stones.length === 0) {
       el('p', 'sel2-empty', this.island, 'Nothing here yet — check back soon!');
+      return;
     }
+
+    // ---- the swipeable rail of big level cards ----
+    const railWrap = el('div', 'sel2-rail-wrap', this.island);
+    const rail = el('div', 'sel2-rail', railWrap);
+    rail.setAttribute('role', 'list');
+    rail.setAttribute('aria-label', `Levels in ${world.name}`);
+    const cards: HTMLElement[] = [];
+    world.stones.forEach((stone, i) => {
+      const cell = el('div', 'sel2-cell', rail);
+      cell.setAttribute('role', 'listitem');
+      cell.style.setProperty('--i', String(i));
+      this.renderCard(cell, stone);
+      cards.push(cell);
+    });
+
+    // Arrows for a mouse or a keyboard; swiping covers touch. They are
+    // real buttons so they clear the tap-target floor and get names.
+    const prev = el('button', 'sel2-arrow prev', railWrap, '‹') as HTMLButtonElement;
+    prev.type = 'button';
+    prev.setAttribute('aria-label', 'Show the level before');
+    const next = el('button', 'sel2-arrow next', railWrap, '›') as HTMLButtonElement;
+    next.type = 'button';
+    next.setAttribute('aria-label', 'Show the next level');
+
+    // Position dots. Presentational on purpose: nine tiny buttons would
+    // add nine controls a child never needs, and the arrows already do
+    // the job with a proper target.
+    const pips = el('div', 'sel2-pips', this.island);
+    pips.setAttribute('aria-hidden', 'true');
+    const pipEls = world.stones.map(() => el('span', 'sel2-pip', pips));
+
+    /** Which card is nearest the middle of the rail right now. */
+    const centred = (): number => {
+      const mid = rail.scrollLeft + rail.clientWidth / 2;
+      let best = 0;
+      let bestGap = Infinity;
+      cards.forEach((c, i) => {
+        const gap = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
+        if (gap < bestGap) { bestGap = gap; best = i; }
+      });
+      return best;
+    };
+    const sync = (): void => {
+      const at = centred();
+      pipEls.forEach((p, i) => p.classList.toggle('on', i === at));
+      cards.forEach((c, i) => c.classList.toggle('focused', i === at));
+      prev.disabled = at === 0;
+      next.disabled = at === cards.length - 1;
+      railWrap.classList.toggle('single', cards.length === 1);
+    };
+    const goTo = (i: number): void => {
+      const card = cards[Math.max(0, Math.min(cards.length - 1, i))];
+      if (!card) return;
+      rail.scrollTo({
+        left: card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2,
+        behavior: this.store.settings.calmMode ? 'auto' : 'smooth',
+      });
+    };
+    prev.addEventListener('click', () => { sharedSfx.play('tap'); goTo(centred() - 1); });
+    next.addEventListener('click', () => { sharedSfx.play('tap'); goTo(centred() + 1); });
+    rail.addEventListener('scroll', sync, { passive: true });
+
+    // Open on the card that matters: the one to play now, else the first
+    // that is not finished, else the beginning.
+    const startAt = Math.max(0,
+      world.stones.findIndex((s) => s.state === 'next' || s.state === 'open'));
+    // Jump without animating, so arriving never looks like a scroll away
+    // from something else.
+    window.setTimeout(() => {
+      if (this.disposed) return;
+      const card = cards[startAt];
+      if (card) {
+        rail.scrollLeft = card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2;
+      }
+      sync();
+    }, 0);
   }
 
-  private renderStone(cell: HTMLElement, stone: TrailStone): void {
-    const btn = el('button', `sel2-stone st-${stone.state}`, cell) as HTMLButtonElement;
+  /** One big level card, the width of most of the screen. */
+  private renderCard(cell: HTMLElement, stone: TrailStone): void {
+    const locked = stone.state === 'locked' || stone.state === 'soon';
+    const btn = el('button', `sel2-stone sel2-card st-${stone.state}`, cell) as HTMLButtonElement;
     btn.type = 'button';
-    const named = stone.state === 'locked' || stone.state === 'soon'
-      ? `${stone.label} — not open yet`
-      : `Play ${stone.label}`;
+    const named = locked ? `${stone.label} — not open yet` : `Play ${stone.label}`;
     btn.setAttribute('aria-label', stone.showStars && stone.stars > 0
       ? `${named}, ${stone.stars} of 3 stars` : named);
 
-    const disc = el('span', 'sel2-disc', btn);
-    el('span', 'sel2-disc-glyph', disc, stone.emoji);
-    el('span', 'sel2-badge', disc, stone.badge);
-    if (stone.state === 'locked' || stone.state === 'soon') {
-      el('span', 'sel2-stone-lock', disc, '🔒');
-    }
-    if (stone.state === 'done') el('span', 'sel2-stone-tick', disc, '✓');
+    const top = el('span', 'sel2-card-top', btn);
+    el('span', 'sel2-badge', top, stone.badge);
+    if (stone.state === 'done') el('span', 'sel2-card-tick', top, '✓ Done');
+    if (stone.state === 'next') el('span', 'sel2-flag', top, 'Play next!');
+
+    const art = el('span', 'sel2-art', btn);
+    el('span', 'sel2-art-glow', art);
+    el('span', 'sel2-disc-glyph', art, stone.emoji);
+    if (locked) el('span', 'sel2-stone-lock', art, '🔒');
 
     el('span', 'sel2-stone-name', btn, stone.label);
     if (stone.note) {
@@ -315,10 +387,12 @@ export class LevelSelectScreen {
       for (let s = 0; s < 3; s += 1) el('span', s < stone.stars ? 'on' : '', row, '★');
     }
 
+    // The action reads as a label on the card rather than a second button:
+    // the whole card is the tap target, which is what a small hand wants.
+    el('span', `sel2-go${locked ? ' locked' : ''}`, btn,
+      locked ? '🔒 Not yet' : (stone.state === 'done' ? '↻ Play again' : '▶ Play'));
+
     if (stone.state === 'next') {
-      // Zip stands next to the thing to do now — the one bit of "you are
-      // here" the old list never managed to say.
-      el('span', 'sel2-flag', cell, 'Play!');
       const zip = el('span', 'sel2-zip', cell);
       zip.setAttribute('aria-hidden', 'true');
       void inlineSvgInto(zip, './art/characters/zip/zip.svg').then((svg) => {
