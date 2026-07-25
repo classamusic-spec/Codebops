@@ -6,7 +6,6 @@ import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { deleteCustomLevel } from '../storage/customLevels';
 import { loadSvg } from '../rendering/svgAsset';
-import { mountMascot } from '../rendering/mascotRig';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
@@ -128,52 +127,59 @@ export class App {
     const screen = el('section', 'screen title-screen', this.host);
     screen.id = 'screen-title';
 
-    // Sky decor: sun rays, clouds, floating sparkles
-    el('div', 'title-rays', screen);
-    for (const cls of ['c1', 'c2', 'c3']) el('div', `title-cloud ${cls}`, screen);
-    const deco = ['⭐', '✨', '⬡', '✦', '💧', '⭐', '✨'];
-    deco.forEach((d, i) => {
-      const s = el('span', `title-spark s${i}`, screen, d);
-      s.setAttribute('aria-hidden', 'true');
-    });
+    // The splash is a little scene that BUILDS ITSELF while a child looks
+    // at it — sky, then sun, then clouds, then the land, then the trees,
+    // then the logo lands on top of it. The order is the whole point: a
+    // world assembling itself reads as "something is about to happen"
+    // in a way a finished picture never does.
+    //
+    // Every stage is one class on the screen and a CSS delay, so calm mode
+    // and prefers-reduced-motion can hand a child the finished scene with
+    // nothing moving, by turning the same animations off.
+    screen.classList.add('title-build');
 
-    // Rolling hills with bushes + flowers
+    const sky = el('div', 'title-sky', screen);
+    sky.setAttribute('aria-hidden', 'true');
+    const sun = el('div', 'title-sun', sky);
+    el('div', 'title-sun-core', sun);
+    el('div', 'title-rays', sun);
+    // Two banks of cloud that drift in from opposite edges.
+    for (const cls of ['c1', 'c2', 'c3', 'c4']) el('div', `title-cloud ${cls}`, sky);
+    const deco = ['⭐', '✨', '⬡', '✦', '💧', '⭐', '✨'];
+    deco.forEach((d, i) => el('span', `title-spark s${i}`, sky, d));
+
+    // The land rises up from the bottom edge, and the trees grow on it.
     const ground = el('div', 'title-ground', screen);
+    ground.setAttribute('aria-hidden', 'true');
     el('div', 'title-hill h1', ground);
     el('div', 'title-hill h2', ground);
+    for (const cls of ['t1', 't2', 't3', 't4', 't5']) {
+      const tree = el('div', `title-tree ${cls}`, ground);
+      el('div', 'tree-trunk', tree);
+      // Three stacked blobs: the same chunky toy tree the worlds use.
+      el('div', 'tree-leaf l1', tree);
+      el('div', 'tree-leaf l2', tree);
+      el('div', 'tree-leaf l3', tree);
+    }
     for (const cls of ['b1', 'b2', 'b3', 'b4']) el('div', `title-bush ${cls}`, ground);
     const flowers = ['🌸', '🌼', '🌺', '🌻'];
     flowers.forEach((f, i) => el('span', `title-flower f${i}`, ground, f));
 
-    // Live rigged mascots: they idle, breathe, blink on a seeded schedule
-    // and watch the pointer. Tapping one makes it hop.
-    const calm = this.store.settings.calmMode;
-    for (const [who, cls] of [['zip', 'zip'], ['mixy', 'mixy']] as const) {
-      const box = el('div', `title-mascot ${cls}`, screen);
-      box.setAttribute('role', 'img');
-      box.setAttribute('aria-label', who === 'zip' ? 'Zip' : 'Mixy');
-      const mascot = mountMascot(box, who, { calm, followPointer: true });
-      box.addEventListener('click', () => {
-        sharedSfx.play('hop');
-        mascot.play('happy');
-      });
-      this.mascotStops.push(() => mascot.destroy());
-    }
-
     const card = el('div', 'title-card', screen);
-    // Official CodeBops logo mark, animated: drop-bounce in, idle rock,
-    // masked glint sweep; tap it to make it pop again.
+    // The logo is the hero now — the mascots used to flank it and on a
+    // phone they simply sat on top of the tagline and the Play button.
     const logoBox = el('div', 'title-logo-art', card);
     logoBox.setAttribute('role', 'img');
     logoBox.setAttribute('aria-label', 'CodeBops');
     const shine = el('div', 'logo-shine', logoBox);
     // Inline the logo, and mask the glint with the SAME (inlined) art via a
     // data-URI so it works from a single-file build too — no external URL.
-    void loadSvg('./art/logo.svg').then((text) => {
+    void loadSvg('./art/splash-logo.svg').then((text) => {
       logoBox.insertAdjacentHTML('afterbegin', text);
       const uri = `url("data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(text)))}")`;
       shine.style.webkitMaskImage = uri;
       shine.style.maskImage = uri;
+      logoBox.classList.add('loaded');
     });
     logoBox.addEventListener('pointerdown', () => {
       sharedSfx.play('star');
@@ -181,11 +187,14 @@ export class App {
       void logoBox.offsetWidth;
       logoBox.classList.add('replay');
     });
-    const tag = el('div', 'title-tag', card);
+    // Words and buttons in one group, so a short landscape phone can put
+    // them beside the logo instead of stacking everything off the bottom.
+    const actions = el('div', 'title-actions', card);
+    const tag = el('div', 'title-tag', actions);
     el('span', 'tag-star', tag, '⭐');
     el('span', undefined, tag, 'Teach tiny helpers. Build big ideas.');
     el('span', 'tag-star', tag, '⭐');
-    const play = el('button', 'btn-play', card);
+    const play = el('button', 'btn-play', actions);
     play.type = 'button';
     play.setAttribute('aria-label', 'Play CodeBops');
     el('span', 'gloss', play);
@@ -197,14 +206,14 @@ export class App {
     });
 
     // Bop Garden entry
-    const garden = el('button', 'garden-btn', card);
+    const garden = el('button', 'garden-btn', actions);
     garden.type = 'button';
     el('span', undefined, garden, '🌻');
     el('span', undefined, garden, 'My Garden');
     garden.addEventListener('click', () => this.showGarden());
 
     // Learning Garden — the child-facing curriculum map (§9)
-    const journey = el('button', 'garden-btn journey-btn', card);
+    const journey = el('button', 'garden-btn journey-btn', actions);
     journey.type = 'button';
     el('span', undefined, journey, '🌱');
     el('span', undefined, journey, 'Big Ideas');

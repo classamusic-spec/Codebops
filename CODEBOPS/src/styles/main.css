@@ -1217,10 +1217,6 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .bop-btn:hover { filter: brightness(1.1); }
   .btn-play:hover { filter: brightness(1.08); transform: translateY(-2px) scale(1.02); }
 }
-.title-mascot { position: absolute; pointer-events: none; aspect-ratio: 1; }
-.title-mascot.zip { left: 7%; bottom: 15%; height: min(47vh, 430px); }
-.title-mascot.mixy { right: 6%; bottom: 19%; height: min(35vh, 330px); }
-.title-mascot canvas { height: 100%; width: 100%; display: block; filter: drop-shadow(0 18px 24px rgba(13,20,55,.35)); }
 .intro-emoji { font-size: 56px; line-height: 1; animation: boot-bob 1.8s ease-in-out infinite; }
 
 /* ============================================================
@@ -1317,8 +1313,6 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .celeb-stars .star { font-size: 44px; }
 
   /* --- title screen: mascots peek from the edges, never cover the logo --- */
-  .title-mascot.zip { left: -5%; bottom: 25%; height: 23vh; }
-  .title-mascot.mixy { right: -4%; bottom: 28%; height: 18vh; }
   .title-logo { font-size: clamp(38px, 11vw, 56px); }
   .title-tag { font-size: 13px; padding: 7px 16px; }
   .btn-play { font-size: 24px; padding: 14px 42px; }
@@ -1373,8 +1367,6 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .choice-card { width: 150px; padding: 8px; }
   .choice-card .big { font-size: 28px; }
   .celeb-stars .star { font-size: 38px; }
-  .title-mascot.zip { height: 34vh; bottom: 12%; }
-  .title-mascot.mixy { height: 27vh; bottom: 15%; }
   .btn-play { font-size: 20px; padding: 10px 34px; }
 }
 
@@ -1680,83 +1672,116 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   -webkit-text-stroke: 0;
 }
 
-/* ---------- Title screen (key art) ---------- */
+/* ============================================================
+   Splash screen — a world that builds itself
+   ============================================================
+   Sky, then sun, then clouds, then the land, then the trees, then the
+   logo landing on top. Each stage is a keyframe with a delay, so the
+   scene assembles in about a second and a half and then settles into
+   slow idle motion.
+
+   Every entrance uses `both` fill so the element starts OFF-STAGE and
+   ends exactly where the idle animation expects it. That is what lets
+   calm mode switch the entrances off and simply show the finished
+   scene — see the reduced-motion block at the end. */
 .title-screen {
-  background: linear-gradient(180deg, #6fd2ff 0%, #45b1f7 34%, #2f8ef0 62%, #2e7ce6 100%);
+  background: linear-gradient(180deg, #7ad8ff 0%, #4fb6f8 32%, #2f8ef0 64%, #2b78e4 100%);
   overflow: hidden;
   align-items: center; justify-content: flex-end;
   padding-bottom: max(6vh, calc(40px + var(--sab)));
 }
-/* Key-art layout: logo up top, mascots mid on the hills, actions below */
-.title-screen .title-card {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center;
-  padding: max(11vh, calc(64px + var(--sat))) 16px max(5vh, calc(34px + var(--sab)));
-  gap: 16px; pointer-events: none;
+.title-sky { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+/* ---- the sun rises from behind the hills ---- */
+.title-sun {
+  position: absolute; left: 50%; top: 21%;
+  width: min(46vh, 340px); height: min(46vh, 340px);
+  transform: translate(-50%, -50%);
+  animation: sun-rise 1.5s var(--ease-out) both;
 }
-.title-screen .title-card > * { pointer-events: auto; }
-.title-screen .title-logo { margin-bottom: auto; }
-.title-mascot.zip { left: 6%; bottom: 16%; height: min(31vh, 360px); }
-.title-mascot.mixy { right: 6%; bottom: 17.5%; height: min(25vh, 290px); }
-.title-rays { top: 19%; }
+.title-sun-core {
+  position: absolute; inset: 26%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 34%, #fffbe8 0%, #ffe9a0 44%, #ffd15e 72%, #ffbe3a 100%);
+  box-shadow: 0 0 60px 18px rgba(255, 226, 140, .55), 0 0 140px 60px rgba(255, 214, 110, .28);
+  animation: sun-pulse 6s ease-in-out infinite;
+}
 .title-rays {
-  position: absolute; left: 50%; top: 24%; width: 160vmax; height: 160vmax;
+  position: absolute; left: 50%; top: 50%; width: 190vmax; height: 190vmax;
   transform: translate(-50%, -50%);
   background: conic-gradient(
-    rgba(255,255,255,.16) 0 9deg, transparent 9deg 30deg,
-    rgba(255,255,255,.16) 30deg 39deg, transparent 39deg 60deg,
-    rgba(255,255,255,.16) 60deg 69deg, transparent 69deg 90deg,
-    rgba(255,255,255,.16) 90deg 99deg, transparent 99deg 120deg,
-    rgba(255,255,255,.16) 120deg 129deg, transparent 129deg 150deg,
-    rgba(255,255,255,.16) 150deg 159deg, transparent 159deg 180deg,
-    rgba(255,255,255,.16) 180deg 189deg, transparent 189deg 210deg,
-    rgba(255,255,255,.16) 210deg 219deg, transparent 219deg 240deg,
-    rgba(255,255,255,.16) 240deg 249deg, transparent 249deg 270deg,
-    rgba(255,255,255,.16) 270deg 279deg, transparent 279deg 300deg,
-    rgba(255,255,255,.16) 300deg 309deg, transparent 309deg 330deg,
-    rgba(255,255,255,.16) 330deg 339deg, transparent 339deg 360deg);
-  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0,0,0,.5) 45%, transparent 72%);
-  mask-image: radial-gradient(closest-side, #000 0%, rgba(0,0,0,.5) 45%, transparent 72%);
-  animation: rays-spin 90s linear infinite;
-  pointer-events: none;
+    rgba(255,255,255,.17) 0 9deg, transparent 9deg 30deg,
+    rgba(255,255,255,.17) 30deg 39deg, transparent 39deg 60deg,
+    rgba(255,255,255,.17) 60deg 69deg, transparent 69deg 90deg,
+    rgba(255,255,255,.17) 90deg 99deg, transparent 99deg 120deg,
+    rgba(255,255,255,.17) 120deg 129deg, transparent 129deg 150deg,
+    rgba(255,255,255,.17) 150deg 159deg, transparent 159deg 180deg,
+    rgba(255,255,255,.17) 180deg 189deg, transparent 189deg 210deg,
+    rgba(255,255,255,.17) 210deg 219deg, transparent 219deg 240deg,
+    rgba(255,255,255,.17) 240deg 249deg, transparent 249deg 270deg,
+    rgba(255,255,255,.17) 270deg 279deg, transparent 279deg 300deg,
+    rgba(255,255,255,.17) 300deg 309deg, transparent 309deg 330deg,
+    rgba(255,255,255,.17) 330deg 339deg, transparent 339deg 360deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0,0,0,.5) 42%, transparent 70%);
+  mask-image: radial-gradient(closest-side, #000 0%, rgba(0,0,0,.5) 42%, transparent 70%);
+  animation: rays-spin 90s linear infinite, rays-in 1.8s ease-out .35s both;
 }
+@keyframes sun-rise {
+  0%   { transform: translate(-50%, 46vh) scale(.72); opacity: 0; }
+  70%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@keyframes sun-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+@keyframes rays-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rays-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
+/* ---- clouds slide in from the edges they will drift toward ---- */
 .title-cloud {
   position: absolute; pointer-events: none;
   background: #fff; border-radius: 999px;
   box-shadow: 26px 10px 0 -6px #fff, -26px 12px 0 -8px #fff, 0 14px 0 -4px #fff;
-  opacity: .95; animation: cloud-drift 46s linear infinite;
+  opacity: .95;
 }
-.title-cloud.c1 { top: 9%; left: 6%; width: 120px; height: 42px; }
-.title-cloud.c2 { top: 16%; right: 8%; width: 90px; height: 34px; animation-duration: 60s; animation-delay: -18s; }
-.title-cloud.c3 { top: 40%; left: 12%; width: 70px; height: 26px; opacity: .7; animation-duration: 74s; animation-delay: -40s; }
+.title-cloud.c1 { top: 8%;  left: 5%;   width: 128px; height: 44px;
+  animation: cloud-in-left 1.5s var(--ease-out) .25s both, cloud-drift 46s linear 1.8s infinite; }
+.title-cloud.c2 { top: 15%; right: 7%;  width: 96px;  height: 36px;
+  animation: cloud-in-right 1.5s var(--ease-out) .4s both, cloud-drift 60s linear 1.95s infinite; }
+.title-cloud.c3 { top: 33%; left: 14%;  width: 74px;  height: 28px; opacity: .72;
+  animation: cloud-in-left 1.5s var(--ease-out) .55s both, cloud-drift 74s linear 2.1s infinite; }
+.title-cloud.c4 { top: 27%; right: 18%; width: 62px;  height: 24px; opacity: .6;
+  animation: cloud-in-right 1.5s var(--ease-out) .68s both, cloud-drift 66s linear 2.25s infinite; }
+@keyframes cloud-in-left  { from { transform: translateX(-46vw); opacity: 0; } to { transform: none; } }
+@keyframes cloud-in-right { from { transform: translateX(46vw);  opacity: 0; } to { transform: none; } }
 @keyframes cloud-drift {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(7vw); }
-  100% { transform: translateX(0); }
+  0% { transform: translateX(0); } 50% { transform: translateX(6vw); } 100% { transform: translateX(0); }
 }
+
 .title-spark {
   position: absolute; pointer-events: none; font-size: 22px;
   filter: drop-shadow(0 2px 3px rgba(13,20,55,.25));
-  animation: spark-twinkle 3.4s ease-in-out infinite;
+  animation: spark-in .6s var(--ease-bounce) both, spark-twinkle 3.4s ease-in-out infinite;
 }
-.title-spark.s0 { top: 22%; left: 16%; }
-.title-spark.s1 { top: 12%; right: 22%; animation-delay: .6s; }
-.title-spark.s2 { top: 30%; right: 12%; color: #d5b3ff; animation-delay: 1.2s; font-size: 18px; }
-.title-spark.s3 { top: 44%; right: 26%; animation-delay: .3s; font-size: 14px; }
-.title-spark.s4 { top: 34%; left: 26%; animation-delay: 1.7s; font-size: 14px; }
-.title-spark.s5 { top: 52%; left: 8%; animation-delay: 2.2s; font-size: 15px; }
-.title-spark.s6 { top: 56%; right: 7%; animation-delay: 1s; font-size: 16px; }
+.title-spark.s0 { top: 22%; left: 16%;  animation-delay: 1.30s, 1.9s; }
+.title-spark.s1 { top: 12%; right: 22%; animation-delay: 1.38s, 2.0s; }
+.title-spark.s2 { top: 30%; right: 12%; color: #d5b3ff; font-size: 18px; animation-delay: 1.46s, 2.1s; }
+.title-spark.s3 { top: 44%; right: 26%; font-size: 14px; animation-delay: 1.54s, 2.2s; }
+.title-spark.s4 { top: 34%; left: 26%;  font-size: 14px; animation-delay: 1.62s, 2.3s; }
+.title-spark.s5 { top: 52%; left: 8%;   font-size: 15px; animation-delay: 1.70s, 2.4s; }
+.title-spark.s6 { top: 56%; right: 7%;  font-size: 16px; animation-delay: 1.78s, 2.5s; }
+@keyframes spark-in { from { opacity: 0; transform: scale(0) rotate(-40deg); } to { opacity: 1; transform: none; } }
 @keyframes spark-twinkle {
   0%, 100% { opacity: .5; transform: scale(.85) rotate(-6deg); }
   50% { opacity: 1; transform: scale(1.12) rotate(6deg); }
 }
 
-.title-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 42%; pointer-events: none; }
-.title-hill {
-  position: absolute; border-radius: 50%;
+/* ---- the land rises, then things grow on it ---- */
+.title-ground {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 44%; pointer-events: none;
+  animation: ground-rise 1.1s var(--ease-out) .55s both;
 }
+@keyframes ground-rise { from { transform: translateY(46%); } to { transform: none; } }
+
+.title-hill { position: absolute; border-radius: 50%; }
 .title-hill.h1 {
   left: -14%; bottom: -26%; width: 74%; height: 62%;
   background: radial-gradient(90% 90% at 50% 8%, #8ee06a 0%, #6fcb52 55%, #57b344 100%);
@@ -1767,20 +1792,149 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   background: radial-gradient(90% 90% at 50% 8%, #7ed95e 0%, #5dbd49 55%, #4aa83c 100%);
   box-shadow: 0 -6px 0 rgba(255,255,255,.18) inset;
 }
+
+/* Chunky toy trees: a trunk and three stacked leaf blobs, growing from
+   their own base so they read as sprouting rather than dropping in. */
+.title-tree {
+  position: absolute; transform-origin: 50% 100%;
+  animation: tree-grow .72s var(--ease-bounce) both;
+}
+.title-tree .tree-trunk {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 22%; height: 34%; border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(90deg, #8a5a33 0%, #a97045 45%, #7d4f2c 100%);
+}
+.title-tree .tree-leaf {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(85% 85% at 42% 22%, #6fd45a 0%, #47ad3c 62%, #358f30 100%);
+  box-shadow: inset 0 -6px 0 rgba(20, 80, 25, .18);
+}
+.title-tree .tree-leaf.l1 { bottom: 26%; width: 100%; height: 46%; }
+.title-tree .tree-leaf.l2 { bottom: 46%; width: 82%;  height: 40%; }
+.title-tree .tree-leaf.l3 { bottom: 64%; width: 60%;  height: 34%; }
+.title-tree.t1 { left: 3%;   bottom: 24%; width: 104px; height: 152px; animation-delay: .95s; }
+.title-tree.t2 { left: 17%;  bottom: 15%; width: 78px;  height: 116px; animation-delay: 1.05s; }
+.title-tree.t3 { right: 5%;  bottom: 26%; width: 116px; height: 168px; animation-delay: 1.00s; }
+.title-tree.t4 { right: 19%; bottom: 16%; width: 82px;  height: 122px; animation-delay: 1.12s; }
+.title-tree.t5 { left: 41%;  bottom: 31%; width: 64px;  height: 94px;  opacity: .92; animation-delay: 1.20s; }
+@keyframes tree-grow {
+  0%   { transform: scaleY(0) scaleX(.6); opacity: 0; }
+  62%  { transform: scaleY(1.12) scaleX(1.04); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
 .title-bush {
-  position: absolute; border-radius: 999px;
+  position: absolute; border-radius: 999px; transform-origin: 50% 100%;
   background: radial-gradient(100% 100% at 50% 20%, #4faf3f 0%, #3b8f31 100%);
   box-shadow: 30px 8px 0 -6px #3f9435, -30px 8px 0 -8px #47a13a;
+  animation: bush-pop .55s var(--ease-bounce) both;
 }
-.title-bush.b1 { left: 2%; bottom: 26%; width: 110px; height: 54px; }
-.title-bush.b2 { right: 4%; bottom: 30%; width: 130px; height: 60px; }
-.title-bush.b3 { left: 30%; bottom: 20%; width: 80px; height: 40px; opacity: .9; }
-.title-bush.b4 { right: 30%; bottom: 18%; width: 90px; height: 44px; opacity: .9; }
-.title-flower { position: absolute; font-size: 26px; filter: drop-shadow(0 3px 3px rgba(20,60,20,.3)); animation: flower-sway 3.6s ease-in-out infinite alternate; transform-origin: 50% 100%; }
-.title-flower.f0 { left: 5%; bottom: 4%; font-size: 34px; }
-.title-flower.f1 { left: 14%; bottom: 10%; animation-delay: .8s; }
-.title-flower.f2 { right: 16%; bottom: 8%; animation-delay: .4s; }
-.title-flower.f3 { right: 5%; bottom: 3%; font-size: 32px; animation-delay: 1.2s; }
+.title-bush.b1 { left: 2%;   bottom: 12%; width: 110px; height: 54px; animation-delay: 1.24s; }
+.title-bush.b2 { right: 4%;  bottom: 14%; width: 130px; height: 60px; animation-delay: 1.30s; }
+.title-bush.b3 { left: 30%;  bottom: 7%;  width: 80px;  height: 40px; opacity: .9; animation-delay: 1.36s; }
+.title-bush.b4 { right: 30%; bottom: 6%;  width: 90px;  height: 44px; opacity: .9; animation-delay: 1.42s; }
+@keyframes bush-pop {
+  0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.1); opacity: 1; } 100% { transform: none; }
+}
+
+.title-flower {
+  position: absolute; font-size: 26px; transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 3px rgba(20,60,20,.3));
+  animation: bush-pop .5s var(--ease-bounce) both,
+             flower-sway 3.6s ease-in-out infinite alternate;
+}
+.title-flower.f0 { left: 5%;   bottom: 4%;  font-size: 34px; animation-delay: 1.46s, 2.1s; }
+.title-flower.f1 { left: 14%;  bottom: 10%; animation-delay: 1.52s, 2.3s; }
+.title-flower.f2 { right: 16%; bottom: 8%;  animation-delay: 1.58s, 2.5s; }
+.title-flower.f3 { right: 5%;  bottom: 3%;  font-size: 32px; animation-delay: 1.64s, 2.7s; }
+
+/* ---- the card: logo hero, then the words, then the buttons ---- */
+.title-screen .title-card {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: max(4vh, calc(24px + var(--sat))) 16px max(5vh, calc(34px + var(--sab)));
+  gap: clamp(10px, 2.6vh, 26px); pointer-events: none;
+}
+.title-screen .title-card > * { pointer-events: auto; }
+.title-actions {
+  display: flex; flex-direction: column; align-items: center;
+  gap: clamp(8px, 1.8vh, 18px);
+}
+
+/* The logo is the hero: as wide as the screen sensibly allows, landing
+   last, on top of the world that just built itself.
+   The third term caps it by HEIGHT — the art is 1.418 times wider than it
+   is tall, so on a short screen a width-only cap would push the buttons
+   straight off the bottom. */
+.title-logo-art {
+  position: relative; width: min(88vw, 720px, calc(56vh * 1.418));
+  filter: drop-shadow(0 16px 30px rgba(13,20,55,.42));
+  animation: logo-land 1s var(--ease-bounce) 1.35s both;
+  cursor: pointer;
+}
+.title-logo-art svg { display: block; width: 100%; height: auto; }
+.title-logo-art.replay { animation: logo-pop .6s var(--ease-bounce); }
+@keyframes logo-land {
+  0%   { transform: translateY(-38vh) scale(.6) rotate(-7deg); opacity: 0; }
+  58%  { transform: translateY(2%) scale(1.06) rotate(2deg); opacity: 1; }
+  78%  { transform: translateY(0) scale(.97) rotate(-1deg); }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes logo-pop {
+  0% { transform: scale(1); } 40% { transform: scale(1.07) rotate(-2deg); } 100% { transform: scale(1); }
+}
+/* A single glint sweeping across the letters, once the logo has landed. */
+.logo-shine {
+  position: absolute; inset: 0; pointer-events: none;
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.78) 50%, transparent 62%);
+  background-size: 260% 100%;
+  animation: logo-glint 4.6s ease-in-out 2.6s infinite;
+}
+@keyframes logo-glint {
+  0%, 62% { background-position: 150% 0; } 88%, 100% { background-position: -60% 0; }
+}
+
+.title-tag { animation: rise-in .6s var(--ease-out) 2.0s both; }
+.title-screen .btn-play { animation: rise-in .6s var(--ease-bounce) 2.15s both; }
+.title-screen .garden-btn { animation: rise-in .5s var(--ease-out) 2.3s both; }
+.title-screen .journey-btn { animation-delay: 2.4s; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(26px) scale(.94); } to { opacity: 1; transform: none; } }
+
+/* Wide screens: the logo sits in the middle of the sky, so move the sun
+   out from behind it. The rays then sweep across the whole scene from a
+   sun a child can actually see. */
+@media (min-aspect-ratio: 1/1) {
+  .title-sun { left: 79%; top: 22%; }
+}
+
+/* Short landscape — a phone on its side. Stacking logo + words + three
+   buttons needs about 430px of height and there are 390. So the scene
+   goes two-column: hero on the left, everything you can press on the
+   right, both vertically centred. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .title-screen .title-card {
+    flex-direction: row; justify-content: center; align-items: center;
+    gap: clamp(16px, 4vw, 48px);
+    padding: 10px max(16px, var(--sar)) 10px max(16px, var(--sal));
+  }
+  .title-logo-art { width: min(46vw, 430px); }
+  .title-actions { gap: 8px; }
+  .title-tag { font-size: 12.5px; padding: 6px 14px; }
+  .title-screen .btn-play { padding: 12px 44px; font-size: 27px; }
+  .title-sun { left: 71%; top: 34%; width: min(74vh, 250px); height: min(74vh, 250px); }
+  .title-tree.t5, .title-cloud.c3, .title-cloud.c4 { display: none; }
+}
+
+/* Calm mode and reduce-motion: the scene is simply THERE. Every entrance
+   above uses `both`, so cancelling the animation leaves each element at
+   its natural resting place rather than stuck off-stage. */
+.calm-mode .title-screen, .calm-mode .title-screen * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .title-screen, .title-screen * { animation: none !important; }
+}
 
 /* Logo — chunky white "Code" + candy "Bops" with glyph o's */
 .title-logo {
@@ -2025,61 +2179,15 @@ button.stars-pill:active { transform: translateY(3px); }
   .li-emoji { font-size: 28px; width: 38px; }
   .li-stars { font-size: 17px; }
   .title-logo { font-size: clamp(40px, 12vw, 64px); }
-  .title-rays { top: 30%; }
   .title-spark { font-size: 16px; }
-  .title-cloud.c3 { display: none; }
+  .title-cloud.c3, .title-cloud.c4 { display: none; }
 }
 
 
 /* ============================================================
-   Official logo mark — splash animation + top-bar chip
-   ============================================================ */
-.title-logo-art {
-  position: relative;
-  /* Hero mark: the wordmark IS the splash screen. */
-  width: min(92vw, 860px);
-  margin-bottom: auto;
-  filter: drop-shadow(0 10px 26px rgba(13,20,55,.42));
-  animation: logo-drop .95s var(--ease-bounce) both .1s;
-  cursor: pointer;
-}
-.title-logo-art svg {
-  width: 100%; height: auto; display: block;
-  transform-origin: 50% 60%;
-  animation: logo-rock 3.4s ease-in-out infinite 1.2s;
-}
-.title-logo-art.replay svg {
-  animation: logo-pop .6s var(--ease-bounce), logo-rock 3.4s ease-in-out infinite .6s;
-}
-@keyframes logo-drop {
-  0% { opacity: 0; transform: translateY(-58vh) scale(.55) rotate(-7deg); }
-  58% { opacity: 1; transform: translateY(3.5%) scale(1.07, .9) rotate(1.5deg); }
-  80% { transform: translateY(-2%) scale(.97, 1.05) rotate(-.6deg); }
-  100% { transform: none; }
-}
-@keyframes logo-rock {
-  0%, 100% { transform: rotate(-1.3deg) translateY(0); }
-  50% { transform: rotate(1.3deg) translateY(-2.5%); }
-}
-@keyframes logo-pop {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.14, .88); }
-  70% { transform: scale(.95, 1.07); }
-  100% { transform: scale(1); }
-}
-.logo-shine {
-  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
-  -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat;
-}
-.logo-shine::after {
-  content: ''; position: absolute; top: -25%; bottom: -25%; width: 16%; left: -30%;
-  background: linear-gradient(100deg, transparent, rgba(255,255,255,.95), transparent);
-  transform: skewX(-18deg);
-  animation: logo-glint 4.6s ease-in-out infinite 1.8s;
-}
-@keyframes logo-glint { 0% { left: -30%; } 16% { left: 118%; } 100% { left: 118%; } }
-body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: none; }
-
+   Logo chip in the top bar
+   ============================================================
+   The splash mark itself lives with the splash screen above. */
 .logo-chip-img { height: clamp(28px, 3.4vw, 40px); width: auto; display: block; filter: drop-shadow(0 3px 6px rgba(13,20,55,.45)); }
 @media (max-width: 760px) { .logo-chip-img { display: none; } }
 

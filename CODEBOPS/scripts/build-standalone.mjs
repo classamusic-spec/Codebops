@@ -40,12 +40,25 @@ if (extra.length > 0) {
 const js = readFileSync(join(dist, 'assets', jsName), 'utf8');
 const css = readFileSync(join(dist, 'assets', cssName), 'utf8');
 
-// Embed the art SVGs the game loads at runtime.
-const artFiles = [
-  'art/characters/zip/zip.svg',
-  'art/characters/mixy/mixy.svg',
-  'art/logo.svg',
-];
+// Embed every art SVG the game can load at runtime.
+//
+// This used to be a hand-written list, and adding a new piece of art
+// meant remembering to add it here too. Nobody did, so the splash logo
+// shipped in a single file that then tried to fetch it over file:// —
+// which browsers refuse. Walk the directory instead: an asset that
+// exists is an asset that gets embedded.
+function svgsUnder(dir, prefix = '') {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...svgsUnder(join(dir, entry.name), rel));
+    else if (entry.name.endsWith('.svg')) out.push(rel);
+  }
+  return out;
+}
+const artFiles = svgsUnder(join(dist, 'art')).map((rel) => `art/${rel}`);
+if (artFiles.length === 0) throw new Error('[standalone] no art SVGs found to embed.');
+console.log(`[standalone] embedding ${artFiles.length} art file(s): ${artFiles.join(', ')}`);
 const art = {};
 for (const rel of artFiles) {
   art[`./${rel}`] = readFileSync(join(dist, rel), 'utf8');
