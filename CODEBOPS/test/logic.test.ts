@@ -201,6 +201,12 @@ import {
   commandChoices, triggerChoices, componentChoices, describeCommand, describeTrigger, sceneName,
 } from '../src/creator/miniAppChoices';
 import { predictionChoices } from '../src/ui/app-lab/predictionPanel';
+// ---- App Lab Phase 3 ----
+import {
+  initialRuntimeState, applyCommand, run, scriptsForCause,
+  tappableComponents, hasStartScript,
+} from '../src/creator/miniAppRuntime';
+import type { MiniAppRuntimeSnapshot } from '../src/creator/miniAppRuntime';
 
 import { readdirSync, readFileSync } from 'node:fs';
 
@@ -2294,6 +2300,303 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     check('predictions never repeat the same wording',
       new Set(choices.map((c) => c.label)).size === choices.length);
   }
+}
+
+// ---------------------------------------------------------------
+// Zip's App Lab — Phase 3: the shared runtime and Tap Magic
+// ---------------------------------------------------------------
+{
+  console.log("\n-- Zip's App Lab: runtime --");
+  const SEED3 = { id: 'p3', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+  const flower = MINI_APP_STARTERS.find((s) => s.id === 'blooming-flower')!.build(SEED3);
+  const zip = MINI_APP_STARTERS.find((s) => s.id === 'jumping-zip')!.build(SEED3);
+  const light = MINI_APP_STARTERS.find((s) => s.id === 'light-switch')!.build(SEED3);
+  const pads = MINI_APP_STARTERS.find((s) => s.id === 'sound-buttons')!.build(SEED3);
+  const NOW3 = 1_700_000_002_000;
+
+  // ---- initial state ----
+  const s0 = initialRuntimeState(flower);
+  check('every component starts with a runtime state',
+    Object.keys(s0.components).length === allComponents(flower).length);
+  check('a component starts in the state the project gave it',
+    s0.components.flower.state === 'droopy');
+  check('a component remembers where home is',
+    s0.components.flower.homeSlotId === s0.components.flower.slotId);
+  check('the first scene is the one that starts', s0.sceneId === flower.scenes[0].id);
+  check('a light starts off when the project says off',
+    initialRuntimeState(light).components.lamp.lit === false);
+  check('nothing has won before anything has happened', !s0.won && !s0.celebrating);
+  check('a hidden component starts invisible', (() => {
+    const story = MINI_APP_STARTERS.find((s) => s.id === 'lost-star')!.build(SEED3);
+    return initialRuntimeState(story).components.star.visible === false;
+  })());
+
+  // ---- the reducer is pure ----
+  check('applying a command does not mutate the state it was given', (() => {
+    const before = initialRuntimeState(flower);
+    const copy = JSON.stringify(before);
+    applyCommand(before, { kind: 'changeState', targetId: 'flower', state: 'blooming' });
+    return JSON.stringify(before) === copy;
+  })());
+  check('the same state and command always give the same result', (() => {
+    const a = applyCommand(s0, { kind: 'changeState', targetId: 'flower', state: 'blooming' });
+    const b = applyCommand(s0, { kind: 'changeState', targetId: 'flower', state: 'blooming' });
+    return JSON.stringify(a) === JSON.stringify(b);
+  })());
+
+  // ---- individual commands ----
+  check('change state changes the state',
+    applyCommand(s0, { kind: 'changeState', targetId: 'flower', state: 'blooming' })
+      .next.components.flower.state === 'blooming');
+  check('changing to the state it already has reports nothing changed',
+    applyCommand(s0, { kind: 'changeState', targetId: 'flower', state: 'droopy' })
+      .outcome.kind === 'noChange');
+  check('hide hides and show shows', (() => {
+    const hidden = applyCommand(s0, { kind: 'hide', targetId: 'flower' }).next;
+    return hidden.components.flower.visible === false
+      && applyCommand(hidden, { kind: 'show', targetId: 'flower' }).next.components.flower.visible === true;
+  })());
+  check('hiding something already hidden reports nothing changed', (() => {
+    const hidden = applyCommand(s0, { kind: 'hide', targetId: 'flower' }).next;
+    return applyCommand(hidden, { kind: 'hide', targetId: 'flower' }).outcome.kind === 'noChange';
+  })());
+  check('a light turns on and off', (() => {
+    const l0 = initialRuntimeState(light);
+    const on = applyCommand(l0, { kind: 'lightOn', targetId: 'lamp' }).next;
+    return on.components.lamp.lit === true
+      && applyCommand(on, { kind: 'lightOff', targetId: 'lamp' }).next.components.lamp.lit === false;
+  })());
+  check('play sound asks the player for a sound',
+    applyCommand(s0, { kind: 'playSound', sound: 'drum' }).sound === 'drum');
+  check('speaking puts a phrase in the bubble',
+    applyCommand(s0, { kind: 'speakPhrase', targetId: 'flower', phrase: 'hello' })
+      .next.components.flower.saying === 'hello');
+  check('change colour records the colour',
+    applyCommand(s0, { kind: 'changeColor', targetId: 'flower', color: 'blue' })
+      .next.components.flower.color === 'blue');
+  check('wait holds for the beats it asks for',
+    applyCommand(s0, { kind: 'wait', beats: 3 }).holdBeats === 3);
+  check('celebrate sets celebrating and makes a sound', (() => {
+    const r = applyCommand(s0, { kind: 'celebrate' });
+    return r.next.celebrating && r.sound === 'celebrate';
+  })());
+  check('show win wins once and then reports nothing changed', (() => {
+    const won = applyCommand(s0, { kind: 'showWin' });
+    return won.next.won && applyCommand(won.next, { kind: 'showWin' }).outcome.kind === 'noChange';
+  })());
+  check('return home puts a piece back where it started', (() => {
+    const moved = applyCommand(s0, { kind: 'sendToSlot', targetId: 'flower', slotId: 'stage-left' }).next;
+    return moved.components.flower.slotId === 'stage-left'
+      && applyCommand(moved, { kind: 'returnHome', targetId: 'flower' })
+        .next.components.flower.slotId === s0.components.flower.slotId;
+  })());
+  check('a command aimed at nothing reports it rather than crashing',
+    applyCommand(s0, { kind: 'hide', targetId: 'ghost' }).outcome.kind === 'noChange');
+  check('counters go up, down and back to zero', (() => {
+    const sorter = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED3);
+    let st = initialRuntimeState(sorter);
+    st = applyCommand(st, { kind: 'increaseCounter', variableId: 'score' }).next;
+    st = applyCommand(st, { kind: 'increaseCounter', variableId: 'score' }).next;
+    const up = st.variables.score === 2;
+    st = applyCommand(st, { kind: 'decreaseCounter', variableId: 'score' }).next;
+    const down = st.variables.score === 1;
+    st = applyCommand(st, { kind: 'resetCounter', variableId: 'score' }).next;
+    return up && down && st.variables.score === 0;
+  })());
+  check('a counter change reports itself so other scripts can react', (() => {
+    const sorter = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED3);
+    return applyCommand(initialRuntimeState(sorter),
+      { kind: 'increaseCounter', variableId: 'score' }).counterChanged === 'score';
+  })());
+
+  // ---- honesty about what is not built yet ----
+  check('a command the runtime cannot run yet says so, and does not pretend', (() => {
+    const r = applyCommand(s0, { kind: 'repeatN', times: 2, body: [] });
+    return r.outcome.kind === 'unsupported'
+      && JSON.stringify(r.next) === JSON.stringify(s0);
+  })());
+  check('every unsupported command explains itself in child words',
+    (['move', 'turn', 'callJob'] as const).every((kind) => {
+      const cmd = kind === 'callJob'
+        ? { kind, jobId: 'j' } as MiniAppCommand
+        : { kind, targetId: 'flower', direction: 'up', cells: 1, rotation: 'left' } as unknown as MiniAppCommand;
+      const r = applyCommand(s0, cmd);
+      return r.outcome.kind === 'unsupported' && r.outcome.why.length > 10;
+    }));
+
+  // ---- trigger matching and ordering ----
+  check('a tap runs the script that watches that thing',
+    scriptsForCause(flower, { kind: 'tap', componentId: 'flower' }, s0).length === 1);
+  check('tapping something else runs nothing',
+    scriptsForCause(flower, { kind: 'tap', componentId: 'ghost' }, s0).length === 0);
+  check('app start runs only start scripts', (() => {
+    const story = MINI_APP_STARTERS.find((s) => s.id === 'lost-star')!.build(SEED3);
+    const st = initialRuntimeState(story);
+    return scriptsForCause(story, { kind: 'appStart' }, st).length === 0
+      && scriptsForCause(story, { kind: 'sceneStart', sceneId: 'scene-1' }, st).length === 1;
+  })());
+  check('scripts run in a stable order — components first, then how they were written', (() => {
+    const order1 = scriptsForCause(pads, { kind: 'tap', componentId: 'pad-drum' }, initialRuntimeState(pads));
+    const order2 = scriptsForCause(pads, { kind: 'tap', componentId: 'pad-drum' }, initialRuntimeState(pads));
+    return order1.map((s) => s.id).join() === order2.map((s) => s.id).join();
+  })());
+
+  // ---- whole runs ----
+  {
+    const r = run(flower, { kind: 'tap', componentId: 'flower' });
+    check('tapping the flower runs its two steps', r.events.length === 2 && r.triggered);
+    check('the flower ends up blooming', r.finalState.components.flower.state === 'blooming');
+    check('every event carries the state before and after',
+      r.events.every((e) => !!e.stateBefore && !!e.stateAfter));
+    check('the state after one event is the state before the next',
+      r.events.every((e, i) => i === 0
+        || JSON.stringify(r.events[i - 1].stateAfter) === JSON.stringify(e.stateBefore)));
+    check('events are numbered from one, in order',
+      r.events.every((e, i) => e.step === i + 1));
+    check('a run reports which script and which thing each step came from',
+      r.events.every((e) => e.scriptId.length > 0 && e.componentId.length > 0));
+    check('a tap on an untaught thing runs nothing and says so',
+      run(flower, { kind: 'tap', componentId: 'ghost' }).triggered === false);
+    check('running the same tap twice gives identical events',
+      JSON.stringify(run(flower, { kind: 'tap', componentId: 'flower' }).events)
+      === JSON.stringify(run(flower, { kind: 'tap', componentId: 'flower' }).events));
+    check('a run never mutates the project', (() => {
+      const before = JSON.stringify(flower);
+      run(flower, { kind: 'tap', componentId: 'flower' });
+      return JSON.stringify(flower) === before;
+    })());
+  }
+
+  check('tapping Zip makes Zip jump', (() => {
+    const r = run(zip, { kind: 'tap', componentId: 'zip' });
+    return r.triggered && r.events[0].command.kind === 'animate';
+  })());
+  check('tapping the button turns the lamp on', (() => {
+    const r = run(light, { kind: 'tap', componentId: 'button' });
+    return r.finalState.components.lamp.lit === true;
+  })());
+  check('each sound pad plays its own sound', (() => {
+    const drum = run(pads, { kind: 'tap', componentId: 'pad-drum' });
+    const bell = run(pads, { kind: 'tap', componentId: 'pad-bell' });
+    return drum.events[0].sound === 'drum' && bell.events[0].sound === 'bell';
+  })());
+  check('all four Tap Magic starters do something when tapped',
+    [flower, zip, light, pads].every((p) => {
+      const target = p.scripts[0].trigger;
+      return target.kind === 'onTap'
+        && run(p, { kind: 'tap', componentId: target.targetId }).triggered;
+    }));
+
+  // ---- the run is bounded ----
+  check('a run stops at its own step budget', (() => {
+    // A project whose budget is one step cannot run two.
+    const tiny = { ...flower, runtimeBudget: { ...flower.runtimeBudget, maximumSteps: 1 } };
+    const r = run(tiny, { kind: 'tap', componentId: 'flower' });
+    return r.stepsUsed === 1 && r.overflowed;
+  })());
+  check('a run that fits its budget does not report an overflow',
+    !run(flower, { kind: 'tap', componentId: 'flower' }).overflowed);
+  check('a kit with no messages cannot start a message chain', (() => {
+    // Tap Magic's budget allows zero messages per step, so even if a
+    // message were somehow sent, nothing would follow it.
+    const t = miniAppTemplate('tap-react-basic')!;
+    return t.runtimeBudget.maximumMessagesPerStep === 0;
+  })());
+  check('a message loop ends at the chain-depth limit rather than spinning', (() => {
+    const music = MINI_APP_STARTERS.find((s) => s.id === 'bop-band')!.build(SEED3);
+    // Both instruments answer GO; make the drum send GO again, which
+    // would loop forever without the depth cap.
+    const looped: typeof music = {
+      ...music,
+      scripts: music.scripts.map((s) => (s.id === 'script-2'
+        ? { ...s, commands: [...s.commands, { kind: 'sendMessage', message: 'go' } as MiniAppCommand] }
+        : s)),
+    };
+    const r = run(looped, { kind: 'tap', componentId: 'play' });
+    return r.events.length > 0 && r.stepsUsed <= looped.runtimeBudget.maximumSteps;
+  })());
+  check('every event records how deep in the chain it ran',
+    run(flower, { kind: 'tap', componentId: 'flower' }).events.every((e) => e.chainDepth === 0));
+
+  // ---- what the player needs to draw ----
+  check('the tappable things are exactly those with a tap script',
+    tappableComponents(flower, 'scene-1').join() === 'flower');
+  check('a thing with no script is not marked tappable',
+    !tappableComponents(light, 'scene-1').includes('lamp'));
+  check('a project with a start script says so', (() => {
+    const withStart = {
+      ...flower,
+      scripts: [{ id: 'x', ownerId: 'flower', trigger: { kind: 'onAppStart' as const }, commands: [] }],
+    };
+    return hasStartScript(withStart) && !hasStartScript(flower);
+  })());
+
+  // ---- the runtime stays inside the sandbox ----
+  check('the runtime is pure — no DOM, no storage, no clock, no string execution', (() => {
+    const src = readFileSync('src/creator/miniAppRuntime.ts', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    return !/\bdocument\b|\bwindow\b|localStorage|indexedDB|eval\(|new Function|Date\.now\(|Math\.random\(/.test(src);
+  })());
+  check('every command in the closed union has a branch in the reducer', (() => {
+    // If a new command were added without a branch, TypeScript would fail
+    // the build; this asserts the runtime answers for all of them at run
+    // time too, rather than falling through to undefined.
+    const samples: MiniAppCommand[] = [
+      { kind: 'show', targetId: 'flower' },
+      { kind: 'hide', targetId: 'flower' },
+      { kind: 'changeState', targetId: 'flower', state: 'happy' },
+      { kind: 'changeColor', targetId: 'flower', color: 'red' },
+      { kind: 'animate', targetId: 'flower', animation: 'hop' },
+      { kind: 'lightOn', targetId: 'flower' },
+      { kind: 'lightOff', targetId: 'flower' },
+      { kind: 'playSound', sound: 'tap' },
+      { kind: 'speakPhrase', targetId: 'flower', phrase: 'hello' },
+      { kind: 'sendToSlot', targetId: 'flower', slotId: 'stage-left' },
+      { kind: 'returnHome', targetId: 'flower' },
+      { kind: 'wait', beats: 1 },
+      { kind: 'celebrate' },
+      { kind: 'showWin' },
+      { kind: 'changeScene', sceneId: 'scene-1' },
+      { kind: 'sendMessage', message: 'go' },
+      { kind: 'increaseCounter', variableId: 'score' },
+      { kind: 'decreaseCounter', variableId: 'score' },
+      { kind: 'resetCounter', variableId: 'score' },
+      { kind: 'move', targetId: 'flower', direction: 'up', cells: 1 },
+      { kind: 'turn', targetId: 'flower', rotation: 'left' },
+      { kind: 'askForHelp', phrase: 'iNeedHelp' },
+      { kind: 'if', test: { kind: 'basketIsFull', targetId: 'flower' }, then: [] },
+      { kind: 'ifElse', test: { kind: 'basketIsFull', targetId: 'flower' }, then: [], otherwise: [] },
+      { kind: 'repeatN', times: 2, body: [] },
+      { kind: 'repeatUntil', test: { kind: 'basketIsFull', targetId: 'flower' }, body: [] },
+      { kind: 'waitForMessage', message: 'go' },
+      { kind: 'callJob', jobId: 'j' },
+      { kind: 'askForApproval', phrase: 'hello', then: [] },
+    ];
+    const kinds = new Set(samples.map((c) => c.kind));
+    const everyKind = new Set<string>();
+    for (const s of MINI_APP_TEMPLATES) for (const k of s.allowedCommands) everyKind.add(k);
+    const covered = [...everyKind].every((k) => kinds.has(k as never));
+    const answered = samples.every((c) => {
+      const r = applyCommand(s0, c);
+      return !!r && typeof r.outcome.kind === 'string' && typeof r.holdBeats === 'number';
+    });
+    return covered && answered;
+  })());
+
+  // ---- a run of a project built through the editor still works ----
+  check('an app assembled by the editor runs', (() => {
+    let ed = initialEditorState(zip);
+    ed = addComponent(ed, {
+      id: 'lamp2', sceneId: 'scene-1', type: 'light', assetId: 'lamp', now: NOW3,
+    }).state;
+    ed = addScript(ed, {
+      id: 's-lamp', ownerId: 'lamp2', trigger: { kind: 'onTap', targetId: 'lamp2' }, now: NOW3,
+    }).state;
+    ed = appendCommand(ed, 's-lamp', { kind: 'lightOn', targetId: 'lamp2' }, NOW3).state;
+    const r = run(ed.project, { kind: 'tap', componentId: 'lamp2' });
+    return validateMiniAppProject(ed.project).valid
+      && r.triggered && r.finalState.components.lamp2.lit === true;
+  })());
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

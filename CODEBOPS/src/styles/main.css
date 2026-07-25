@@ -3084,6 +3084,161 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 }
 
 /* ============================================================
+   App Lab Play Mode — the finished app, as a user meets it
+   No slots, no labels, no tray: the contrast with Build Mode is
+   the lesson (App Lab §8.2).
+   ============================================================ */
+.pm-wrap { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+
+.pm-bar { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.pm-exit, .pm-restart {
+  cursor: pointer; font: inherit; width: 40px; height: 40px; border-radius: 13px;
+  background: rgba(255,255,255,.14); border: 3px solid rgba(255,255,255,.22);
+  color: #fff; font-size: 17px;
+}
+.pm-debug {
+  cursor: pointer; font: inherit; margin-left: auto;
+  background: linear-gradient(180deg, #6f5cd8, #5040b0);
+  border: 3px solid rgba(255,255,255,.22); border-radius: 999px;
+  padding: 7px 15px; color: #fff; font-weight: 800; font-size: 12.5px;
+  box-shadow: 0 3px 0 rgba(13,20,55,.5);
+}
+
+.pm-stage {
+  /* The stage is the "device screen" the app runs on — capped so a wide
+     monitor does not turn a small app into a lot of empty sky. */
+  position: relative; flex: 1 1 auto; min-height: 220px;
+  width: min(100%, 780px); align-self: center;
+  display: grid; place-items: center;
+  border: 4px solid rgba(255,255,255,.28); border-radius: var(--r-xl);
+  overflow: hidden; box-shadow: inset 0 -30px 60px rgba(13,20,55,.18);
+}
+
+/*
+ * The board keeps the layout's own proportions and stops growing at a
+ * comfortable size. Letting it stretch to a widescreen leaves a lone
+ * flower marooned in the middle of a very large sky.
+ */
+.pm-board {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), 1fr);
+  grid-template-rows: repeat(var(--rows, 2), 1fr);
+  width: min(100%, 620px); max-height: 100%;
+  aspect-ratio: var(--cols, 3) / var(--rows, 2);
+  gap: 6px; padding: 12px;
+}
+
+.pm-piece {
+  /* Sized to its glyph and centred in its cell, so the tap ring hugs the
+     thing rather than the whole cell. */
+  justify-self: center; align-self: center;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  background: none; border: 0; padding: 7%; position: relative;
+  transition: opacity .22s ease, transform .22s ease;
+}
+.pm-piece { cursor: pointer; }
+.pm-piece.tappable::after {
+  content: ''; position: absolute; inset: 0;
+  border: 3px dashed rgba(255,255,255,.6); border-radius: 22px;
+  animation: pmHint 2.4s ease-in-out infinite;
+}
+@keyframes pmHint { 0%, 100% { opacity: .28; } 50% { opacity: .75; } }
+.pm-piece.gone { opacity: 0; transform: scale(.6); pointer-events: none; }
+.pm-piece-glyph {
+  font-size: clamp(28px, 11vh, 74px); line-height: 1;
+  filter: drop-shadow(0 4px 6px rgba(13,20,55,.35));
+}
+.pm-piece.lit .pm-piece-glyph { filter: drop-shadow(0 0 16px rgba(255,214,102,.95)); }
+.pm-piece[data-state="blooming"] .pm-piece-glyph { transform: scale(1.18); }
+.pm-piece[data-state="sleepy"] .pm-piece-glyph { opacity: .6; }
+.pm-piece[data-state="off"] .pm-piece-glyph { opacity: .45; filter: grayscale(.7); }
+.pm-piece[data-color="red"] .pm-piece-glyph { filter: hue-rotate(-40deg) saturate(1.5); }
+.pm-piece[data-color="blue"] .pm-piece-glyph { filter: hue-rotate(150deg) saturate(1.4); }
+.pm-piece[data-color="green"] .pm-piece-glyph { filter: hue-rotate(80deg) saturate(1.4); }
+.pm-piece[data-color="purple"] .pm-piece-glyph { filter: hue-rotate(220deg) saturate(1.4); }
+.pm-piece[data-color="yellow"] .pm-piece-glyph { filter: hue-rotate(30deg) saturate(1.6) brightness(1.15); }
+
+.pm-bubble {
+  position: absolute; bottom: 78%; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  background: #fff7e2; color: #2a2350; border: 3px solid #2a2350;
+  border-radius: 14px; padding: 4px 10px; font-weight: 800; font-size: 12px;
+  animation: pmBubbleIn .22s var(--ease-bounce) both;
+}
+@keyframes pmBubbleIn { from { opacity: 0; transform: translateX(-50%) scale(.7); } }
+
+.pm-win {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  background: rgba(13,20,55,.55); color: #fff;
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(20px, 4vw, 34px);
+  animation: pmWinIn .34s var(--ease-bounce) both;
+}
+.pm-win-glyph { font-size: clamp(40px, 9vw, 72px); }
+@keyframes pmWinIn { from { opacity: 0; transform: scale(.8); } }
+
+.pm-note {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  background: #2a2350; color: #fff7e2; border: 3px solid rgba(255,255,255,.28);
+  border-radius: 999px; padding: 7px 15px; font-weight: 800; font-size: 12.5px;
+  max-width: 92%; text-align: center; z-index: 5;
+}
+
+.cr-guess-note {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  background: rgba(255,207,62,.14); border: 2px solid rgba(255,207,62,.4);
+  border-radius: var(--r-lg); padding: 7px 12px;
+  color: #ffe9a8; font-weight: 800; font-size: 12.5px;
+}
+
+/* ---- the animation set commands can ask for ---- */
+@keyframes pmJump { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-26%) scale(1.05, .95); } }
+@keyframes pmHop { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-14%); } 60% { transform: translateY(-4%); } }
+@keyframes pmWave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(13deg); } 75% { transform: rotate(-13deg); } }
+@keyframes pmSpin { to { transform: rotate(360deg); } }
+@keyframes pmWiggle { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-7%); } 75% { transform: translateX(7%); } }
+@keyframes pmGrow { 0%,100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+@keyframes pmShrink { 0%,100% { transform: scale(1); } 50% { transform: scale(.72); } }
+@keyframes pmSparkle { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.9) drop-shadow(0 0 14px #fff); } }
+@keyframes pmBloom { 0% { transform: scale(.8) rotate(-8deg); } 100% { transform: scale(1.18) rotate(0); } }
+@keyframes pmNod { 0%,100% { transform: rotate(0); } 50% { transform: rotate(9deg); } }
+@keyframes pmShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-9%); } 40% { transform: translateX(9%); } 60% { transform: translateX(-6%); } 80% { transform: translateX(6%); } }
+@keyframes pmPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+
+.pm-anim-jump    .pm-piece-glyph { animation: pmJump .42s var(--ease-bounce); }
+.pm-anim-hop     .pm-piece-glyph { animation: pmHop .42s ease; }
+.pm-anim-wave    .pm-piece-glyph { animation: pmWave .5s ease; }
+.pm-anim-spin    .pm-piece-glyph { animation: pmSpin .6s linear; }
+.pm-anim-wiggle  .pm-piece-glyph { animation: pmWiggle .45s ease; }
+.pm-anim-grow    .pm-piece-glyph { animation: pmGrow .45s ease; }
+.pm-anim-shrink  .pm-piece-glyph { animation: pmShrink .45s ease; }
+.pm-anim-sparkle .pm-piece-glyph { animation: pmSparkle .5s ease; }
+.pm-anim-bloom   .pm-piece-glyph { animation: pmBloom .5s var(--ease-bounce); }
+.pm-anim-nod     .pm-piece-glyph { animation: pmNod .4s ease; }
+.pm-anim-shake   .pm-piece-glyph { animation: pmShake .45s ease; }
+.pm-anim-pulse   .pm-piece-glyph { animation: pmPulse .34s ease; }
+.pm-nudge        .pm-piece-glyph { animation: pmShake .4s ease; }
+
+/*
+ * Calm mode and reduced motion: a state change must still be VISIBLE, so
+ * the movement is replaced with a steady outline rather than removed.
+ */
+.pm-calm-mark { outline: 4px solid #ffcf3e; outline-offset: 3px; border-radius: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .pm-piece .pm-piece-glyph { animation: none !important; }
+  .pm-piece.tappable::after { animation: none; opacity: .6; }
+  .pm-bubble, .pm-win { animation: none; }
+}
+.calm-mode .pm-piece .pm-piece-glyph { animation: none !important; }
+.calm-mode .pm-piece.tappable::after { animation: none; opacity: .6; }
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .pm-stage { min-height: 150px; }
+  .pm-piece-glyph { font-size: clamp(24px, 12vh, 48px); }
+  .pm-exit, .pm-restart { width: 34px; height: 34px; font-size: 15px; }
+}
+
+/* ============================================================
    Landscape phones — hand the screen back to the toy.
    The camera now frames into the space chrome leaves, so every
    pixel we save here becomes a bigger machine.

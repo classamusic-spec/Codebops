@@ -7,9 +7,9 @@
  * a draft on every accepted edit, and keeps undo/redo honest. The step
  * panels themselves live in ui/app-lab; this file is the wiring.
  *
- * Play Mode is deliberately empty in Phase 2: the runtime arrives in Phase
- * 3. Rather than fake it, the play panel says plainly that the app is ready
- * to run and offers the way back — nothing here pretends to execute.
+ * Play Mode runs the child's app for real through the shared runtime. It
+ * is a different world from Build Mode on purpose: the toolbar goes away
+ * entirely, and the only ways out are Leave and Restart.
  */
 import { el } from '../ui/dom';
 import { sharedSfx } from '../audio/sfx';
@@ -31,6 +31,7 @@ import { TemplatePicker } from '../ui/app-lab/templatePicker';
 import { SceneBuilder } from '../ui/app-lab/sceneBuilder';
 import { LogicBuilder } from '../ui/app-lab/logicBuilder';
 import { PredictionPanel } from '../ui/app-lab/predictionPanel';
+import { AppPlayMode } from '../ui/app-lab/appPlayMode';
 import type { CreatorState } from '../creator/miniAppMode';
 import { initialCreatorState, applyCreatorAction, showsEditingChrome } from '../creator/miniAppMode';
 import { APP_LAB_THEMES } from '../data/app-lab/approvedAssets';
@@ -54,6 +55,8 @@ export class AppCreatorScreen {
   private sceneId = '';
   private selectedId: string | null = null;
   private predictedCorrectly: boolean | null = null;
+  /** True once a run actually set something off. */
+  private ranSuccessfully = false;
   private disposed = false;
 
   private body!: HTMLElement;
@@ -62,6 +65,7 @@ export class AppCreatorScreen {
   private sceneBuilder: SceneBuilder | null = null;
   private logicBuilder: LogicBuilder | null = null;
   private prediction: PredictionPanel | null = null;
+  private play: AppPlayMode | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -69,7 +73,6 @@ export class AppCreatorScreen {
     private readonly store: SaveStore,
     private readonly events: AppCreatorEvents,
   ) {
-    void this.store;
   }
 
   enter(): void {
@@ -139,6 +142,7 @@ export class AppCreatorScreen {
     this.sceneBuilder?.dispose(); this.sceneBuilder = null;
     this.logicBuilder?.dispose(); this.logicBuilder = null;
     this.prediction?.dispose(); this.prediction = null;
+    this.play?.dispose(); this.play = null;
     this.body.innerHTML = '';
     const subtitle = document.getElementById('cr-subtitle');
 
@@ -200,8 +204,14 @@ export class AppCreatorScreen {
         break;
       }
       case 'play': {
-        if (subtitle) subtitle.textContent = 'Play Mode.';
-        this.renderPlayPlaceholder();
+        if (!this.editor) return;
+        if (subtitle) subtitle.textContent = 'Play Mode — this is your app.';
+        this.renderPlay();
+        break;
+      }
+      case 'debug': {
+        if (subtitle) subtitle.textContent = 'What happened?';
+        this.renderDebugSoon();
         break;
       }
       default:
@@ -229,28 +239,44 @@ export class AppCreatorScreen {
     }
   }
 
-  /**
-   * Phase 2 has no runtime yet. This says so honestly rather than showing
-   * a still frame that looks like a broken app.
-   */
-  private renderPlayPlaceholder(): void {
-    const wrap = el('div', 'cr-play-soon', this.body);
-    el('div', 'cr-play-glyph', wrap, '▶️');
-    el('h2', undefined, wrap, 'Your app is ready to run!');
-    el('p', undefined, wrap,
-      'Play Mode wakes up in the next part of the Lab. Everything you built is saved.');
+  /** Play Mode: the finished app, running for real. */
+  private renderPlay(): void {
+    if (!this.editor) return;
+
     if (this.predictedCorrectly !== null) {
-      el('p', 'cr-play-guess', wrap, this.predictedCorrectly
-        ? '🌟 And your guess matched your plan — good reading!'
-        : '🤔 Your guess was different from your plan. Worth a look!');
+      const guess = el('div', 'cr-guess-note', this.body);
+      el('span', undefined, guess, this.predictedCorrectly ? '🌟' : '🤔');
+      el('span', undefined, guess, this.predictedCorrectly
+        ? 'You said what your app would do — good reading!'
+        : 'Your app had a different idea. Watch what it really does.');
     }
+
+    this.play = new AppPlayMode(this.body, this.editor.project, this.store.settings.calmMode, {
+      onExit: () => this.go({ kind: 'editFromDebug' }),
+      onDebug: () => {
+        // Phase 9 opens the full Think Trail here; until then the state
+        // machine still moves, so Debug is genuinely a different place.
+        this.go({ kind: 'unexpectedResult' });
+      },
+      onRan: ({ triggered }) => { if (triggered) this.ranSuccessfully = true; },
+    });
+  }
+
+  /** Debug Mode: Phase 9 fills this in; the door is real, the room is not yet. */
+  private renderDebugSoon(): void {
+    const wrap = el('div', 'cr-play-soon', this.body);
+    el('div', 'cr-play-glyph', wrap, '🔍');
+    el('h2', undefined, wrap, 'Let us look at what happened');
+    el('p', undefined, wrap,
+      'The step-by-step Think Trail for your own apps opens in a later part of the Lab. '
+      + 'For now, go back and change one thing, then try it again.');
     const row = el('div', 'cr-play-actions', wrap);
-    const backBtn = el('button', 'mini-btn purple', row, '← Keep building') as HTMLButtonElement;
+    const backBtn = el('button', 'mini-btn purple', row, '← Change something') as HTMLButtonElement;
     backBtn.type = 'button';
     backBtn.addEventListener('click', () => { sharedSfx.play('tap'); this.go({ kind: 'editFromDebug' }); });
-    const labBtn = el('button', 'btn-play small', row, 'Back to the Lab') as HTMLButtonElement;
-    labBtn.type = 'button';
-    labBtn.addEventListener('click', () => { sharedSfx.play('tap'); this.exit(); });
+    const again = el('button', 'btn-play small', row, 'Try it again ▶') as HTMLButtonElement;
+    again.type = 'button';
+    again.addEventListener('click', () => { sharedSfx.play('bop'); this.go({ kind: 'test' }); });
   }
 
   // ---------------- toolbar ----------------
@@ -285,7 +311,12 @@ export class AppCreatorScreen {
 
     const mid = el('div', 'cr-tool-mid', this.toolbar);
     const r = readiness(this.editor.project);
-    el('span', 'cr-nudge', mid, r.nudge ?? 'Looking good!');
+    // Once an app has actually done something, the most useful next step
+    // is keeping it — so the coaching line says that instead.
+    const line = r.nudge ?? (this.ranSuccessfully
+      ? 'It works! Tap 💾 to keep it in My Apps.'
+      : 'Looking good!');
+    el('span', 'cr-nudge', mid, line);
 
     const right = el('div', 'cr-tool-right', this.toolbar);
     if (this.creator.step === 'build') {
