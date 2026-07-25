@@ -180,7 +180,10 @@ export class TeamworkRig {
       this.waveT = Math.max(0, this.waveT - dt * 1.3);
       const p = 1 - this.waveT;
       this.wave.position.x = (PACK_X - 0.4) + (MAIL_X + 1.7 - (PACK_X - 0.4)) * p;
-      for (const r of this.wave.children) (r as THREE.Mesh).material && ((((r as THREE.Mesh).material) as THREE.MeshToonMaterial).opacity = Math.sin(this.waveT * Math.PI));
+      for (const r of this.wave.children) {
+        const mat = (r as THREE.Mesh).material as THREE.MeshToonMaterial | undefined;
+        if (mat) mat.opacity = Math.sin(this.waveT * Math.PI);
+      }
     } else {
       for (const r of this.wave.children) (((r as THREE.Mesh).material) as THREE.MeshToonMaterial).opacity = 0;
     }

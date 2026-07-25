@@ -3,21 +3,25 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
-  "description": "CodeBops — Teach tiny helpers. Build big ideas. A playful coding adventure for ages 3–7.",
+  "description": "CodeBops \u2014 Teach tiny helpers. Build big ideas. A playful coding adventure for ages 3\u20137.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:logic": "esbuild test/logic.test.ts --bundle --platform=node --outfile=/tmp/logic-test.cjs && node /tmp/logic-test.cjs",
-    "build:standalone": "vite build && node scripts/build-standalone.mjs"
+    "build:standalone": "vite build && node scripts/build-standalone.mjs",
+    "lint": "eslint src test"
   },
   "dependencies": {
     "three": "^0.171.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/three": "^0.171.0",
+    "eslint": "^9.39.5",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.65.0",
     "vite": "^6.0.5"
   },
   "allowScripts": {

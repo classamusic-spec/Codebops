@@ -186,11 +186,11 @@ import {
   initialCreatorState, applyCreatorAction, canApply, showsEditingChrome, showsDebugButton, STEP_MODE,
 } from '../src/creator/miniAppMode';
 import { APP_KITS, appKit, kitAvailability, waitingSentence, nextKit } from '../src/data/app-lab/appLabDefinition';
-import { APPROVED_ASSETS, approvedAsset, isApprovedAsset, APP_LAB_THEMES } from '../src/data/app-lab/approvedAssets';
+import { APPROVED_ASSETS, isApprovedAsset, APP_LAB_THEMES } from '../src/data/app-lab/approvedAssets';
 import { APPROVED_COMPONENTS, approvedComponent } from '../src/data/app-lab/approvedComponents';
 import { APPROVED_SOUNDS, PREPARED_PHRASES } from '../src/data/app-lab/approvedSounds';
 import { SCENE_LAYOUTS, sceneLayout, layoutHasSlot } from '../src/data/app-lab/sceneLayouts';
-import { TITLE_TOKENS, isTitleToken, tokensInGroup } from '../src/data/app-lab/preparedTitleTokens';
+import { tokensInGroup } from '../src/data/app-lab/preparedTitleTokens';
 // ---- App Lab Phases 11-12 ----
 import { thumbnailFor, thumbnailSummary } from '../src/creator/miniAppThumbnail';
 import {
@@ -221,7 +221,6 @@ import {
   initialRuntimeState, applyCommand, run, scriptsForCause,
   tappableComponents, hasStartScript,
 } from '../src/creator/miniAppRuntime';
-import type { MiniAppRuntimeSnapshot } from '../src/creator/miniAppRuntime';
 import { evaluateCondition, UNTIL_ROUNDS_CAP } from '../src/creator/miniAppRuntime';
 import { DROP_TARGET_REF } from '../src/creator/miniAppTypes';
 // ---- App Lab Phases 9-10 ----
@@ -230,7 +229,7 @@ import {
   plainLanguageProject, plainLanguageScript, javaScriptProject, translatableCommandKinds,
 } from '../src/creator/miniAppCodePeek';
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean): void {
@@ -1744,7 +1743,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('starter ids are unique',
     new Set(MINI_APP_STARTERS.map((s) => s.id)).size === MINI_APP_STARTERS.length);
   const builtStarters = MINI_APP_STARTERS.map((s) => ({ s, p: s.build(SEED) }));
-  let starterProblems: string[] = [];
+  const starterProblems: string[] = [];
   for (const { s, p } of builtStarters) {
     const r = validateMiniAppProject(p);
     if (!r.valid) starterProblems.push(`${s.id}: ${r.issues.map((i) => i.path + ' ' + i.problem).join(' | ')}`);
@@ -2053,7 +2052,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   const sort = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED2);
 
   // ---- adding and removing components ----
-  let ed = initialEditorState(tap);
+  const ed = initialEditorState(tap);
   check('a fresh editor has nothing to undo', !canUndo(ed) && !canRedo(ed));
   check('free slots exclude the ones already used',
     !freeSlots(tap, 'scene-1').includes('stage-center'));
@@ -3391,6 +3390,70 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   })());
   check('a sound always has words available for it',
     APPROVED_SOUNDS.every((s) => typeof s.label === 'string' && s.label.length > 0));
+}
+
+// ============================================================
+// App Lab Phase 15 — the boundaries, swept across every file
+// ============================================================
+{
+  const appLabFiles = [
+    ...readdirSync('src/creator').map((f) => `src/creator/${f}`),
+    ...readdirSync('src/data/app-lab').map((f) => `src/data/app-lab/${f}`),
+    ...readdirSync('src/ui/app-lab').map((f) => `src/ui/app-lab/${f}`),
+    'src/app/appLabScreen.ts', 'src/app/appCreatorScreen.ts', 'src/app/appLibraryScreen.ts',
+    'src/storage/miniAppStore.ts', 'src/storage/miniAppDraft.ts', 'src/ui/a11y.ts',
+  ].filter((f) => f.endsWith('.ts'));
+  const sourceOf = new Map(appLabFiles.map((f) => [f, readFileSync(f, 'utf8')]));
+
+  const offenders = (re: RegExp): string[] =>
+    [...sourceOf].filter(([, src]) => re.test(src)).map(([f]) => f);
+
+  check('nothing in the App Lab runs a string as code',
+    offenders(/\beval\(|new Function\(|document\.write|setTimeout\(\s*['"`]/).length === 0);
+  check('nothing in the App Lab reaches the network',
+    offenders(/\bfetch\(|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon|navigator\.share/)
+      .length === 0);
+  check('nothing in the App Lab names an external address',
+    offenders(/https?:\/\/(?!www\.w3\.org)/).length === 0);
+  check('nothing in the App Lab opens a camera, a microphone or a location',
+    offenders(/getUserMedia|MediaRecorder|SpeechRecognition|geolocation|<input[^>]*type=["']file/)
+      .length === 0);
+  check('nothing in the App Lab inserts a child\'s data as markup', (() => {
+    // innerHTML is used to CLEAR and nothing else; anything assigned to it
+    // would be an injection surface for a value out of a project. Capture
+    // the right-hand side and check it rather than using a lookahead —
+    // a lookahead after \s* just backtracks around itself.
+    const bad: string[] = [];
+    for (const [file, src] of sourceOf) {
+      for (const m of src.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)) {
+        if (!/^(''|""|``)$/.test(m[1].trim())) bad.push(`${file}: ${m[1].trim()}`);
+      }
+      if (/insertAdjacentHTML|\.outerHTML\s*=/.test(src)) bad.push(`${file}: outerHTML`);
+    }
+    return bad.length === 0;
+  })());
+  check('the App Lab has no text field anywhere',
+    offenders(/createElement\(['"]input['"]\)|contentEditable|window\.prompt\(/).length === 0);
+
+  check('the lint config bans dynamic code across the whole codebase', (() => {
+    const cfg = readFileSync('eslint.config.js', 'utf8');
+    return ['no-eval', 'no-implied-eval', 'no-new-func', 'no-script-url']
+      .every((r) => cfg.includes(`'${r}': 'error'`));
+  })());
+
+  check('every creator module is pure of the DOM, storage, clock and randomness',
+    readdirSync('src/creator').filter((f) => f.endsWith('.ts')).every((f) => {
+      const src = readFileSync(`src/creator/${f}`, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      return !/\bdocument\b|\bwindow\b|localStorage|indexedDB|eval\(|new Function|Date\.now\(|Math\.random\(/
+        .test(src);
+    }));
+
+  check('every App Lab document the README points at exists', (() => {
+    const readme = readFileSync('docs/app-lab/README.md', 'utf8');
+    const linked = [...readme.matchAll(/\]\(([a-z-]+\.md)\)/g)].map((m) => m[1]);
+    return linked.length >= 7 && linked.every((f) => existsSync(`docs/app-lab/${f}`));
+  })());
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
