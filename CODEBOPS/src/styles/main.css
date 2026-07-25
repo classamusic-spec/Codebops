@@ -46,6 +46,10 @@ button { font-family: inherit; border: 0; cursor: pointer; }
    ============================================================ */
 .screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .screen[hidden] { display: none; }
+/* Any class that sets `display` outranks the browser's own [hidden] rule,
+   which silently un-hides elements we set `.hidden = true` on. One rule
+   here rather than a matching [hidden] beside every flex/grid class. */
+[hidden] { display: none !important; }
 
 #world-canvas-wrap { position: absolute; inset: 0; }
 #world-canvas-wrap canvas { display: block; width: 100%; height: 100%; }
@@ -2573,6 +2577,15 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
    ============================================================ */
 .campfire-dialog .camp-summary { color: #fff; font-weight: 700; font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
 .campfire-dialog .camp-note { color: #b9aee6; font-size: 12px; font-weight: 700; line-height: 1.4; margin: 0 0 8px; }
+
+/* "What they built" — one row per saved app (App Lab §12, §24) */
+.campfire-dialog .camp-built { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.campfire-dialog .camp-built-row {
+  background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.12);
+  border-radius: var(--r-lg); padding: 9px 11px; text-align: left;
+}
+.campfire-dialog .cb-what { color: #fff; font-size: 13px; font-weight: 700; line-height: 1.45; margin: 0; }
+.campfire-dialog .cb-idea { color: #ffe9a8; font-size: 12px; font-weight: 700; line-height: 1.4; margin: 5px 0 0; }
 .campfire-dialog .camp-notyet { color: #9a8fd0; font-size: 12px; font-weight: 700; margin: 8px 0 0; }
 
 .camp-report { display: flex; flex-direction: column; gap: 6px; }
@@ -2784,6 +2797,120 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   .al-station { animation: none; }
 }
 .calm-mode .al-station { animation: none; }
+
+/* ============================================================
+   App Library — the shelf of finished apps (App Lab §9.8, §21)
+   ============================================================ */
+.lib-screen {
+  /* Same note as .applab-screen: do not override .screen's position. */
+  overflow-y: auto;
+  padding: max(14px, var(--sat)) max(14px, var(--sar)) 24px max(14px, var(--sal));
+  min-height: 100%;
+  background: radial-gradient(130% 90% at 50% 0%, #35529a 0%, #1f2a52 55%, #151d3a 100%);
+  background-attachment: local;
+}
+
+.lib-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.lib-titles { flex: 1; min-width: 190px; }
+.lib-titles h1 {
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: clamp(22px, 3vw, 34px); margin: 0;
+}
+.lib-titles p {
+  color: #9fe0ff; font-weight: 800; margin: 2px 0 0;
+  font-size: clamp(12px, 1.5vw, 16px); letter-spacing: .4px;
+}
+
+.lib-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+}
+.lib-card {
+  display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.04));
+  border: 3px solid rgba(255,255,255,.16); border-radius: var(--r-xl);
+  padding: 10px;
+}
+.lib-card.needs-repair { border-color: rgba(255,207,62,.5); }
+
+.lib-shot {
+  border-radius: var(--r-lg); overflow: hidden; background: rgba(13,20,55,.4);
+  aspect-ratio: 16 / 10; display: grid; place-items: center;
+}
+.lib-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.lib-meta { display: flex; flex-direction: column; gap: 5px; }
+.lib-name {
+  color: #fff; font-family: var(--font-display); font-weight: 800;
+  font-size: 16px; line-height: 1.15;
+}
+.lib-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.lib-chip {
+  background: rgba(255,255,255,.12); border-radius: 999px; padding: 2px 9px;
+  color: #cfe4ff; font-weight: 800; font-size: 11px;
+}
+.lib-sub { color: #9fb4e8; font-weight: 800; font-size: 11.5px; }
+.lib-repair {
+  background: rgba(255,207,62,.16); border: 2px solid rgba(255,207,62,.45);
+  border-radius: var(--r-lg); padding: 6px 9px;
+  color: #ffe9a8; font-weight: 800; font-size: 11.5px;
+}
+
+.lib-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+.lib-btn {
+  flex: 1 1 auto; min-width: 44px; min-height: 44px; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.06));
+  border: 2px solid rgba(255,255,255,.2); border-radius: var(--r-lg);
+  padding: 6px 10px; color: #fff; font-weight: 800; font-size: 12.5px;
+}
+.lib-btn:active { transform: translateY(2px); }
+.lib-btn.play { background: linear-gradient(180deg, #7ee79b, #3fae66); color: #06280f; }
+.lib-btn.danger { flex: 0 0 auto; position: relative; overflow: hidden; }
+/* The hold gate fills the button over the same 1.2s the timer runs. */
+.lib-btn.danger.holding::after {
+  content: ''; position: absolute; inset: 0; transform-origin: left center;
+  background: rgba(255,110,110,.55); animation: libHold 1.2s linear forwards;
+}
+@keyframes libHold { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.lib-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 40px 16px; text-align: center;
+}
+.lib-empty-glyph { font-size: 54px; }
+.lib-empty p { color: #cfe4ff; font-weight: 800; font-size: 15px; margin: 0; max-width: 30ch; }
+
+/* ---- the prepared-token rename dialog: no text field anywhere ---- */
+.dialog.lib-rename { align-items: stretch; text-align: left; max-width: 480px; }
+.lib-rename-preview {
+  background: rgba(13,20,55,.4); border-radius: var(--r-lg); padding: 9px 12px;
+  color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 19px;
+  text-align: center;
+}
+.lib-token-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.lib-token {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 62px; min-height: 56px; cursor: pointer; font: inherit;
+  background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.16);
+  border-radius: var(--r-lg); padding: 5px 8px; color: #cfe4ff;
+  font-weight: 800; font-size: 11.5px;
+}
+.lib-token span:first-child { font-size: 19px; }
+.lib-token.on {
+  background: linear-gradient(180deg, #8fe3ff, #4fb8e8);
+  border-color: #d8f4ff; color: #0b2340;
+}
+
+@media (max-width: 720px) {
+  .lib-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .lib-name { font-size: 14px; }
+  .lib-btn { font-size: 11.5px; padding: 5px 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lib-btn.danger.holding::after { animation: none; background: rgba(255,110,110,.35); }
+}
 
 /* ============================================================
    App Lab creator — template picker, scene builder, logic builder

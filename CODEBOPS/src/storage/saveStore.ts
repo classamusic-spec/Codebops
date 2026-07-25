@@ -138,6 +138,22 @@ export class SaveStore {
     this.persist();
   }
 
+  /**
+   * Record evidence a caller derived itself — the App Lab reads a child's
+   * own project rather than a level's run steps, so it arrives already
+   * shaped. Merging is identical: one entry per (levelId, requirement),
+   * so running the same app twice never inflates the log.
+   */
+  recordEvidence(fresh: readonly EvidenceEvent[]): void {
+    if (fresh.length === 0) return;
+    const log = this.data.evidence ?? (this.data.evidence = []);
+    for (const e of fresh) {
+      const at = log.findIndex((x) => x.levelId === e.levelId && x.requirement === e.requirement);
+      if (at >= 0) log[at] = e; else log.push(e);
+    }
+    this.persist();
+  }
+
   get evidence(): readonly EvidenceEvent[] {
     return this.data.evidence ?? [];
   }

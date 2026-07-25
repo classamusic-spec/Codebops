@@ -33,6 +33,8 @@ import { createCampfireGate, showCampfire } from './campfire';
 import { JourneyScreen } from './journeyScreen';
 import { AppLabScreen } from './appLabScreen';
 import { AppCreatorScreen } from './appCreatorScreen';
+import { AppLibraryScreen } from './appLibraryScreen';
+import type { MiniAppProject } from '../creator/miniAppProject';
 import type { AppKitDefinition } from '../data/app-lab/appLabDefinition';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
@@ -64,6 +66,7 @@ export class App {
   private journey: JourneyScreen | null = null;
   private appLab: AppLabScreen | null = null;
   private creator: AppCreatorScreen | null = null;
+  private library: AppLibraryScreen | null = null;
   private editor: EditorScreen | null = null;
   private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | GearworksMakerScreen | null = null;
   private store = new SaveStore();
@@ -102,6 +105,8 @@ export class App {
     this.appLab = null;
     this.creator?.dispose();
     this.creator = null;
+    this.library?.dispose();
+    this.library = null;
     this.editor?.dispose();
     this.editor = null;
     this.gearworks?.dispose();
@@ -539,18 +544,34 @@ export class App {
       onBack: () => this.showSelect(),
       onOpenJourney: () => this.showJourney(),
       onOpenKit: (kit) => this.showCreator(kit),
+      onOpenLibrary: () => this.showAppLibrary(),
     });
     this.appLab.enter();
   }
 
-  private showCreator(kit: AppKitDefinition): void {
+  private showAppLibrary(): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-app-library';
+    this.library = new AppLibraryScreen(screen, {
+      onBack: () => this.showAppLab(),
+      onPlay: (project) => this.showCreator(null, project, 'play'),
+      onEdit: (project) => this.showCreator(null, project, 'edit'),
+    });
+    this.library.enter();
+  }
+
+  private showCreator(
+    kit: AppKitDefinition | null, project?: MiniAppProject, open?: 'play' | 'edit',
+  ): void {
     this.clearHost();
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-creator';
     this.creator = new AppCreatorScreen(screen, kit, this.store, {
       onExitToLab: () => this.showAppLab(),
+      onExitToLibrary: () => this.showAppLibrary(),
     });
-    this.creator.enter();
+    this.creator.enter(project, open);
   }
 
   // ---------- learning garden (curriculum map) ----------

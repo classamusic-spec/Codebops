@@ -17,6 +17,7 @@ import { showToast } from '../ui/dialogs';
 import type { SaveStore } from '../storage/saveStore';
 import type { AppKitDefinition } from '../data/app-lab/appLabDefinition';
 import { titleText } from '../creator/miniAppProject';
+import type { MiniAppProject } from '../creator/miniAppProject';
 import type { StarterDefinition } from '../creator/miniAppProjectFactory';
 import type { EditorState, EditResult } from '../creator/miniAppEditor';
 import {
@@ -39,9 +40,12 @@ import type { CreatorState } from '../creator/miniAppMode';
 import { initialCreatorState, applyCreatorAction, showsEditingChrome } from '../creator/miniAppMode';
 import { APP_LAB_THEMES } from '../data/app-lab/approvedAssets';
 import { sceneName } from '../creator/miniAppChoices';
+import { factsFor, evidenceForCreation } from '../creator/miniAppEvidence';
 
 export interface AppCreatorEvents {
   readonly onExitToLab: () => void;
+  /** Where a saved app came from, so Leave goes back there. */
+  readonly onExitToLibrary?: () => void;
 }
 
 /** Ids are minted here, at the edge, so the creator itself stays pure. */
@@ -60,7 +64,11 @@ export class AppCreatorScreen {
   private predictedCorrectly: boolean | null = null;
   /** True once a run actually set something off. */
   private ranSuccessfully = false;
+  /** True once the child changed the app AFTER watching it run. */
+  private repairedAfterRunning = false;
   private disposed = false;
+  /** True when this app was opened from the library, not a station. */
+  private fromLibrary = false;
 
   private body!: HTMLElement;
   private stepBar!: HTMLElement;
@@ -75,14 +83,17 @@ export class AppCreatorScreen {
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly kit: AppKitDefinition,
+    /** Null when the app came from the library rather than a station. */
+    private readonly kit: AppKitDefinition | null,
     private readonly store: SaveStore,
     private readonly events: AppCreatorEvents,
   ) {
   }
 
-  enter(): void {
+  /** Open a station, or re-open a saved app straight into play or build. */
+  enter(existing?: MiniAppProject, open: 'play' | 'edit' = 'edit'): void {
     this.root.classList.add('creator-screen');
+    this.fromLibrary = !!existing;
     this.creator = applyCreatorAction(initialCreatorState(), { kind: 'chooseKit' });
 
     const head = el('div', 'cr-head', this.root);
@@ -91,7 +102,8 @@ export class AppCreatorScreen {
     back.setAttribute('aria-label', 'Back to the App Lab');
     back.addEventListener('click', () => { sharedSfx.play('tap'); this.exit(); });
     const titles = el('div', 'cr-titles', head);
-    el('h1', undefined, titles, `${this.kit.glyph} ${this.kit.name}`);
+    const kitName = this.kit ? `${this.kit.glyph} ${this.kit.name}` : '🗂️ My App';
+    el('h1', undefined, titles, kitName);
     const subtitle = el('p', 'cr-subtitle', titles, 'Pick something to start with.');
     subtitle.id = 'cr-subtitle';
 
@@ -99,6 +111,14 @@ export class AppCreatorScreen {
     this.stepBar.setAttribute('aria-label', 'Where you are');
     this.body = el('div', 'cr-body', this.root);
     this.toolbar = el('div', 'cr-toolbar', this.root);
+
+    if (existing) {
+      this.editor = initialEditorState(existing);
+      this.sceneId = existing.scenes[0]?.id ?? '';
+      this.creator = applyCreatorAction(this.creator, { kind: 'chooseTemplate' });
+      if (open === 'play') this.creator = applyCreatorAction(this.creator, { kind: 'toTeach' });
+      if (open === 'play') this.creator = applyCreatorAction(this.creator, { kind: 'test' });
+    }
 
     this.renderStepBar();
     this.renderBody();
@@ -155,6 +175,7 @@ export class AppCreatorScreen {
 
     switch (this.creator.step) {
       case 'template': {
+        if (!this.kit) { this.exit(); return; }
         if (subtitle) subtitle.textContent = 'Pick something to start with.';
         new TemplatePicker(this.body, this.kit, {
           onPick: (starter, themeId) => this.startFrom(starter, themeId),
@@ -379,6 +400,9 @@ export class AppCreatorScreen {
 
   private afterEdit(): void {
     if (!this.editor) return;
+    // Changing something after watching it run IS debugging, whether or not
+    // anything was actually broken — the child looked, then acted.
+    if (this.ranSuccessfully) this.repairedAfterRunning = true;
     saveDraft(this.editor.project, Date.now());
     this.sceneBuilder?.update(this.editor.project, this.sceneId);
     if (this.selectedId) this.sceneBuilder?.select(this.selectedId);
@@ -400,6 +424,7 @@ export class AppCreatorScreen {
     if (outcome.ok) {
       sharedSfx.play('star');
       clearDraft();
+      this.recordCreationEvidence();
       showToast(this.root, `💾 Saved "${titleText(project.title)}" to My Apps!`);
     } else {
       sharedSfx.play('bump');
@@ -413,8 +438,26 @@ export class AppCreatorScreen {
     return APP_LAB_THEMES.find((t) => t.id === id)?.label ?? '';
   }
 
+  /**
+   * Write what this creation showed into the same evidence log the levels
+   * use (spec §12). Only what is actually in the child's scripts counts,
+   * and only after the app has run — see miniAppEvidence.
+   */
+  private recordCreationEvidence(): void {
+    if (!this.editor) return;
+    const facts = factsFor(this.editor.project, {
+      ran: this.ranSuccessfully,
+      repairedAfterRunning: this.repairedAfterRunning,
+    });
+    this.store.recordEvidence(evidenceForCreation(this.editor.project, facts));
+  }
+
   private exit(): void {
-    this.events.onExitToLab();
+    // A child who ran their app and then walked away without saving still
+    // showed what they showed.
+    this.recordCreationEvidence();
+    if (this.fromLibrary && this.events.onExitToLibrary) this.events.onExitToLibrary();
+    else this.events.onExitToLab();
   }
 
   dispose(): void {

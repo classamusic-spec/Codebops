@@ -191,6 +191,12 @@ import { APPROVED_COMPONENTS, approvedComponent } from '../src/data/app-lab/appr
 import { APPROVED_SOUNDS, PREPARED_PHRASES } from '../src/data/app-lab/approvedSounds';
 import { SCENE_LAYOUTS, sceneLayout, layoutHasSlot } from '../src/data/app-lab/sceneLayouts';
 import { TITLE_TOKENS, isTitleToken, tokensInGroup } from '../src/data/app-lab/preparedTitleTokens';
+// ---- App Lab Phases 11-12 ----
+import { thumbnailFor, thumbnailSummary } from '../src/creator/miniAppThumbnail';
+import {
+  factsFor, evidenceForCreation, parentSentenceFor, offScreenIdeaFor,
+} from '../src/creator/miniAppEvidence';
+import { stage, isStageId } from '../src/data/curriculum/stages';
 // ---- App Lab Phase 2 ----
 import {
   initialEditorState, addComponent, removeComponent, moveComponent, addScript, removeScript,
@@ -3040,6 +3046,143 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const src = readFileSync('src/creator/miniAppCodePeek.ts', 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     return !/\bdocument\b|\bwindow\b|localStorage|eval\(|new Function/.test(src);
+  })());
+}
+
+// ============================================================
+// App Lab Phase 11 — the App Library (thumbnails, copies)
+// ============================================================
+{
+  const SEED11 = { id: 'p11', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+  const flower11 = MINI_APP_STARTERS.find((s) => s.id === 'blooming-flower')!.build(SEED11);
+  const sorter11 = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED11);
+
+  check('a thumbnail is an inline SVG data URI — nothing is fetched',
+    thumbnailFor(flower11).startsWith('data:image/svg+xml;charset=utf-8,'));
+  check('a thumbnail is deterministic — the same project draws the same picture',
+    thumbnailFor(flower11) === thumbnailFor(flower11));
+  check('different apps draw different pictures',
+    thumbnailFor(flower11) !== thumbnailFor(sorter11));
+  check('every starter draws a thumbnail with at least one glyph in it',
+    MINI_APP_STARTERS.every((s) => {
+      const svg = decodeURIComponent(thumbnailFor(s.build(SEED11)).split(',')[1]);
+      return svg.includes('<svg') && svg.includes('<text');
+    }));
+  check('a thumbnail never emits a raw angle bracket from a glyph', (() => {
+    // Glyphs come from the approved list, but the escape must still hold.
+    const svg = decodeURIComponent(thumbnailFor(flower11).split(',')[1]);
+    const body = svg.replace(/<[^>]*>/g, '');
+    return !body.includes('<') && !body.includes('>');
+  })());
+  check('the thumbnail caption counts things and jobs, never a score',
+    /^\d+ things? · \d+ jobs?$/.test(thumbnailSummary(flower11)));
+  check('a project with no scenes still draws something rather than throwing',
+    thumbnailFor({ ...flower11, scenes: [] }).startsWith('data:image/svg+xml'));
+
+  check('a copy is a new app, not a second name for the same one', (() => {
+    const copy = duplicateProject(flower11, { ...SEED11, id: 'p11-copy' }, 2);
+    return copy.id !== flower11.id && copy.scripts.length === flower11.scripts.length;
+  })());
+  check('the library is pure of the DOM in its data modules', (() => {
+    const src = readFileSync('src/creator/miniAppThumbnail.ts', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    return !/\bdocument\b|\bwindow\b|localStorage|eval\(|new Function/.test(src);
+  })());
+  check('the library screen never reaches the network', (() => {
+    const src = readFileSync('src/app/appLibraryScreen.ts', 'utf8');
+    return !/\bfetch\(|XMLHttpRequest|WebSocket|navigator\.share|https?:\/\//.test(src);
+  })());
+  check('renaming offers prepared words only — there is no text input anywhere', (() => {
+    const src = readFileSync('src/app/appLibraryScreen.ts', 'utf8');
+    return !/input|contenteditable|prompt\(/i.test(src);
+  })());
+  check('deleting is behind a hold, not a tap', (() => {
+    const src = readFileSync('src/app/appLibraryScreen.ts', 'utf8');
+    return src.includes('holdToDelete') && src.includes('1200');
+  })());
+}
+
+// ============================================================
+// App Lab Phase 12 — what a built app SHOWS
+// ============================================================
+{
+  const SEED12 = { id: 'p12', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+  const flower12 = MINI_APP_STARTERS.find((s) => s.id === 'blooming-flower')!.build(SEED12);
+  const sorter12 = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED12);
+  const music12 = MINI_APP_STARTERS.find((s) => s.id === 'four-beat-loop')!.build(SEED12);
+  const helper12 = MINI_APP_STARTERS.find((s) => s.id === 'feed-the-pet')!.build(SEED12);
+  const RAN = { ran: true, repairedAfterRunning: false };
+
+  check('building an app records nothing — running it is the demonstration',
+    evidenceForCreation(flower12, factsFor(flower12, { ran: false, repairedAfterRunning: false })).length === 0);
+  check('running an app records evidence',
+    evidenceForCreation(flower12, factsFor(flower12, RAN)).length > 0);
+
+  check('every claim names a real requirement on a real stage',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED12);
+      return evidenceForCreation(p, factsFor(p, RAN)).every((e) => {
+        if (!isStageId(e.stage)) return false;
+        return stage(e.stage).evidenceRequirements.some((r) => r.id === e.requirement);
+      });
+    }));
+  check('creation evidence is always transfer — the child chose the problem',
+    evidenceForCreation(music12, factsFor(music12, RAN)).every((e) => e.phase === 'create'));
+  check('creation evidence is filed against the app, not a level',
+    evidenceForCreation(music12, factsFor(music12, RAN)).every((e) => e.levelId === `applab:${music12.id}`));
+
+  check('a loop is only claimed when a loop is actually in the scripts', (() => {
+    const withLoop = factsFor(music12, RAN);
+    const stripped = factsFor({ ...music12, scripts: [] }, RAN);
+    return withLoop.usedLoop && !stripped.usedLoop;
+  })());
+  check('an if-else in the child\'s own scripts is what claims two-way thinking',
+    factsFor(sorter12, RAN).usedBranch
+    && !factsFor({ ...sorter12, scripts: [] }, RAN).usedBranch);
+  check('asking a grown-up first is claimed only by an app that really asks',
+    factsFor(helper12, RAN).usedApproval && !factsFor(flower12, RAN).usedApproval);
+  check('the kit\'s allow-list never counts as evidence on its own', (() => {
+    // Tiny Game Maker ALLOWS counters; an app with none must not claim one.
+    const bare = { ...sorter12, scripts: [] };
+    return !factsFor(bare, RAN).usedVariable;
+  })());
+  check('debugging is claimed only after the child changed it and ran again', (() => {
+    const no = factsFor(flower12, RAN);
+    const yes = factsFor(flower12, { ran: true, repairedAfterRunning: true });
+    return !evidenceForCreation(flower12, no).some((e) => e.requirement === 'dbg-change')
+      && evidenceForCreation(flower12, yes).some((e) => e.requirement === 'dbg-change');
+  })());
+  check('running the same app twice never doubles a requirement', (() => {
+    const list = evidenceForCreation(flower12, factsFor(flower12, RAN));
+    const keys = list.map((e) => `${e.levelId}|${e.requirement}`);
+    return new Set(keys).size === keys.length;
+  })());
+
+  check('every parent sentence names the app and reads as plain English',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED12);
+      const line = parentSentenceFor(p, factsFor(p, RAN));
+      return line.startsWith('Your child built "') && line.endsWith('.')
+        && !/undefined|null|\[object/.test(line);
+    }));
+  check('a parent sentence never prints a raw token id',
+    !/[a-z]+-[a-z]+-[a-z]+/.test(parentSentenceFor(flower12, factsFor(flower12, RAN))));
+  check('the off-screen idea is an action a grown-up can take, never a score',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED12);
+      const idea = offScreenIdeaFor(factsFor(p, RAN));
+      return idea.length > 12 && !/%|score|rank|behind|ahead/i.test(idea);
+    }));
+  check('no creation note ever compares a child to anyone',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED12);
+      return evidenceForCreation(p, factsFor(p, RAN))
+        .every((e) => !/%|faster|slower|better|worse|average|than other/i.test(e.note));
+    }));
+  check('evidence is pure — it reads the project and nothing else', (() => {
+    const src = readFileSync('src/creator/miniAppEvidence.ts', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    return !/\bdocument\b|\bwindow\b|localStorage|eval\(|new Function|Date\.now|Math\.random/.test(src);
   })());
 }
 

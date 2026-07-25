@@ -9,6 +9,8 @@ import { ALL_LEVELS } from '../data/levels';
 import { loadCustomLevels } from '../storage/customLevels';
 import { buildParentReport } from '../data/curriculum/report';
 import { APP_LAB_ALL_KITS } from '../data/app-lab/appLabDefinition';
+import { MiniAppStore } from '../storage/miniAppStore';
+import { factsFor, parentSentenceFor, offScreenIdeaFor } from '../creator/miniAppEvidence';
 import { sharedSfx } from '../audio/sfx';
 
 /** Worlds a grown-up may open by hand (§7). Ids match the level data. */
@@ -106,6 +108,39 @@ export function showCampfire(parent: HTMLElement, store: SaveStore, onReset: () 
         `Still to come: ${notYet.map((s) => s.codingName).join(', ')}.`);
     }
   }
+
+  // ---- What they built (App Lab §12, §24) ----
+  // The apps themselves live in an async store, so this section fills in
+  // once it has loaded rather than holding the whole dialog open.
+  const builtHead = el('h3', undefined, dlg, 'What they built');
+  const built = el('div', 'camp-built', dlg);
+  builtHead.hidden = true;
+  built.hidden = true;
+  void (async () => {
+    const store2 = new MiniAppStore();
+    const list = await store2.list();
+    if (!dlg.isConnected || list.length === 0) return;
+    builtHead.hidden = false;
+    built.hidden = false;
+    for (const summary of list.slice(0, 6)) {
+      const { project } = await store2.load(summary.id);
+      if (!project || !dlg.isConnected) continue;
+      // `ran` and `repaired` are read back out of the evidence log rather
+      // than guessed — if nothing was recorded, the app was never run.
+      const mine = store.evidence.filter((e) => e.levelId === `applab:${project.id}`);
+      const facts = factsFor(project, {
+        ran: mine.length > 0,
+        repairedAfterRunning: mine.some((e) => e.requirement === 'dbg-change'),
+      });
+      const row = el('div', 'camp-built-row', built);
+      el('p', 'cb-what', row, parentSentenceFor(project, facts));
+      if (facts.ran) el('p', 'cb-idea', row, `Away from the screen: ${offScreenIdeaFor(facts)}`);
+      else el('p', 'cb-idea', row, 'They have not run this one yet — ask them to show you what it does.');
+    }
+    if (list.length > 6) {
+      el('p', 'camp-note', built, `…and ${list.length - 6} more in their App Library.`);
+    }
+  })();
 
   // ---- Code Peek: grown-ups may hide the JavaScript view (App Lab §20) ----
   el('h3', undefined, dlg, 'Code Peek');
