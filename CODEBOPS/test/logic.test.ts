@@ -191,6 +191,16 @@ import { APPROVED_COMPONENTS, approvedComponent } from '../src/data/app-lab/appr
 import { APPROVED_SOUNDS, PREPARED_PHRASES } from '../src/data/app-lab/approvedSounds';
 import { SCENE_LAYOUTS, sceneLayout, layoutHasSlot } from '../src/data/app-lab/sceneLayouts';
 import { TITLE_TOKENS, isTitleToken, tokensInGroup } from '../src/data/app-lab/preparedTitleTokens';
+// ---- App Lab Phase 2 ----
+import {
+  initialEditorState, addComponent, removeComponent, moveComponent, addScript, removeScript,
+  appendCommand, removeCommandAt, moveCommand, clearScript, undo, redo, canUndo, canRedo,
+  freeSlots, readiness, setTitleTokens, setTheme, HISTORY_LIMIT,
+} from '../src/creator/miniAppEditor';
+import {
+  commandChoices, triggerChoices, componentChoices, describeCommand, describeTrigger, sceneName,
+} from '../src/creator/miniAppChoices';
+import { predictionChoices } from '../src/ui/app-lab/predictionPanel';
 
 import { readdirSync, readFileSync } from 'node:fs';
 
@@ -1875,8 +1885,12 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
       && JSON.stringify(copy.scripts) === JSON.stringify(good.scripts)
       && validateMiniAppProject(copy).valid;
   })());
-  check('a title reads back as words a grown-up can read',
-    titleText({ tokens: ['owner-zip', 'thing-berry', 'thing-game'] }).length > 0);
+  check('a title reads back as words, never as token ids',
+    titleText({ tokens: ['owner-zip', 'thing-berry', 'thing-game'] }) === "Zip's Berry Game");
+  check('a duplicated title carries its number',
+    titleText({ tokens: ['owner-my', 'thing-song'], version: 2 }) === 'My Song 2');
+  check('an unknown token drops out rather than printing an id',
+    titleText({ tokens: ['owner-my', 'not-a-token'] }) === 'My');
 
   // ---- command tree helpers ----
   const tree: MiniAppCommand[] = [
@@ -1995,6 +2009,290 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     check('the creator is pure, deterministic and cannot execute a string',
       offenders.length === 0);
     if (offenders.length > 0) console.log('   ' + offenders.join('\n   '));
+  }
+}
+
+// ---------------------------------------------------------------
+// Zip's App Lab — Phase 2: editing, choices, prediction
+// ---------------------------------------------------------------
+{
+  console.log("\n-- Zip's App Lab: creator UI logic --");
+  const SEED2 = { id: 'p2', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+  const NOW = 1_700_000_001_000;
+  const tap = MINI_APP_STARTERS.find((s) => s.id === 'blooming-flower')!.build(SEED2);
+  const sort = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED2);
+
+  // ---- adding and removing components ----
+  let ed = initialEditorState(tap);
+  check('a fresh editor has nothing to undo', !canUndo(ed) && !canRedo(ed));
+  check('free slots exclude the ones already used',
+    !freeSlots(tap, 'scene-1').includes('stage-center'));
+
+  const added = addComponent(ed, {
+    id: 'c-new', sceneId: 'scene-1', type: 'button', assetId: 'button-green', now: NOW,
+  });
+  check('adding a component works', added.changed && !added.refusal);
+  check('an added component lands in a free slot',
+    added.state.project.scenes[0].components.some((c) => c.id === 'c-new'));
+  check('adding a component records the asset in the manifest',
+    added.state.project.assets.some((a) => a.assetId === 'button-green'));
+  check('an accepted edit can be undone', canUndo(added.state));
+  check('an added component still validates', validateMiniAppProject(added.state.project).valid);
+  check('adding does not mutate the original project',
+    tap.scenes[0].components.every((c) => c.id !== 'c-new'));
+
+  check('a component this kit does not allow is refused', (() => {
+    const r = addComponent(ed, {
+      id: 'c-x', sceneId: 'scene-1', type: 'collectible', assetId: 'berry', now: NOW,
+    });
+    return !r.changed && !!r.refusal;
+  })());
+  check('an unknown asset is refused', (() => {
+    const r = addComponent(ed, {
+      id: 'c-x', sceneId: 'scene-1', type: 'prop', assetId: 'laser', now: NOW,
+    });
+    return !r.changed && !!r.refusal;
+  })());
+  check('a taken slot is refused', (() => {
+    const r = addComponent(ed, {
+      id: 'c-x', sceneId: 'scene-1', type: 'prop', assetId: 'star', slotId: 'stage-center', now: NOW,
+    });
+    return !r.changed && !!r.refusal;
+  })());
+  check('filling the screen refuses the next piece', (() => {
+    let st = initialEditorState(tap);
+    // Tap Magic allows five components and starts with one.
+    for (let i = 0; i < 4; i++) {
+      st = addComponent(st, { id: `f${i}`, sceneId: 'scene-1', type: 'prop', assetId: 'star', now: NOW }).state;
+    }
+    const r = addComponent(st, { id: 'f5', sceneId: 'scene-1', type: 'prop', assetId: 'leaf', now: NOW });
+    return !r.changed && /full|taken/i.test(r.refusal ?? '');
+  })());
+  check('every refusal is written for a child, not a developer', (() => {
+    const r = addComponent(ed, { id: 'c-x', sceneId: 'scene-1', type: 'collectible', assetId: 'berry', now: NOW });
+    const m = r.refusal ?? '';
+    return m.length > 10 && !/error|invalid|failed|illegal|null|undefined/i.test(m);
+  })());
+
+  // ---- removing tidies up after itself ----
+  {
+    const st = initialEditorState(tap);
+    const gone = removeComponent(st, 'flower', NOW);
+    check('removing a component removes it', gone.changed
+      && gone.state.project.scenes[0].components.length === 0);
+    check('removing a component removes the scripts that belonged to it',
+      gone.state.project.scripts.length === 0);
+    check('a project stays valid after a removal',
+      validateMiniAppProject(gone.state.project).valid);
+  }
+  {
+    // A script owned by something ELSE that mentions the removed piece.
+    const withCross = addScript(initialEditorState(sort), {
+      id: 'cross', ownerId: 'basket-red', trigger: { kind: 'onTap', targetId: 'basket-red' }, now: NOW,
+    }).state;
+    const withCmd = appendCommand(withCross, 'cross', { kind: 'hide', targetId: 'item-1' }, NOW).state;
+    const gone = removeComponent(withCmd, 'item-1', NOW);
+    const cross = gone.state.project.scripts.find((s) => s.id === 'cross');
+    check('removing a component prunes commands that pointed at it',
+      !!cross && cross.commands.length === 0);
+    check('the pruned project still validates',
+      validateMiniAppProject(gone.state.project).valid);
+  }
+
+  // ---- moving swaps rather than refusing ----
+  {
+    const two = addComponent(initialEditorState(tap), {
+      id: 'c2', sceneId: 'scene-1', type: 'prop', assetId: 'star', slotId: 'stage-left', now: NOW,
+    }).state;
+    const moved = moveComponent(two, 'c2', 'stage-center', NOW);
+    const comps = moved.state.project.scenes[0].components;
+    check('moving onto an occupied slot swaps the two pieces',
+      comps.find((c) => c.id === 'c2')?.slotId === 'stage-center'
+      && comps.find((c) => c.id === 'flower')?.slotId === 'stage-left');
+    check('a swap leaves the project valid', validateMiniAppProject(moved.state.project).valid);
+    check('moving to a slot the layout lacks is refused',
+      !moveComponent(two, 'c2', 'nowhere', NOW).changed);
+  }
+
+  // ---- scripts and steps ----
+  {
+    let st = initialEditorState(tap);
+    const withScript = addScript(st, {
+      id: 's-new', ownerId: 'flower', trigger: { kind: 'onAppStart' }, now: NOW,
+    });
+    check('adding a script works', withScript.changed);
+    st = withScript.state;
+    check('a trigger this kit does not allow is refused',
+      !addScript(st, { id: 's-x', ownerId: 'flower', trigger: { kind: 'onDrop', targetId: 'flower' }, now: NOW }).changed);
+    check('a script for a component that is not there is refused',
+      !addScript(st, { id: 's-x', ownerId: 'ghost', trigger: { kind: 'onAppStart' }, now: NOW }).changed);
+
+    const withCmd = appendCommand(st, 's-new', { kind: 'playSound', sound: 'pop' }, NOW);
+    check('adding a step works', withCmd.changed);
+    check('a step this kit does not allow is refused',
+      !appendCommand(st, 's-new', { kind: 'celebrate' }, NOW).changed === false
+      || !appendCommand(st, 's-new', { kind: 'increaseCounter', variableId: 'x' }, NOW).changed);
+    check('a step added to a script that is gone is refused',
+      !appendCommand(st, 'no-such-script', { kind: 'playSound', sound: 'pop' }, NOW).changed);
+
+    // Tap Magic allows six commands per script.
+    let long = st;
+    for (let i = 0; i < 6; i++) {
+      long = appendCommand(long, 's-new', { kind: 'playSound', sound: 'pop' }, NOW).state;
+    }
+    const overflow = appendCommand(long, 's-new', { kind: 'playSound', sound: 'tap' }, NOW);
+    check('a script that is already full refuses another step',
+      !overflow.changed && /long|out/i.test(overflow.refusal ?? ''));
+
+    const two = appendCommand(withCmd.state, 's-new', { kind: 'hide', targetId: 'flower' }, NOW).state;
+    const reordered = moveCommand(two, 's-new', 0, 1, NOW);
+    check('steps can be reordered',
+      reordered.state.project.scripts.find((s) => s.id === 's-new')!.commands[0].kind === 'hide');
+    check('moving the first step earlier is refused',
+      !moveCommand(two, 's-new', 0, -1, NOW).changed);
+    check('a step can be removed',
+      removeCommandAt(two, 's-new', 0, NOW).state.project.scripts
+        .find((s) => s.id === 's-new')!.commands.length === 1);
+    check('clearing a script empties it',
+      clearScript(two, 's-new', NOW).state.project.scripts
+        .find((s) => s.id === 's-new')!.commands.length === 0);
+    check('clearing an already-empty script is refused',
+      !clearScript(st, 's-new', NOW).changed);
+    check('a removed script takes its steps with it',
+      removeScript(two, 's-new', NOW).state.project.scripts.every((s) => s.id !== 's-new'));
+    check('every edited project still validates',
+      [withScript, withCmd, reordered].every((r) => validateMiniAppProject(r.state.project).valid));
+  }
+
+  // ---- undo and redo ----
+  {
+    let st = initialEditorState(tap);
+    const before = JSON.stringify(st.project);
+    st = addComponent(st, { id: 'u1', sceneId: 'scene-1', type: 'prop', assetId: 'star', now: NOW }).state;
+    st = addComponent(st, { id: 'u2', sceneId: 'scene-1', type: 'prop', assetId: 'leaf', now: NOW }).state;
+    check('two edits stack two undos', st.past.length === 2);
+    const back = undo(undo(st));
+    check('undoing twice returns the original project', JSON.stringify(back.project) === before);
+    check('undo past the start is a no-op', undo(back) === back);
+    const forward = redo(redo(back));
+    check('redoing twice returns the edited project',
+      JSON.stringify(forward.project) === JSON.stringify(st.project));
+    check('redo past the end is a no-op', redo(forward) === forward);
+    const fresh = addComponent(back, { id: 'u3', sceneId: 'scene-1', type: 'prop', assetId: 'berry', now: NOW });
+    check('a new edit after undo clears the redo trail', fresh.state.future.length === 0);
+    check('history is capped so a long session cannot grow forever', (() => {
+      let s2 = initialEditorState(tap);
+      for (let i = 0; i < HISTORY_LIMIT + 12; i++) {
+        const r = setTitleTokens(s2, ['owner-my', i % 2 ? 'thing-star' : 'thing-berry'], NOW);
+        s2 = r.state;
+      }
+      return s2.past.length === HISTORY_LIMIT;
+    })());
+    check('every undone state is a project that still validates',
+      validateMiniAppProject(back.project).valid && validateMiniAppProject(forward.project).valid);
+  }
+
+  // ---- project-level edits ----
+  check('a title needs at least one word', !setTitleTokens(initialEditorState(tap), [], NOW).changed);
+  check('the theme can be changed', setTheme(initialEditorState(tap), 'bubble-bay', NOW).changed);
+  check('setting the theme it already has is refused',
+    !setTheme(initialEditorState(tap), tap.themeId, NOW).changed);
+
+  // ---- readiness coaching ----
+  check('an app with nothing on screen is not ready', (() => {
+    const empty = removeComponent(initialEditorState(tap), 'flower', NOW).state;
+    const r = readiness(empty.project);
+    return !r.ready && /screen/i.test(r.nudge ?? '');
+  })());
+  check('an app with steps is ready to try', readiness(tap).ready);
+  check('readiness never scolds', (() => {
+    const empty = removeComponent(initialEditorState(tap), 'flower', NOW).state;
+    return !/wrong|must|cannot|error/i.test(readiness(empty.project).nudge ?? '');
+  })());
+
+  // ---- tap-first choices ----
+  {
+    const choices = commandChoices(tap);
+    check('every command choice is already complete — no arguments to fill in',
+      choices.length > 0 && choices.every((c) => typeof c.command.kind === 'string'));
+    check('every command choice is one this kit allows', (() => {
+      const allowed = new Set(miniAppTemplate(tap.templateId)!.allowedCommands);
+      return choices.every((c) => allowed.has(c.command.kind));
+    })());
+    check('command choices only name components the project has', (() => {
+      const ids = new Set(allComponents(tap).map((c) => c.id));
+      return choices.every((c) => !('targetId' in c.command) || ids.has(c.command.targetId));
+    })());
+    check('a tapped choice produces a project that validates', (() => {
+      const st = addScript(initialEditorState(tap), {
+        id: 's-c', ownerId: 'flower', trigger: { kind: 'onAppStart' }, now: NOW,
+      }).state;
+      return choices.slice(0, 12).every((c) => {
+        const r = appendCommand(st, 's-c', c.command, NOW);
+        return !r.changed || validateMiniAppProject(r.state.project).valid;
+      });
+    })());
+    check('choice ids are unique', new Set(choices.map((c) => c.id)).size === choices.length);
+    check('every choice has a picture and words',
+      choices.every((c) => c.glyph.length > 0 && c.label.length > 2));
+
+    const sortChoices = commandChoices(sort);
+    check('a kit with counters offers counter steps',
+      sortChoices.some((c) => c.command.kind === 'increaseCounter'));
+    check('a kit without counters offers none',
+      !choices.some((c) => c.command.kind === 'increaseCounter'));
+
+    const triggers = triggerChoices(tap, 'flower');
+    check('trigger choices are offered for the chosen object', triggers.length > 0);
+    check('every trigger choice is one this kit allows', (() => {
+      const allowed = new Set(miniAppTemplate(tap.templateId)!.allowedTriggers);
+      return triggers.every((t) => allowed.has(t.trigger.kind));
+    })());
+    check('a trigger for an object that is not there yields nothing',
+      triggerChoices(tap, 'ghost').length === 0);
+    check('component choices respect the kit allow-list', (() => {
+      const allowed = new Set(miniAppTemplate(tap.templateId)!.allowedComponents);
+      return componentChoices(tap).every((c) => allowed.has(c.type));
+    })());
+  }
+
+  // ---- plain descriptions ----
+  check('every command in every starter can be described in words', (() => {
+    return MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED2);
+      return p.scripts.every((sc) =>
+        flattenCommands(sc.commands).every((c) => {
+          const text = describeCommand(p, c);
+          return typeof text === 'string' && text.length > 2;
+        }));
+    });
+  })());
+  check('every trigger in every starter can be described in words',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED2);
+      return p.scripts.every((sc) => describeTrigger(p, sc.trigger).length > 5);
+    }));
+  check('a description names the thing, not its id',
+    describeCommand(tap, { kind: 'hide', targetId: 'flower' }) === 'Hide Flower');
+  check('scenes are numbered for a child, never named by id',
+    sceneName(tap, 'scene-1') === 'Scene 1' && sceneName(tap, 'nope') === 'that scene');
+
+  // ---- prediction is built from the real program ----
+  {
+    const choices = predictionChoices(tap);
+    check('a prediction offers at least two outcomes', choices.length >= 2);
+    check('exactly one prediction is correct',
+      choices.filter((c) => c.correct).length === 1);
+    check('the correct prediction is the first real step',
+      choices.find((c) => c.correct)?.label === describeCommand(tap, tap.scripts[0].commands[0]));
+    check('every prediction has a picture, so it can be answered without reading',
+      choices.every((c) => c.glyph.length > 0));
+    check('an app with no steps offers no prediction', (() => {
+      const bare = clearScript(initialEditorState(tap), 'script-1', NOW).state;
+      return predictionChoices(bare.project).length === 0;
+    })());
+    check('predictions never repeat the same wording',
+      new Set(choices.map((c) => c.label)).size === choices.length);
   }
 }
 

@@ -32,6 +32,8 @@ import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
 import { JourneyScreen } from './journeyScreen';
 import { AppLabScreen } from './appLabScreen';
+import { AppCreatorScreen } from './appCreatorScreen';
+import type { AppKitDefinition } from '../data/app-lab/appLabDefinition';
 
 const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
   'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
@@ -61,6 +63,7 @@ export class App {
   private trophy: GearworksTrophyScreen | null = null;
   private journey: JourneyScreen | null = null;
   private appLab: AppLabScreen | null = null;
+  private creator: AppCreatorScreen | null = null;
   private editor: EditorScreen | null = null;
   private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | GearworksMakerScreen | null = null;
   private store = new SaveStore();
@@ -97,6 +100,8 @@ export class App {
     this.journey = null;
     this.appLab?.dispose();
     this.appLab = null;
+    this.creator?.dispose();
+    this.creator = null;
     this.editor?.dispose();
     this.editor = null;
     this.gearworks?.dispose();
@@ -533,8 +538,19 @@ export class App {
     this.appLab = new AppLabScreen(screen, this.store, {
       onBack: () => this.showSelect(),
       onOpenJourney: () => this.showJourney(),
+      onOpenKit: (kit) => this.showCreator(kit),
     });
     this.appLab.enter();
+  }
+
+  private showCreator(kit: AppKitDefinition): void {
+    this.clearHost();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-creator';
+    this.creator = new AppCreatorScreen(screen, kit, this.store, {
+      onExitToLab: () => this.showAppLab(),
+    });
+    this.creator.enter();
   }
 
   // ---------- learning garden (curriculum map) ----------

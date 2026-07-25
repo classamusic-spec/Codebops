@@ -15,6 +15,7 @@ import type {
   SerializableValue, MiniAppStateToken,
 } from './miniAppTypes';
 import type { CurriculumStageId, LearningPhase } from '../data/curriculum/stages';
+import { tokenWords } from '../data/app-lab/preparedTitleTokens';
 
 /** Bump when the on-disk shape changes; migrations key off it. */
 export const MINI_APP_SCHEMA_VERSION = 1;
@@ -181,8 +182,12 @@ export function statesUsed(project: MiniAppProject): MiniAppStateToken[] {
   return [...out];
 }
 
-/** A stable, human-readable title for reports and the library card. */
+/**
+ * The title as WORDS. Tokens are ids on disk, so anything showing a title
+ * to a person has to resolve them — printing the ids is a bug a child
+ * would see, not an internal detail.
+ */
 export function titleText(title: MiniAppTitle): string {
-  const words = title.tokens.join(' ');
+  const words = tokenWords(title.tokens).join(' ');
   return title.version && title.version > 1 ? `${words} ${title.version}` : words;
 }
