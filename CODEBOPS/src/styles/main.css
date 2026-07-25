@@ -183,20 +183,25 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   background: linear-gradient(180deg, #202f77 0%, var(--ink-800) 70%);
   border: 3px solid rgba(255,255,255,.14);
   border-radius: var(--r-xl);
-  padding: 10px 6px 12px;
+  /* Tight on purpose. The slot row and tile row bring their own padding,
+     so anything generous here is doubled — and every pixel spent on the
+     navy card is a pixel the 3D stage does not get. */
+  padding: 6px 6px 8px;
   box-shadow: 0 6px 0 var(--ink-line), var(--shadow-card);
   min-height: 0;
   min-width: 0;
 }
 .deck-tray {
   order: 2; display: flex; gap: 8px; flex-wrap: wrap;
-  justify-content: center; padding-top: 2px;
+  justify-content: center; padding-top: 0;
 }
 .deck-divider { display: none; }
 .deck-sequence {
   order: 1; display: flex; gap: 8px; min-width: 0;
   justify-content: center; align-items: center;
-  padding: 10px 2px 2px;
+  /* Top padding only, and only enough to clear the slot numbers that
+     hang above the row. */
+  padding: 9px 2px 0;
   overflow-x: auto; overflow-y: visible;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
@@ -416,6 +421,55 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   min-height: 44px;
 }
 .pm-exit, .pm-restart, .cr-tool, .cr-tool.save { min-width: 44px; }
+
+/* ============================================================
+   "Turn me sideways" — narrow portrait on a play screen (§14)
+
+   It never blocks: the card offers "Play like this" and the game is
+   already running underneath. This is an invitation, not a gate.
+   ============================================================ */
+.rotate-hint {
+  position: absolute; inset: 0; z-index: 60;
+  display: grid; place-items: center; padding: 24px;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(22,34,92,.82), rgba(10,16,44,.94));
+  animation: rhIn .28s var(--ease-out);
+}
+@keyframes rhIn { from { opacity: 0; } }
+.rh-card {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  max-width: 320px; text-align: center;
+  background: linear-gradient(180deg, #2b3d92, #1b2560);
+  border: 4px solid rgba(255,255,255,.28); border-radius: var(--r-xl);
+  padding: 22px 20px 18px;
+  box-shadow: 0 10px 0 rgba(10,16,44,.6), 0 20px 44px rgba(0,0,0,.45);
+}
+.rh-art { position: relative; display: grid; place-items: center; height: 78px; }
+.rh-phone { font-size: 54px; line-height: 1; animation: rhTilt 2.6s ease-in-out infinite; }
+@keyframes rhTilt {
+  0%, 40% { transform: rotate(0deg); }
+  70%, 100% { transform: rotate(-90deg); }
+}
+.rh-turn {
+  position: absolute; right: -6px; top: 2px; font-size: 24px; color: #8fe3ff;
+  animation: rhSpin 2.6s linear infinite;
+}
+@keyframes rhSpin { to { transform: rotate(360deg); } }
+.rh-card h2 {
+  margin: 0; color: #fff; font-family: var(--font-display); font-weight: 800;
+  font-size: 22px;
+}
+.rh-card p { margin: 0; color: #bcd4ff; font-weight: 800; font-size: 13.5px; line-height: 1.4; }
+.rh-anyway { min-height: 44px; margin-top: 4px; }
+
+/* Calm mode and reduce-motion: the phone tilts once and stops. */
+@media (prefers-reduced-motion: reduce) {
+  .rotate-hint, .rh-phone, .rh-turn { animation: none !important; }
+  .rh-phone { transform: rotate(-90deg); }
+}
+.calm-mode .rh-phone, .calm-mode .rh-turn { animation: none; }
+.calm-mode .rh-phone { transform: rotate(-90deg); }
+body.high-contrast .rh-card { border-color: #fff; }
+body.high-contrast .rh-card p { color: #fff; }
 
 /* Visible to a screen reader, invisible on screen (App Lab §14). */
 .sr-only {
@@ -1342,18 +1396,18 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   /* --- bottom deck: slots row over a wrapped tray, BOP pinned right --- */
   .bottom-deck { gap: 8px; left: max(8px, var(--sal)); right: max(8px, var(--sar)); bottom: max(8px, var(--sab)); }
   .deck-panel {
-    flex-direction: column; align-items: stretch; gap: 4px;
-    padding: 6px 8px 8px; min-height: 0; border-radius: 20px;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: 4px 8px 6px; min-height: 0; border-radius: 20px;
   }
   .deck-tray {
     order: 2; flex-wrap: wrap; justify-content: center; gap: 7px;
-    padding: 2px; overflow: visible;
+    padding: 0; overflow: visible;
   }
   .deck-divider { display: none; }
   .deck-sequence {
     order: 1; flex: 0 0 auto; justify-content: flex-start;
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
-    padding: 11px 8px 3px; gap: 7px;
+    padding: 10px 8px 0; gap: 7px;
     -webkit-overflow-scrolling: touch; touch-action: pan-x;
   }
   .deck-sequence::-webkit-scrollbar { display: none; }
@@ -1427,11 +1481,13 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .goal-visual { font-size: 20px; gap: 4px; }
   .goal-visual img { height: 24px; }
   .goal-text { font-size: 11px; text-align: left; }
-  .deck-panel { min-height: 0; padding: 6px 10px; }
+  .deck-panel { min-height: 0; padding: 4px 10px 5px; gap: 2px; }
+  .deck-sequence { padding: 9px 6px 0; }
+  .deck-tray { padding: 0; }
   .tile, .slot, .drag-ghost { width: 46px; height: 46px; }
   .tile .ico { font-size: 20px; }
   .tile .lbl { font-size: 7.5px; }
-  .bop-btn { height: 60px; font-size: 20px; }
+  .bop-btn { height: 52px; font-size: 19px; }
   .deck-tray, .deck-sequence { overflow-x: auto; scrollbar-width: none; }
   .deck-tray::-webkit-scrollbar, .deck-sequence::-webkit-scrollbar { display: none; }
   .dialog { padding: 14px 20px 16px; gap: 10px; max-height: 92vh; overflow-y: auto; }
@@ -2284,10 +2340,19 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
   padding: 4px 18px; border-radius: var(--r-pill); font-size: 14px;
   box-shadow: 0 4px 0 #5e2fa8; white-space: nowrap;
 }
+/* The visible pip stays small so it does not shout over the trail, but
+   the thing a finger has to hit is the full 44px (§14). Measured at 30x30
+   on every Gearworks screen before this. */
 .gw-trail-toggle {
-  position: absolute; top: 6px; right: 8px; width: 30px; height: 30px;
-  border-radius: 50%; background: rgba(42,24,69,.12); color: #4a3b6e;
-  font-size: 15px; font-weight: 900; display: grid; place-items: center;
+  position: absolute; top: 0; right: 0; width: 44px; height: 44px;
+  min-width: 44px; min-height: 44px; cursor: pointer; font: inherit;
+  background: none; border: none; padding: 0;
+  display: grid; place-items: center; color: #4a3b6e;
+  font-size: 15px; font-weight: 900;
+}
+.gw-trail-toggle::before {
+  content: ''; position: absolute; width: 30px; height: 30px;
+  border-radius: 50%; background: rgba(42,24,69,.12);
 }
 .gw-trail.collapsed .gw-trail-list, .gw-trail.collapsed .gw-trail-hint { display: none; }
 .gw-trail-list { display: flex; flex-direction: column; gap: 8px; max-height: 44vh; overflow-y: auto; }
@@ -4201,16 +4266,17 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 
   /* the deck: slots + tiles get the full width, BOP becomes a big
      thumb-friendly bar underneath instead of stealing a third of the row */
-  .bottom-deck { flex-direction: column; align-items: stretch; gap: 7px; }
+  .bottom-deck { flex-direction: column; align-items: stretch; gap: 5px; }
   /* the panel sizes to its content in a column — `flex:1 1 0` would
      collapse it to zero height and hide the tiles entirely */
   .deck-panel { flex: 0 0 auto; }
   .bop-wrap { width: 100%; }
   .bop-btn { width: 100%; }
-  .deck-panel { padding: 8px 5px 10px; gap: 5px; }
+  .deck-panel { padding: 4px 5px 6px; gap: 2px; }
   .tile, .slot, .drag-ghost { width: clamp(44px, 11.6vw, 54px); height: clamp(44px, 11.6vw, 54px); }
   .deck-tray { gap: 6px; }
   .deck-sequence { gap: 6px; justify-content: flex-start; }
-  .bop-btn { height: auto; min-height: 60px; font-size: 21px; padding: 0 14px; }
+  /* Still well over the 44px floor, 12px shorter than before. */
+  .bop-btn { height: auto; min-height: 52px; font-size: 20px; padding: 0 14px; }
   .bop-wrap { flex: 0 0 auto; }
 }

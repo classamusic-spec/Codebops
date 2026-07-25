@@ -29,6 +29,8 @@ import { GEARWORKS_SEQUENCE } from '../data/gearworks/world';
 import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
 import { applyAccessibility, stopSpeaking } from '../ui/a11y';
+import { watchOrientation } from '../ui/rotateHint';
+import type { RotateHintHandle } from '../ui/rotateHint';
 import { JourneyScreen } from './journeyScreen';
 import { LevelSelectScreen } from './levelSelectScreen';
 import { AppLabScreen } from './appLabScreen';
@@ -63,6 +65,7 @@ export class App {
   private gearworks: GearworksScreen | GearworksChainScreen | GearworksLoopScreen | GearworksSensorScreen | GearworksSorterScreen | GearworksCounterScreen | GearworksJamScreen | GearworksJobScreen | GearworksSignalScreen | GearworksDebugScreen | GearworksOrchestraScreen | GearworksLighthouseScreen | GearworksDeliveryScreen | GearworksPaintScreen | GearworksStoryScreen | GearworksMakerScreen | null = null;
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
+  private rotate: RotateHintHandle | null = null;
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -79,6 +82,10 @@ export class App {
    */
   private setNeedsLandscape(on: boolean): void {
     document.body.classList.toggle('playing', on);
+    // Every play screen routes through here, so this is the one place the
+    // "turn me sideways" offer needs to live (§14).
+    this.rotate?.dispose();
+    this.rotate = on ? watchOrientation(this.host) : null;
   }
 
   private clearHost(): void {

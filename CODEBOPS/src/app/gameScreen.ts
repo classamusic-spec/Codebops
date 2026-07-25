@@ -138,7 +138,7 @@ export class GameScreen {
     // monitors to portrait phones.
     {
       const l = this.level;
-      const pad = 0.65;
+      const pad = 0.3;
       const framePts = [
         this.world.cellToWorld(-pad, -pad),
         this.world.cellToWorld(l.cols - 1 + pad, -pad),
@@ -147,12 +147,20 @@ export class GameScreen {
       ];
       const center = this.world.cellToWorld((l.cols - 1) / 2, (l.rows - 1) / 2);
       center.y = 0.2;
-      // GlitchBop watches from a perch off the grid. Pull the framing most
-      // of the way toward that perch so the cast (and the scenery around
-      // it) reads as part of the scene instead of being cropped away.
+      // GlitchBop watches from a perch off the grid, and on most levels she
+      // IS the goal ("bring the fruit to our friend"), so she has to be in
+      // shot. This used to push the frame 82% of the way toward her and
+      // rely on the grid padding to get her the rest of the way — which
+      // meant her visibility was an accident of the margin. Measured: with
+      // the padding trimmed she fell off the canvas in three of five worlds
+      // in portrait. Naming her actual spot makes the frame exactly
+      // "the grid plus the friend", and nothing wider.
       const perch = this.world.mixyLookout().clone();
       perch.y = 0.2;
-      framePts.push(center.clone().lerp(perch, 0.82));
+      framePts.push(perch);
+      // Her sprite stands UP from that spot, so frame her head too — a
+      // ground point alone left the top of her cropped on a wide desktop.
+      framePts.push(perch.clone().setY(1.7));
       this.stage.frameArea(center, framePts);
     }
 
