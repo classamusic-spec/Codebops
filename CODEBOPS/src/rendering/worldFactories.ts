@@ -376,3 +376,131 @@ export function createSpores(count = 24, area = 13, color = '#c9a0ff'): THREE.Po
   pts.name = 'spores';
   return pts;
 }
+
+// =====================================================================
+// Life and wind
+//
+// The worlds were static except for clouds, water and a couple of birds,
+// which left the ground reading as a painted backdrop rather than a place.
+// Everything below is cheap on purpose: shared cached materials, no new
+// textures, and one update call per world that walks a flat list.
+// =====================================================================
+
+/** A fan of grass blades. Register it with a WindField to make it move. */
+export function createGrassTuft(scale = 1, color = '#4dbb5c'): THREE.Group {
+  const g = new THREE.Group();
+  const blades = 5 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < blades; i++) {
+    const h = (0.3 + Math.random() * 0.26) * scale;
+    const blade = mesh(
+      new THREE.CylinderGeometry(0.012 * scale, 0.032 * scale, h, 4),
+      toonMat(color), 0, h / 2, 0, false, false,
+    );
+    blade.rotation.z = (Math.random() - 0.5) * 0.5;
+    blade.position.x = (Math.random() - 0.5) * 0.3 * scale;
+    blade.position.z = (Math.random() - 0.5) * 0.3 * scale;
+    g.add(blade);
+  }
+  return g;
+}
+
+/**
+ * Flat ground detail — clover dots and pebbles lying ON the grass.
+ *
+ * This exists to answer a specific complaint: in portrait the camera shows
+ * a lot of ground, and empty ground is dead space however nice the green
+ * is. These are flat discs, so they cost almost nothing and never poke
+ * above the puzzle silhouette.
+ */
+export function createGroundDetail(count = 10, spread = 3, colors = ['#54c05f', '#68cf6c', '#9aa7bd']): THREE.Group {
+  const g = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const r = (0.09 + Math.random() * 0.16);
+    const disc = mesh(
+      new THREE.CircleGeometry(r, 7), toonMat(colors[i % colors.length]),
+      (Math.random() - 0.5) * spread, 0.012, (Math.random() - 0.5) * spread, false, false,
+    );
+    disc.rotation.x = -Math.PI / 2;
+    g.add(disc);
+  }
+  return g;
+}
+
+/** A butterfly: two wings that flap, flown on a figure-of-eight. */
+export function createButterfly(color = '#ff8fc0', scale = 1): THREE.Group {
+  const g = new THREE.Group();
+  const body = mesh(new THREE.CapsuleGeometry(0.03 * scale, 0.12 * scale, 3, 6), toonMat('#3b2f4a'), 0, 0, 0, false, false);
+  body.rotation.z = Math.PI / 2;
+  g.add(body);
+  for (const side of [-1, 1]) {
+    const wing = mesh(new THREE.SphereGeometry(0.13 * scale, 8, 6), toonMat(color), 0, 0, side * 0.1 * scale, false, false);
+    wing.scale.set(0.75, 0.28, 1);
+    wing.name = side < 0 ? 'wingL' : 'wingR';
+    g.add(wing);
+  }
+  g.userData.home = new THREE.Vector3();
+  return g;
+}
+
+/**
+ * Fly a butterfly on a lazy figure-of-eight around wherever it was placed.
+ * `span` is how far it wanders, so a butterfly over the puzzle can be kept
+ * on a short leash and never wander behind the deck.
+ */
+export function updateButterfly(
+  b: THREE.Group, elapsed: number, phase = 0, span = 1.1, speed = 0.6,
+): void {
+  const home = b.userData.home as THREE.Vector3;
+  const t = elapsed * speed + phase;
+  b.position.set(
+    home.x + Math.sin(t) * span,
+    home.y + Math.sin(t * 2.1) * span * 0.28,
+    home.z + Math.sin(t * 2) * span * 0.5,
+  );
+  // Face the direction of travel, roughly.
+  b.rotation.y = Math.cos(t) >= 0 ? -Math.PI / 2 : Math.PI / 2;
+  const flap = 0.6 + Math.sin(elapsed * 13 + phase) * 0.55;
+  const l = b.getObjectByName('wingL');
+  const r = b.getObjectByName('wingR');
+  if (l) l.rotation.x = -flap;
+  if (r) r.rotation.x = flap;
+}
+
+/**
+ * Wind, as one list rather than a special case per prop.
+ *
+ * Register a tree, bush or tuft with a strength, and every frame it leans
+ * on a shared sine with its own phase, so a whole meadow moves together
+ * without moving in lockstep. Calm mode passes strength 0 and the field
+ * goes still without any branching at the call sites.
+ */
+export class WindField {
+  private readonly items: Array<{
+    obj: THREE.Object3D; phase: number; amount: number; baseZ: number; baseX: number;
+  }> = [];
+
+  /** `amount` is radians of lean at full gust — 0.02 for a tree, 0.09 for grass. */
+  add(obj: THREE.Object3D, amount: number): void {
+    this.items.push({
+      obj, amount, phase: Math.random() * Math.PI * 2,
+      baseZ: obj.rotation.z, baseX: obj.rotation.x,
+    });
+  }
+
+  /** Register every direct child of a group, so a patch sways as individuals. */
+  addChildren(group: THREE.Object3D, amount: number): void {
+    for (const child of group.children) this.add(child, amount);
+  }
+
+  update(elapsed: number, strength = 1): void {
+    if (strength === 0) return;
+    // Two frequencies: a slow swell plus a faster flutter, which reads as
+    // wind rather than as a metronome.
+    const swell = Math.sin(elapsed * 0.42);
+    for (const it of this.items) {
+      const f = Math.sin(elapsed * 1.6 + it.phase) * 0.6 + swell * 0.4;
+      it.obj.rotation.z = it.baseZ + f * it.amount * strength;
+      it.obj.rotation.x = it.baseX + f * it.amount * 0.35 * strength;
+    }
+  }
+}

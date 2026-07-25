@@ -5,10 +5,13 @@
  */
 import * as THREE from 'three';
 import type { LevelDef } from '../data/schemas/level';
-import { createGroundTile, createBush, createSparkles, createSpores } from './worldFactories';
+import {
+  createGroundTile, createBush, createSparkles, createSpores,
+  createGrassTuft, createGroundDetail, createButterfly, updateButterfly, WindField,
+} from './worldFactories';
 
-export const TILE = 1.6;
-export const STEP = 1.72;
+export const TILE = 1.68;
+export const STEP = 1.78;
 export const TILE_TOP = 0.42;
 
 function toon(color: string, emissive = '#000000', intensity = 0): THREE.MeshToonMaterial {
@@ -118,11 +121,19 @@ export class PatternForest {
   private readonly giantCaps: THREE.Object3D[] = [];
   private readonly originX: number;
   private readonly originZ: number;
+  private readonly perch: THREE.Vector3;
+  private readonly moths: THREE.Group[] = [];
+  private readonly wind = new WindField();
 
   constructor(level: LevelDef) {
     this.group.name = 'pattern-forest';
     this.originX = -((level.cols - 1) * STEP) / 2;
     this.originZ = -((level.rows - 1) * STEP) / 2;
+    // Mixy's moon flower sits just off the board's right edge rather than at
+    // a fixed x=4.55, so the frame is the grove floor plus her and no more.
+    const boardRight = this.originX + (level.cols - 1) * STEP;
+    const boardMidZ = this.originZ + ((level.rows - 1) * STEP) / 2;
+    this.perch = new THREE.Vector3(boardRight + STEP * 0.94, 1.15, boardMidZ - STEP * 0.2);
 
     // Midnight forest floor
     const slab = mesh(new THREE.CylinderGeometry(16, 18, 0.6, 40), toon('#1d3b4a'), false, true);
@@ -175,9 +186,15 @@ export class PatternForest {
       this.group.add(ring);
     }
 
-    // Giant glowing mushrooms framing the grove
+    // ---- giant mushrooms: behind and beside, never in front ----
+    // The pair at z = +3.4 / +3.6 used to stand level with the board's front
+    // edge and crowd both lower corners. They are pushed back and out, and
+    // more added deeper so the grove reads dense without blocking the play.
     const giants: Array<[number, number, number, string]> = [
-      [-6.2, -2.6, 1.25, '#7d4fd4'], [6.4, -3.2, 1.5, '#4f8fd4'], [-5.6, 3.4, 0.95, '#d44f9e'], [6.0, 3.6, 1.1, '#7d4fd4'],
+      [-6.2, -2.6, 1.25, '#7d4fd4'], [this.perch.x + 2.2, -3.2, 1.5, '#4f8fd4'],
+      [-7.0, -6.2, 0.95, '#d44f9e'], [this.perch.x + 3.0, -7.0, 1.1, '#7d4fd4'],
+      [-4.4, -8.4, 0.8, '#4f8fd4'], [this.perch.x + 1.6, 1.9, 0.7, '#d44f9e'],
+      [-6.6, 1.2, 0.75, '#7d4fd4'],
     ];
     for (const [x, z, s, c] of giants) {
       const gm = giantMushroom(s, c);
@@ -189,8 +206,69 @@ export class PatternForest {
 
     // Sleeping moon flower where Mixy watches
     const moonCap = giantMushroom(0.55, '#d44f9e');
-    moonCap.position.set(4.55, 0, -1.4);
+    moonCap.position.set(this.perch.x, 0, this.perch.z);
     this.group.add(moonCap);
+
+    // ---- grove floor: moss tufts, night flowers and flat litter ----
+    // The forest floor is the darkest, emptiest part of the frame in
+    // portrait, so it gets the most dressing.
+    for (const [x, z, scale] of [
+      [-4.4, 3.6, 1.0], [-1.6, 4.6, 1.1], [2.1, 4.2, 0.95], [-6.0, 2.2, 0.9],
+      [4.4, 4.6, 1.0], [-2.9, 7.2, 1.05], [0.4, 6.8, 0.95], [-5.4, -3.0, 0.9],
+      [3.4, -5.4, 0.85], [-1.0, -6.6, 0.9],
+    ] as Array<[number, number, number]>) {
+      const tuft = createGrassTuft(scale, '#3f7f5c');
+      tuft.position.set(x, 0, z);
+      this.group.add(tuft);
+      this.wind.addChildren(tuft, 0.1);
+    }
+    for (const [x, z, scale] of [
+      [-5.2, 4.8, 0.85], [2.8, 6.0, 0.8], [-3.0, -4.4, 0.75], [5.0, 0.6, 0.7],
+    ] as Array<[number, number, number]>) {
+      const bush = createBush(scale);
+      bush.position.set(x, 0, z);
+      this.group.add(bush);
+      this.wind.add(bush, 0.03);
+    }
+    for (const [x, z, n, spread] of [
+      [-2.5, 4.8, 14, 6], [2.6, 5.4, 12, 5], [0, 7.6, 12, 8], [-5.6, -3.6, 9, 5],
+    ] as Array<[number, number, number, number]>) {
+      const detail = createGroundDetail(n, spread, ['#2e6b4d', '#3b7d5a', '#6f5f8c']);
+      detail.position.set(x, 0, z);
+      this.group.add(detail);
+    }
+
+    // Moths, the night-time butterfly.
+    for (const [x, y, z, color] of [
+      [-3.2, 1.0, 4.0, '#c9a0ff'], [2.4, 1.2, 3.6, '#9ad7ff'], [-5.6, 0.9, -1.0, '#ffd9a0'],
+    ] as Array<[number, number, number, string]>) {
+      const m = createButterfly(color, 0.95);
+      (m.userData.home as THREE.Vector3).set(x, y, z);
+      m.position.set(x, y, z);
+      this.moths.push(m);
+      this.group.add(m);
+    }
+
+    // ---- the portrait back-fill (see sparkleMeadow) ----
+    for (const [x, z, scale, color] of [
+      [-2.9, -5.6, 1.15, '#7d4fd4'], [0.6, -6.4, 1.3, '#4f8fd4'], [3.0, -5.4, 1.1, '#d44f9e'],
+      [-1.3, -8.0, 0.9, '#4f8fd4'], [2.1, -8.8, 0.85, '#7d4fd4'],
+    ] as Array<[number, number, number, string]>) {
+      const gm = giantMushroom(scale, color);
+      gm.position.set(x, 0, z);
+      const cap = gm.getObjectByName('gmCap');
+      if (cap) this.giantCaps.push(cap);
+      this.group.add(gm);
+    }
+    for (const [x, z, scale] of [
+      [-2.2, -4.2, 0.85], [1.8, -4.4, 0.8], [-0.3, -5.0, 0.75], [3.1, -3.6, 0.7],
+      [-2.7, 3.6, 0.8], [2.3, 3.8, 0.75], [-0.5, 8.2, 0.85], [2.8, 7.6, 0.7],
+    ] as Array<[number, number, number]>) {
+      const bush = createBush(scale);
+      bush.position.set(x, 0, z);
+      this.group.add(bush);
+      this.wind.add(bush, 0.03);
+    }
 
     // Fireflies — additive points that drift and twinkle
     const count = 70;
@@ -225,10 +303,14 @@ export class PatternForest {
 
   /** Mixy's lookout — atop the moon flower's cap. */
   mixyLookout(): THREE.Vector3 {
-    return new THREE.Vector3(4.55, 1.15, -1.4);
+    return this.perch.clone();
   }
 
-  update(dt: number, elapsed: number): void {
+  update(dt: number, elapsed: number, windStrength = 1): void {
+    this.wind.update(elapsed, windStrength);
+    if (windStrength > 0) {
+      this.moths.forEach((m, i) => updateButterfly(m, elapsed, i * 2.3, 1.1, 0.5));
+    }
     const attr = this.fireflies.geometry.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < attr.count; i++) {
       const bx = this.fireflyBase[i * 3];

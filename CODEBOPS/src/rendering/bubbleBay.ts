@@ -10,10 +10,11 @@ import { toonMat, waterTexture } from './materials/toon';
 import {
   createGroundTile, createCloud, createFlowerPatch, createRockCluster,
   createBird, updateBird, createFish,
+  createGrassTuft, createGroundDetail, createButterfly, updateButterfly, WindField,
 } from './worldFactories';
 
-export const TILE = 1.6;
-export const STEP = 1.72;
+export const TILE = 1.68;
+export const STEP = 1.78;
 export const TILE_TOP = 0.42;
 
 function mesh(
@@ -115,13 +116,23 @@ export class BubbleBay {
   private readonly clouds: THREE.Group[] = [];
   private readonly gulls: THREE.Group[] = [];
   private readonly fish: THREE.Group[] = [];
+  private readonly butterflies: THREE.Group[] = [];
+  private readonly buoys: THREE.Group[] = [];
+  private readonly wind = new WindField();
   private readonly originX: number;
   private readonly originZ: number;
+  /** The boat Mixy stands on, derived from the board — see sparkleMeadow. */
+  private readonly perch: THREE.Vector3;
 
   constructor(private readonly level: LevelDef) {
     this.group.name = 'bubble-bay';
-    this.originX = -1.2 - ((level.cols - 1) * STEP) / 2;
-    this.originZ = -0.3 - ((level.rows - 1) * STEP) / 2;
+    // Centred board: the room on the right now comes from moving the boat
+    // and the palms, not from shoving the puzzle left.
+    this.originX = -((level.cols - 1) * STEP) / 2;
+    this.originZ = -((level.rows - 1) * STEP) / 2;
+    const boardRight = this.originX + (level.cols - 1) * STEP;
+    const boardMidZ = this.originZ + ((level.rows - 1) * STEP) / 2;
+    this.perch = new THREE.Vector3(boardRight + STEP * 0.98, 0.72, boardMidZ + STEP * 0.28);
 
     // The bay itself — animated painted water
     this.waterTex = waterTexture();
@@ -170,32 +181,107 @@ export class BubbleBay {
     this.goalNode.position.set(gp.x, TILE_TOP, gp.z);
     this.group.add(this.goalNode);
 
-    // Palms framing the bay
-    const palmL = createPalm(1.15);
-    palmL.position.set(-5.6, 0, -1.6);
-    this.group.add(palmL);
-    const palmL2 = createPalm(0.85);
-    palmL2.position.set(-4.6, 0, 2.6);
-    palmL2.rotation.y = 1.2;
-    this.group.add(palmL2);
-    const palmR = createPalm(1.0);
-    palmR.position.set(6.0, 0, -2.4);
-    palmR.rotation.y = -0.6;
-    this.group.add(palmR);
+    // ---- palms: back and far sides, never in front of the board ----
+    // A palm used to stand at (-4.6, 2.6) — front-left, level with the
+    // island — which crowded the lower-left of the shot. Fronds now sit
+    // behind the island's front edge so the sandbar reads clear.
+    const palmSpecs: Array<[number, number, number, number]> = [
+      [-5.9, -1.6, 1.15, 0],
+      [-6.8, -5.2, 0.95, 0.8],
+      [-4.2, -7.4, 0.8, -0.4],
+      [this.perch.x + 2.1, -2.4, 1.0, -0.6],
+      [this.perch.x + 3.0, -6.4, 0.85, 0.3],
+      [-8.4, 1.4, 0.9, 1.5],
+    ];
+    for (const [x, z, scale, ry] of palmSpecs) {
+      const palm = createPalm(scale);
+      palm.position.set(x, 0, z);
+      palm.rotation.y = ry;
+      this.group.add(palm);
+      this.wind.add(palm, 0.03);
+    }
 
-    // Boat on the right
+    // Boat on the right — Mixy's deck, now beside the island
     this.boat = createBoat();
-    this.boat.position.set(4.25, -0.05, 2.55);
+    this.boat.position.set(this.perch.x, -0.05, this.perch.z);
     this.boat.rotation.y = -0.5;
     this.group.add(this.boat);
 
-    // Shells + rocks scattered on the sandbar
-    const shells = createRockCluster(3, 1.0);
-    shells.position.set(-4.9, 0, 4.2);
-    this.group.add(shells);
-    const flowers = createFlowerPatch(4, 1.2);
-    flowers.position.set(4.4, 0, -4.2);
-    this.group.add(flowers);
+    // ---- sandbar dressing: the anti-negative-space pass ----
+    for (const [x, z, n, spread] of [
+      [-4.9, 4.2, 3, 1.0], [3.9, 4.8, 3, 1.2], [-2.4, 6.6, 2, 0.9], [5.4, -1.4, 2, 0.8],
+    ] as Array<[number, number, number, number]>) {
+      const rocks = createRockCluster(n, spread);
+      rocks.position.set(x, 0, z);
+      this.group.add(rocks);
+    }
+    for (const [x, z, n] of [
+      [4.4, -4.2, 4], [-6.2, 2.6, 5], [-1.6, -6.8, 4],
+    ] as Array<[number, number, number]>) {
+      const flowers = createFlowerPatch(n, 1.4);
+      flowers.position.set(x, 0, z);
+      this.group.add(flowers);
+      this.wind.addChildren(flowers, 0.07);
+    }
+    // Seaweed, but only hugging the island — a tuft of grass standing in
+    // open water reads as a mistake, so these stay on the shallow shelf.
+    for (const [x, z, scale] of [
+      [-3.2, 2.6, 0.9], [1.9, 3.0, 0.95], [-2.0, -2.6, 0.85], [2.6, -2.4, 0.8],
+    ] as Array<[number, number, number]>) {
+      const weed = createGrassTuft(scale, '#4fae86');
+      weed.position.set(x, 0, z);
+      this.group.add(weed);
+      this.wind.addChildren(weed, 0.14);
+    }
+    // Foam and ripple flecks rather than pebbles: the same anti-empty pass
+    // as the meadow, in the only material the bay actually has.
+    for (const [x, z, n, spread] of [
+      [-2.5, 5.0, 16, 7], [2.6, 5.6, 14, 6], [0, 8.4, 14, 9], [-5.8, -3.4, 10, 6],
+      [4.4, 2.4, 10, 5],
+    ] as Array<[number, number, number, number]>) {
+      const foam = createGroundDetail(n, spread, ['#bfeaff', '#a8dff5', '#dff6ff']);
+      foam.position.set(x, 0.02, z);
+      this.group.add(foam);
+    }
+    // Mooring buoys bobbing in the shallows.
+    for (const [x, z, color] of [
+      [-3.9, 5.8, '#ff8f5f'], [3.4, 6.6, '#ffd23e'], [-1.4, 8.6, '#7dd7ff'],
+    ] as Array<[number, number, string]>) {
+      const buoy = new THREE.Group();
+      buoy.add(mesh(new THREE.SphereGeometry(0.3, 12, 10), toonMat(color), 0, 0.16, 0));
+      buoy.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.34, 6), toonMat('#3d4b63'), 0, 0.5, 0, false, false));
+      buoy.position.set(x, 0, z);
+      buoy.userData.bob = Math.random() * Math.PI * 2;
+      this.buoys.push(buoy);
+      this.group.add(buoy);
+    }
+
+    // ---- the portrait back-fill (see sparkleMeadow) ----
+    for (const [x, z, scale, ry] of [
+      [-2.8, -5.6, 1.05, 0.4], [0.6, -6.4, 1.15, -0.7], [3.0, -5.4, 1.0, 1.1],
+      [-1.3, -8.0, 0.85, 0.2], [2.1, -8.8, 0.8, -0.3],
+    ] as Array<[number, number, number, number]>) {
+      const palm = createPalm(scale);
+      palm.position.set(x, 0, z);
+      palm.rotation.y = ry;
+      this.group.add(palm);
+      this.wind.add(palm, 0.028);
+    }
+    for (const [x, z, n, spread] of [
+      [-2.2, -6.6, 3, 1.1], [1.8, -6.9, 2, 0.9], [-0.6, 8.0, 3, 1.2], [2.6, 7.4, 2, 1.0],
+    ] as Array<[number, number, number, number]>) {
+      const rocks = createRockCluster(n, spread);
+      rocks.position.set(x, 0, z);
+      this.group.add(rocks);
+    }
+    for (const [x, z, scale] of [
+      [-2.6, 3.6, 0.95], [2.2, 3.8, 0.9], [-0.4, 8.6, 1.0], [-2.9, -7.6, 0.85],
+    ] as Array<[number, number, number]>) {
+      const tuft = createGrassTuft(scale, '#7bc98f');
+      tuft.position.set(x, 0, z);
+      this.group.add(tuft);
+      this.wind.addChildren(tuft, 0.11);
+    }
 
     // Backdrop: tropical islets + clouds
     const islets: Array<[number, number, number, number, string]> = [
@@ -254,21 +340,45 @@ export class BubbleBay {
     fishB.userData = { cx: 3.2, cz: 5.4, r: 0.85, speed: -1.2, phase: 2.1 };
     this.fish.push(fishB);
     this.group.add(fishB);
+    const fishC = createFish('#ffd23e', 0.7);
+    fishC.userData = { cx: -0.4, cz: 6.6, r: 1.3, speed: 0.7, phase: 4.2 };
+    this.fish.push(fishC);
+    this.group.add(fishC);
+
+    // Dragonflies over the shallows — the beach equivalent of butterflies.
+    for (const [x, y, z, color] of [
+      [-3.0, 0.95, 3.8, '#7dd7ff'], [3.4, 1.1, 3.2, '#c79bff'],
+    ] as Array<[number, number, number, string]>) {
+      const b = createButterfly(color, 0.9);
+      (b.userData.home as THREE.Vector3).set(x, y, z);
+      b.position.set(x, y, z);
+      this.butterflies.push(b);
+      this.group.add(b);
+    }
   }
 
   cellToWorld(col: number, row: number): THREE.Vector3 {
     return new THREE.Vector3(this.originX + col * STEP, TILE_TOP, this.originZ + row * STEP);
   }
 
-  /** Mixy's lookout — the boat deck. */
+  /** Mixy's lookout — the boat deck, right of the board and always in frame. */
   mixyLookout(): THREE.Vector3 {
-    return new THREE.Vector3(4.25, 0.72, 2.55);
+    return this.perch.clone();
   }
 
-  update(dt: number, elapsed: number): void {
+  update(dt: number, elapsed: number, windStrength = 1): void {
     this.waterTex.offset.x = (elapsed * 0.02) % 1;
     this.waterTex.offset.y = (elapsed * 0.03) % 1;
     this.boat.position.y = -0.05 + Math.sin(elapsed * 1.1) * 0.07;
+    this.wind.update(elapsed, windStrength);
+    if (windStrength > 0) {
+      this.butterflies.forEach((b, i) => updateButterfly(b, elapsed, i * 2.6, 1.15, 0.62));
+    }
+    for (const buoy of this.buoys) {
+      const phase = buoy.userData.bob as number;
+      buoy.position.y = Math.sin(elapsed * 1.3 + phase) * 0.08;
+      buoy.rotation.z = Math.sin(elapsed * 1.1 + phase) * 0.14;
+    }
     this.boat.rotation.z = Math.sin(elapsed * 0.9) * 0.03;
     for (let i = 0; i < this.clouds.length; i++) {
       const c = this.clouds[i];

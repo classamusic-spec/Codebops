@@ -239,7 +239,9 @@ export class GameScreen {
 
     // --- tick ---
     const offTick = this.stage.onTick((dt, elapsed) => {
-      this.world.update(dt, elapsed);
+      // Calm mode stills the wind along with everything else — the world's
+      // update takes the strength rather than each prop checking a setting.
+      this.world.update(dt, elapsed, this.store.settings.calmMode ? 0 : 1);
       this.zip.update(dt, elapsed);
       this.bolt?.update(dt, elapsed);
       this.mixy.update(dt, elapsed);

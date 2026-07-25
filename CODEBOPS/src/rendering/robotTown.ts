@@ -5,10 +5,13 @@
  */
 import * as THREE from 'three';
 import type { LevelDef } from '../data/schemas/level';
-import { createDrone, TILE_THICK } from './worldFactories';
+import {
+  createDrone, TILE_THICK,
+  createGrassTuft, createGroundDetail, createButterfly, updateButterfly, WindField,
+} from './worldFactories';
 
-export const TILE = 1.6;
-export const STEP = 1.72;
+export const TILE = 1.68;
+export const STEP = 1.78;
 export const TILE_TOP = 0.42;
 
 function toon(color: string, emissive = '#000000', intensity = 0): THREE.MeshToonMaterial {
@@ -124,11 +127,18 @@ export class RobotTown {
   private beaconMat: THREE.MeshToonMaterial | null = null;
   private readonly originX: number;
   private readonly originZ: number;
+  private readonly perchPos: THREE.Vector3;
+  private readonly sparks: THREE.Group[] = [];
+  private readonly wind = new WindField();
 
   constructor(level: LevelDef) {
     this.group.name = 'robot-town';
     this.originX = -((level.cols - 1) * STEP) / 2;
     this.originZ = -((level.rows - 1) * STEP) / 2;
+    // Mixy's rooftop, derived from the board instead of a fixed x = 4.9.
+    const boardRight = this.originX + (level.cols - 1) * STEP;
+    const boardMidZ = this.originZ + ((level.rows - 1) * STEP) / 2;
+    this.perchPos = new THREE.Vector3(boardRight + STEP * 0.98, 1.15, boardMidZ - STEP * 0.24);
 
     // City floor
     const slab = mesh(new THREE.CylinderGeometry(16, 18, 0.6, 40), toon('#232f47'), false, true);
@@ -231,18 +241,101 @@ export class RobotTown {
       this.group.add(gear);
     }
 
-    // Mixy's lookout — a rooftop perch
+    // Mixy's lookout — a rooftop perch beside the board
+    const px = this.perchPos.x;
+    const pz = this.perchPos.z;
     const perch = mesh(new THREE.BoxGeometry(1.4, 1.1, 1.4), toon('#3d4b63'));
-    perch.position.set(4.9, 0.55, -1.8);
+    perch.position.set(px, 0.55, pz);
     this.group.add(perch);
     const antenna = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), toon('#9fb4d8'));
-    antenna.position.set(4.9, 1.55, -1.8);
+    antenna.position.set(px, 1.55, pz);
     this.group.add(antenna);
     const beaconMat = toon('#ff5fa2', '#ff5fa2', 1.2);
     const beacon = mesh(new THREE.SphereGeometry(0.09, 8, 6), beaconMat, false, false);
-    beacon.position.set(4.9, 2.0, -1.8);
+    beacon.position.set(px, 2.0, pz);
     this.beaconMat = beaconMat;
     this.group.add(beacon);
+
+    // ---- street dressing: planters, cable spools, floor markings ----
+    // A robot city still needs life in the foreground; the empty plaza floor
+    // was the largest dead area in portrait.
+    for (const [x, z, scale] of [
+      [-4.6, 3.4, 1.0], [-1.4, 4.6, 1.05], [2.4, 4.2, 0.95], [-6.2, 2.0, 0.9],
+      [px + 0.6, 4.4, 1.0], [-3.0, 7.0, 1.0], [0.6, 6.8, 0.95],
+    ] as Array<[number, number, number]>) {
+      // Planters: a metal ring with a tuft of green inside, so the city has
+      // something growing in it.
+      const ring = mesh(new THREE.CylinderGeometry(0.42 * scale, 0.46 * scale, 0.24, 12), toon('#4a5a75'));
+      ring.position.set(x, 0.12, z);
+      this.group.add(ring);
+      const tuft = createGrassTuft(scale * 0.9, '#5cc47a');
+      tuft.position.set(x, 0.24, z);
+      this.group.add(tuft);
+      this.wind.addChildren(tuft, 0.09);
+    }
+    for (const [x, z, r] of [
+      [-5.6, 5.2, 0.5], [3.8, 6.0, 0.42], [px + 1.9, 1.4, 0.46], [-7.2, -1.4, 0.5],
+    ] as Array<[number, number, number]>) {
+      // Cable spools lying about the yard.
+      const spool = mesh(new THREE.CylinderGeometry(r, r, 0.3, 14), toon('#6b7794'));
+      spool.rotation.z = Math.PI / 2;
+      spool.position.set(x, r, z);
+      this.group.add(spool);
+    }
+    for (const [x, z, n, spread] of [
+      [-2.5, 4.8, 14, 6], [2.8, 5.6, 12, 5], [0, 7.8, 12, 8], [-5.8, -3.4, 9, 5],
+    ] as Array<[number, number, number, number]>) {
+      const detail = createGroundDetail(n, spread, ['#55627d', '#63708c', '#8b96ad']);
+      detail.position.set(x, 0, z);
+      this.group.add(detail);
+    }
+    // ---- the portrait back-fill ----
+    // A phone in portrait fits the board by WIDTH, so anything past about
+    // x = ±3.5 is off-frame and the empty bands are above and below. These
+    // crates and barriers sit inside that column.
+    for (const [x, z, w, hh] of [
+      [-2.6, -4.6, 1.2, 1.4], [1.9, -5.0, 1.0, 1.8], [-0.4, -6.2, 1.5, 1.2],
+      [2.9, -6.8, 1.1, 1.5], [-2.4, -7.6, 1.3, 2.0], [0.8, -8.6, 1.2, 1.6],
+    ] as Array<[number, number, number, number]>) {
+      const crate = mesh(new THREE.BoxGeometry(w, hh, w), toon(hh > 1.1 ? '#3a4863' : '#46557a'));
+      crate.position.set(x, hh / 2, z);
+      crate.rotation.y = (x % 1) * 0.6;
+      this.group.add(crate);
+      // A lit strip on the front face, so a crate reads as machinery.
+      const strip = mesh(new THREE.BoxGeometry(w * 0.7, 0.06, 0.03), toon('#5fd0ff', '#5fd0ff', 0.9), false, false);
+      strip.position.set(x, hh * 0.72, z + w / 2 + 0.02);
+      strip.rotation.y = crate.rotation.y;
+      this.group.add(strip);
+    }
+    for (const [x, z] of [
+      [-2.7, 3.6], [2.3, 3.9], [-0.5, 8.4], [2.9, 7.8], [-2.9, 6.4], [0.9, 5.6],
+    ] as Array<[number, number]>) {
+      // Low barriers with a hazard stripe. Seen from a high three-quarter
+      // angle a 0.34-tall bar reads as tape stuck to the floor, so these are
+      // taller and carry a dark cap that catches the light.
+      const bar = mesh(new THREE.BoxGeometry(1.5, 0.62, 0.24), toon('#ffb703'));
+      bar.position.set(x, 0.62, z);
+      this.group.add(bar);
+      const cap = mesh(new THREE.BoxGeometry(1.62, 0.12, 0.34), toon('#3a4863'));
+      cap.position.set(x, 0.98, z);
+      this.group.add(cap);
+      for (const side of [-0.62, 0.62]) {
+        const leg = mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.62, 6), toon('#3a4863'));
+        leg.position.set(x + side, 0.31, z);
+        this.group.add(leg);
+      }
+    }
+
+    // Little hover-sparks instead of butterflies — same flight, city clothes.
+    for (const [x, y, z, color] of [
+      [-3.2, 1.1, 3.8, '#7dd7ff'], [2.6, 1.3, 3.4, '#ffd23e'],
+    ] as Array<[number, number, number, string]>) {
+      const sp = createButterfly(color, 0.7);
+      (sp.userData.home as THREE.Vector3).set(x, y, z);
+      sp.position.set(x, y, z);
+      this.sparks.push(sp);
+      this.group.add(sp);
+    }
 
     // Two patrol drones circling the board
     const droneA = createDrone(1);
@@ -261,10 +354,14 @@ export class RobotTown {
 
   /** Mixy's rooftop perch. */
   mixyLookout(): THREE.Vector3 {
-    return new THREE.Vector3(4.9, 1.15, -1.8);
+    return this.perchPos.clone();
   }
 
-  update(dt: number, elapsed: number): void {
+  update(dt: number, elapsed: number, windStrength = 1): void {
+    this.wind.update(elapsed, windStrength);
+    if (windStrength > 0) {
+      this.sparks.forEach((sp, i) => updateButterfly(sp, elapsed, i * 2.7, 1.0, 0.8));
+    }
     for (let i = 0; i < this.gears.length; i++) {
       this.gears[i].rotation.z += dt * (i % 2 === 0 ? 0.5 : -0.35);
     }

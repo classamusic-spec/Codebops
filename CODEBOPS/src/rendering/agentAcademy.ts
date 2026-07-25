@@ -6,10 +6,14 @@
 import * as THREE from 'three';
 import type { LevelDef } from '../data/schemas/level';
 import { createMushroom } from './patternForest';
-import { TILE_THICK } from './worldFactories';
+import {
+  TILE_THICK,
+  createGrassTuft, createGroundDetail, createFlowerPatch, createBush,
+  createButterfly, updateButterfly, WindField,
+} from './worldFactories';
 
-export const TILE = 1.6;
-export const STEP = 1.72;
+export const TILE = 1.68;
+export const STEP = 1.78;
 export const TILE_TOP = 0.42;
 
 function toon(color: string, emissive = '#000000', intensity = 0): THREE.MeshToonMaterial {
@@ -146,11 +150,19 @@ export class AgentAcademy {
   private flags: THREE.Object3D[] = [];
   private readonly originX: number;
   private readonly originZ: number;
+  private readonly perch: THREE.Vector3;
+  private readonly butterflies: THREE.Group[] = [];
+  private readonly wind = new WindField();
 
   constructor(level: LevelDef) {
     this.group.name = 'agent-academy';
     this.originX = -((level.cols - 1) * STEP) / 2;
     this.originZ = -((level.rows - 1) * STEP) / 2;
+    // The hall steps Mixy waits on used to sit at a fixed (5.2, -5.6), which
+    // pushed the frame out on BOTH axes. Derived from the board instead.
+    const boardRight = this.originX + (level.cols - 1) * STEP;
+    const boardMidZ = this.originZ + ((level.rows - 1) * STEP) / 2;
+    this.perch = new THREE.Vector3(boardRight + STEP * 1.0, 0.55, boardMidZ - STEP * 0.5);
 
     // Lawn + running-track ring around the courtyard
     const lawn = mesh(new THREE.CylinderGeometry(16, 18, 0.6, 40), toon('#7cc25e'), false, true);
@@ -225,10 +237,81 @@ export class AgentAcademy {
       this.group.add(flag);
     }
 
-    // Mixy's lookout — on the hall steps
+    // Mixy's lookout — a set of hall steps beside the courtyard
     const steps = mesh(new THREE.BoxGeometry(2.2, 0.5, 1), toon('#e8d5ae'), false, false);
-    steps.position.set(5.2, 0.25, -5.6);
+    steps.position.set(this.perch.x, 0.25, this.perch.z);
     this.group.add(steps);
+
+    // ---- campus lawn: hedges, flower beds and turf detail ----
+    // The lawn ring around the courtyard was flat colour; in portrait it was
+    // the biggest empty band on the screen.
+    for (const [x, z, scale] of [
+      [-5.6, 3.6, 0.95], [-2.4, 5.4, 0.85], [2.2, 5.2, 0.9], [-6.8, 0.4, 1.0],
+      [this.perch.x + 1.8, 2.0, 0.9], [-4.0, -6.4, 0.85], [this.perch.x + 2.4, -4.2, 0.8],
+    ] as Array<[number, number, number]>) {
+      const bush = createBush(scale);
+      bush.position.set(x, 0, z);
+      this.group.add(bush);
+      this.wind.add(bush, 0.03);
+    }
+    for (const [x, z, n] of [
+      [-4.4, 4.8, 6], [3.0, 4.4, 5], [-6.2, 2.4, 5], [0.4, 7.0, 6], [-2.0, -6.0, 4],
+    ] as Array<[number, number, number]>) {
+      const bed = createFlowerPatch(n, 1.5);
+      bed.position.set(x, 0, z);
+      this.group.add(bed);
+      this.wind.addChildren(bed, 0.07);
+    }
+    for (const [x, z, scale] of [
+      [-3.4, 3.2, 1.0], [1.6, 4.0, 1.05], [-5.0, 5.0, 0.95], [4.2, 3.0, 0.9],
+      [-1.2, 7.4, 1.0], [3.2, -5.2, 0.85], [-7.0, -2.6, 0.95],
+    ] as Array<[number, number, number]>) {
+      const tuft = createGrassTuft(scale, '#6ec96f');
+      tuft.position.set(x, 0, z);
+      this.group.add(tuft);
+      this.wind.addChildren(tuft, 0.1);
+    }
+    for (const [x, z, n, spread] of [
+      [-2.5, 5.0, 14, 6], [2.8, 5.6, 12, 5], [0, 7.8, 12, 8], [-5.8, -3.6, 9, 5],
+    ] as Array<[number, number, number, number]>) {
+      const detail = createGroundDetail(n, spread, ['#63c86a', '#77d67c', '#d8cba6']);
+      detail.position.set(x, 0, z);
+      this.group.add(detail);
+    }
+    // ---- the portrait back-fill ----
+    // Portrait fits the courtyard by WIDTH, so the bands above and below are
+    // what need filling; x beyond about ±3.5 never shows there.
+    for (const [x, z, scale] of [
+      [-2.6, -4.6, 1.15], [1.9, -5.0, 1.05], [-0.4, -6.0, 1.25],
+      [2.8, -6.6, 1.0], [-2.4, -7.4, 1.1], [0.9, -8.2, 0.95],
+    ] as Array<[number, number, number]>) {
+      // Trimmed topiary: taller than a bush, still behind the board.
+      const trunk = mesh(new THREE.CylinderGeometry(0.1 * scale, 0.13 * scale, 0.7 * scale, 8), toon('#8d5a2b'));
+      trunk.position.set(x, 0.35 * scale, z);
+      this.group.add(trunk);
+      const ball = mesh(new THREE.SphereGeometry(0.52 * scale, 14, 12), toon('#3faf5a'));
+      ball.position.set(x, 1.05 * scale, z);
+      this.group.add(ball);
+      this.wind.add(ball, 0.02);
+    }
+    for (const [x, z, scale] of [
+      [-2.7, 3.8, 0.85], [2.3, 4.0, 0.8], [-0.5, 8.4, 0.9], [2.9, 7.8, 0.75],
+    ] as Array<[number, number, number]>) {
+      const bush = createBush(scale);
+      bush.position.set(x, 0, z);
+      this.group.add(bush);
+      this.wind.add(bush, 0.03);
+    }
+
+    for (const [x, y, z, color] of [
+      [-3.0, 1.0, 4.2, '#ffd23e'], [2.8, 1.15, 3.8, '#ff8fc0'], [-5.6, 0.9, -1.4, '#7dd7ff'],
+    ] as Array<[number, number, number, string]>) {
+      const b = createButterfly(color, 1);
+      (b.userData.home as THREE.Vector3).set(x, y, z);
+      b.position.set(x, y, z);
+      this.butterflies.push(b);
+      this.group.add(b);
+    }
 
     // Distant birds
     for (let i = 0; i < 2; i++) {
@@ -254,10 +337,14 @@ export class AgentAcademy {
 
   /** Mixy watches from the hall steps. */
   mixyLookout(): THREE.Vector3 {
-    return new THREE.Vector3(5.2, 0.55, -5.6);
+    return this.perch.clone();
   }
 
-  update(dt: number, elapsed: number): void {
+  update(dt: number, elapsed: number, windStrength = 1): void {
+    this.wind.update(elapsed, windStrength);
+    if (windStrength > 0) {
+      this.butterflies.forEach((b, i) => updateButterfly(b, elapsed, i * 2.4, 1.15, 0.58));
+    }
     for (const s of this.goalStars) {
       s.rotation.y += dt * 1.8;
       s.position.y = 1.05 + Math.sin(elapsed * 2.2) * 0.07;
