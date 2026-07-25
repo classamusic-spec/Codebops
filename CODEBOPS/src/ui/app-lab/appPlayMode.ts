@@ -22,6 +22,7 @@ import {
 } from '../../creator/miniAppRuntime';
 import { approvedAsset, APP_LAB_THEMES } from '../../data/app-lab/approvedAssets';
 import { approvedSound, preparedPhrase } from '../../data/app-lab/approvedSounds';
+import type { PreparedPhraseId } from '../../creator/miniAppTypes';
 import { sceneLayout } from '../../data/app-lab/sceneLayouts';
 
 /** Milliseconds per beat. Calm mode slows everything down together. */
@@ -46,6 +47,14 @@ export class AppPlayMode {
   private disposed = false;
   private lastEvents: readonly MiniAppExecutionEvent[] = [];
   private pieceNodes = new Map<string, HTMLElement>();
+  /** The thing a child has picked up, waiting for somewhere to put it. */
+  private carrying: string | null = null;
+  /** Components a rule says can be dropped somewhere. */
+  private draggable = new Set<string>();
+  /** Reserved for kits that name explicit drop zones. */
+  private readonly dropTargets = new Set<string>();
+  /** Approvals already given this run, replayed so the run is reproducible. */
+  private approvals: boolean[] = [];
 
   constructor(
     parent: HTMLElement,
@@ -102,6 +111,11 @@ export class AppPlayMode {
     board.style.setProperty('--rows', String(layout.rows));
 
     const canTap = new Set(tappableComponents(this.project, scene.id));
+    this.draggable = new Set(
+      this.project.scripts
+        .filter((sc) => sc.trigger.kind === 'onDrop')
+        .map((sc) => (sc.trigger as { targetId: string }).targetId),
+    );
 
     for (const component of scene.components) {
       const rt = this.state.components[component.id];
@@ -122,10 +136,48 @@ export class AppPlayMode {
       node.dataset.state = rt.state;
       if (rt.color) node.dataset.color = rt.color;
       if (rt.lit) node.classList.add('lit');
-      node.setAttribute('aria-label', taught
-        ? component.accessibilityLabel
-        : `${component.accessibilityLabel} — nothing taught yet`);
-      node.addEventListener('click', () => this.fire({ kind: 'tap', componentId: component.id }));
+      // Sorting kits are tap-to-pick-up, tap-to-drop — never a precision
+      // drag (§26). Anything with a drop rule can be carried; anything at
+      // all can be dropped onto.
+      const carryable = this.dropTargets.has(component.id) === false && this.draggable.has(component.id);
+      if (this.carrying === component.id) node.classList.add('carrying');
+      else if (this.carrying && component.id !== this.carrying) node.classList.add('droppable');
+
+      // The asset label may already say "— tap it"; build from the plain
+      // name so a label never reads "Zip — tap it — nothing taught yet".
+      const plain = approvedAsset(component.assetId)?.label ?? component.accessibilityLabel;
+      node.setAttribute('aria-label', this.carrying === component.id
+        ? `${plain} — picked up. Tap where it should go.`
+        : this.carrying
+          ? `Put it on ${plain}`
+          : carryable
+            ? `${plain} — tap to pick it up`
+            : taught
+              ? `${plain} — tap it`
+              : `${plain} — nothing taught yet`);
+
+      node.addEventListener('click', () => {
+        if (this.carrying && this.carrying !== component.id) {
+          const item = this.carrying;
+          this.carrying = null;
+          sharedSfx.play('place');
+          this.fire({ kind: 'drop', componentId: item, ontoId: component.id });
+          return;
+        }
+        if (this.carrying === component.id) {
+          this.carrying = null;
+          sharedSfx.play('remove');
+          this.renderScene();
+          return;
+        }
+        if (carryable) {
+          this.carrying = component.id;
+          sharedSfx.play('tap');
+          this.renderScene();
+          return;
+        }
+        this.fire({ kind: 'tap', componentId: component.id });
+      });
 
       el('span', 'pm-piece-glyph', node, asset?.glyph ?? '❔');
       if (rt.saying) {
@@ -136,6 +188,29 @@ export class AppPlayMode {
       }
       this.pieceNodes.set(component.id, node);
     }
+
+    // A variable is always something a child can SEE (spec §12). If the
+    // scene has a counter or memory piece the number rides on it; if not,
+    // it gets its own readout rather than being invisible.
+    const holders = scene.components.filter(
+      (c) => c.type === 'counter' || c.type === 'memoryContainer');
+    let loose: HTMLElement | null = null;
+    this.project.variables.forEach((v, i) => {
+      const value = this.state.variables[v.id];
+      if (typeof value !== 'number') return;
+      const holder = holders[i] ?? holders[0];
+      const node = holder ? this.pieceNodes.get(holder.id) : null;
+      if (node) {
+        const badge = el('span', 'pm-count', node, String(value));
+        badge.setAttribute('aria-label', `${v.accessibilityLabel}: ${value}`);
+        return;
+      }
+      loose = loose ?? el('div', 'pm-readouts', this.stage);
+      const chip = el('div', 'pm-readout', loose);
+      chip.setAttribute('aria-label', `${v.accessibilityLabel}: ${value}`);
+      el('span', 'pm-readout-name', chip, v.accessibilityLabel);
+      el('span', 'pm-readout-value', chip, String(value));
+    });
 
     if (this.state.won) {
       const win = el('div', 'pm-win', this.stage);
@@ -148,7 +223,48 @@ export class AppPlayMode {
 
   private fire(cause: TriggerCause): void {
     if (this.running || this.disposed) return;
-    const result = run(this.project, cause, this.state);
+    this.approvals = [];
+    this.runFrom(cause);
+  }
+
+  /**
+   * Run a cause, pausing at any Ask First gate. Answering re-runs from the
+   * same starting state with the answer recorded, which reproduces the run
+   * exactly and then carries on — no callbacks held inside the runtime.
+   */
+  private runFrom(cause: TriggerCause): void {
+    const before = this.state;
+    const result = run(this.project, cause, before, { approvals: this.approvals });
+    if (result.awaitingApproval) {
+      const ask = result.awaitingApproval;
+      this.askPermission(ask.phrase, (yes) => {
+        this.approvals = [...this.approvals, yes];
+        this.state = before;
+        this.runFrom(cause);
+      });
+      return;
+    }
+    this.finishRun(cause, result);
+  }
+
+  private askPermission(phrase: PreparedPhraseId, decide: (yes: boolean) => void): void {
+    const scrim = el('div', 'pm-ask-scrim', this.root);
+    const box = el('div', 'pm-ask', scrim);
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'Your helper is asking first');
+    el('div', 'pm-ask-glyph', box, '🙋');
+    el('p', 'pm-ask-text', box, `Your helper asks: "${preparedPhrase(phrase)?.text ?? 'May I?'}"`);
+    const row = el('div', 'pm-ask-row', box);
+    const yes = el('button', 'btn-play small', row, 'Yes, go ahead') as HTMLButtonElement;
+    yes.type = 'button';
+    yes.addEventListener('click', () => { sharedSfx.play('tap'); scrim.remove(); decide(true); });
+    const no = el('button', 'mini-btn purple', row, 'Not this time') as HTMLButtonElement;
+    no.type = 'button';
+    no.addEventListener('click', () => { sharedSfx.play('tap'); scrim.remove(); decide(false); });
+    yes.focus();
+  }
+
+  private finishRun(cause: TriggerCause, result: ReturnType<typeof run>): void {
     this.lastEvents = result.events;
     this.events.onRan?.({ events: result.events, triggered: result.triggered });
 
@@ -173,8 +289,19 @@ export class AppPlayMode {
     this.running = true;
     for (const event of events) {
       if (this.disposed) return;
+      const sceneChanged = event.stateBefore.sceneId !== event.stateAfter.sceneId;
       this.state = event.stateAfter;
       this.renderScene();
+      if (sceneChanged) {
+        this.stage.classList.remove('pm-scene-in');
+        void this.stage.offsetWidth;
+        this.stage.classList.add('pm-scene-in');
+        // A new scene is its own beginning.
+        const sceneId = this.state.sceneId;
+        this.timers.push(window.setTimeout(() => {
+          if (!this.disposed && !this.running) this.fire({ kind: 'sceneStart', sceneId });
+        }, this.beat()));
+      }
       this.flash(event);
       if (event.sound) sharedSfx.play(approvedSound(event.sound)?.voice ?? 'tap');
       if (event.outcome.kind !== 'done') {

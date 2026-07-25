@@ -14,6 +14,7 @@ import type {
 } from './miniAppTypes';
 import {
   MINI_APP_TYPES, flattenCommands, commandDepth, conditionRefs, triggerRefs, nestedCommands,
+  DROP_TARGET_REF,
 } from './miniAppTypes';
 import type { MiniAppProject, MiniAppScript } from './miniAppProject';
 import { MINI_APP_SCHEMA_VERSION, allComponents } from './miniAppProject';
@@ -311,6 +312,7 @@ function validateCommandRefs(
   template: MiniAppTemplateDefinition, refs: RefSets, issues: MiniAppIssue[],
 ): void {
   const needComponent = (id: string): void => {
+    if (id === DROP_TARGET_REF) return; // resolved at run time from the drop
     if (!refs.componentIds.has(id)) issues.push(err(at, `names unknown component "${id}"`));
   };
   const needVariable = (id: string): void => {
@@ -369,6 +371,7 @@ function validateCondition(
   }
   const r = conditionRefs(test);
   for (const id of r.components) {
+    if (id === DROP_TARGET_REF) continue; // resolved at run time from the drop
     if (!refs.componentIds.has(id)) issues.push(err(at, `question names unknown component "${id}"`));
   }
   for (const id of r.variables) {

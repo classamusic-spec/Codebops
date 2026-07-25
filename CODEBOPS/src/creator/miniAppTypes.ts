@@ -90,6 +90,15 @@ export type PreparedPhraseId =
 
 /** A reference to something the project already contains. */
 export type ComponentRef = string;
+
+/**
+ * The one reserved component reference: "whatever this was just dropped
+ * on". Sorting is about where a thing LANDS, and without this a rule could
+ * only ever ask about one basket by name — so a red berry dropped in the
+ * blue basket would still score. Resolved by the runtime from the drop
+ * itself; accepted by the validator; never shown to a child as an id.
+ */
+export const DROP_TARGET_REF = '@dropped-on';
 export type VariableRef = string;
 export type JobRef = string;
 export type SceneRef = string;

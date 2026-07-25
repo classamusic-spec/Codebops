@@ -3177,6 +3177,51 @@ body.calm-mode .title-logo-art, body.calm-mode .title-logo-art svg { animation: 
 .pm-win-glyph { font-size: clamp(40px, 9vw, 72px); }
 @keyframes pmWinIn { from { opacity: 0; transform: scale(.8); } }
 
+.pm-piece.carrying { transform: scale(1.14); z-index: 4; }
+.pm-piece.carrying::after {
+  content: ''; position: absolute; inset: 0;
+  border: 4px solid #ffcf3e; border-radius: 22px;
+  box-shadow: 0 0 18px rgba(255,207,62,.6);
+}
+.pm-piece.droppable::after {
+  content: ''; position: absolute; inset: 0;
+  border: 3px dashed rgba(255,255,255,.85); border-radius: 22px;
+  background: rgba(255,255,255,.14);
+}
+.pm-count {
+  position: absolute; top: -8px; right: -10px;
+  min-width: 26px; padding: 1px 6px; border-radius: 999px;
+  background: #2a2350; color: #fff7e2; border: 3px solid #fff7e2;
+  font-family: var(--font-display); font-weight: 800; font-size: 13px;
+}
+@keyframes pmSceneIn { from { opacity: .25; transform: scale(1.03); } }
+.pm-scene-in { animation: pmSceneIn .34s ease; }
+
+.pm-readouts {
+  position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 3;
+}
+.pm-readout {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #2a2350; color: #fff7e2; border: 3px solid #fff7e2;
+  border-radius: 999px; padding: 3px 11px;
+}
+.pm-readout-name { font-weight: 800; font-size: 11px; }
+.pm-readout-value { font-family: var(--font-display); font-weight: 800; font-size: 15px; }
+
+.pm-ask-scrim {
+  position: absolute; inset: 0; z-index: 20; display: grid; place-items: center;
+  background: rgba(13,20,55,.72);
+}
+.pm-ask {
+  background: linear-gradient(180deg, #27398f, var(--ink-800));
+  border: 4px solid rgba(255,255,255,.22); border-radius: var(--r-xl);
+  padding: 20px 22px; max-width: min(420px, 88%); text-align: center;
+  box-shadow: 0 10px 0 var(--ink-line), var(--shadow-card);
+}
+.pm-ask-glyph { font-size: 40px; }
+.pm-ask-text { color: #fff; font-weight: 800; margin: 6px 0 14px; font-size: 14.5px; }
+.pm-ask-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
 .pm-note {
   position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
   background: #2a2350; color: #fff7e2; border: 3px solid rgba(255,255,255,.28);

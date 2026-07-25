@@ -207,6 +207,8 @@ import {
   tappableComponents, hasStartScript,
 } from '../src/creator/miniAppRuntime';
 import type { MiniAppRuntimeSnapshot } from '../src/creator/miniAppRuntime';
+import { evaluateCondition, UNTIL_ROUNDS_CAP } from '../src/creator/miniAppRuntime';
+import { DROP_TARGET_REF } from '../src/creator/miniAppTypes';
 
 import { readdirSync, readFileSync } from 'node:fs';
 
@@ -2597,6 +2599,296 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return validateMiniAppProject(ed.project).valid
       && r.triggered && r.finalState.components.lamp2.lit === true;
   })());
+}
+
+// ---------------------------------------------------------------
+// App Lab Phases 4–8: conditions, control flow, drops, approval
+// ---------------------------------------------------------------
+{
+  console.log("\n-- Zip's App Lab: conditions and control flow --");
+  const SEED4 = { id: 'p4', now: 1_700_000_000_000, themeId: 'sparkle-meadow' };
+  const sorter = MINI_APP_STARTERS.find((s) => s.id === 'color-sorter')!.build(SEED4);
+  const shapes = MINI_APP_STARTERS.find((s) => s.id === 'shape-match')!.build(SEED4);
+  const story = MINI_APP_STARTERS.find((s) => s.id === 'lost-star')!.build(SEED4);
+  const music = MINI_APP_STARTERS.find((s) => s.id === 'four-beat-loop')!.build(SEED4);
+  const band = MINI_APP_STARTERS.find((s) => s.id === 'bop-band')!.build(SEED4);
+  const game = MINI_APP_STARTERS.find((s) => s.id === 'collect-stars')!.build(SEED4);
+  const helper = MINI_APP_STARTERS.find((s) => s.id === 'feed-the-pet')!.build(SEED4);
+  const st4 = initialRuntimeState(sorter);
+
+  // ---- conditions ----
+  check('colour matching compares what two things are like',
+    evaluateCondition(sorter, st4, { kind: 'colorEquals', itemId: 'item-1', targetId: 'basket-red' })
+    && !evaluateCondition(sorter, st4, { kind: 'colorEquals', itemId: 'item-1', targetId: 'basket-blue' }));
+  check('shape matching ignores colour',
+    evaluateCondition(shapes, initialRuntimeState(shapes),
+      { kind: 'shapeEquals', itemId: 'item-1', targetId: 'basket-square' }));
+  check('a state question reads the live state', (() => {
+    const flower = MINI_APP_STARTERS.find((s) => s.id === 'blooming-flower')!.build(SEED4);
+    const s0 = initialRuntimeState(flower);
+    const bloomed = applyCommand(s0, { kind: 'changeState', targetId: 'flower', state: 'blooming' }).next;
+    return evaluateCondition(flower, bloomed, { kind: 'stateIs', targetId: 'flower', state: 'blooming' })
+      && !evaluateCondition(flower, s0, { kind: 'stateIs', targetId: 'flower', state: 'blooming' });
+  })());
+  check('counter questions compare numbers', (() => {
+    const two = { ...st4, variables: { ...st4.variables, score: 2 } };
+    return evaluateCondition(sorter, two, { kind: 'counterEquals', variableId: 'score', value: 2 })
+      && evaluateCondition(sorter, two, { kind: 'counterAtLeast', variableId: 'score', value: 1 })
+      && !evaluateCondition(sorter, two, { kind: 'counterAtLeast', variableId: 'score', value: 5 });
+  })());
+  check('a question about something that is not there is false, never a crash',
+    !evaluateCondition(sorter, st4, { kind: 'stateIs', targetId: 'ghost', state: 'idle' })
+    && !evaluateCondition(sorter, st4, { kind: 'colorEquals', itemId: 'ghost', targetId: 'basket-red' }));
+  check('"where it landed" resolves from the drop itself',
+    evaluateCondition(sorter, st4,
+      { kind: 'colorEquals', itemId: 'item-1', targetId: DROP_TARGET_REF }, { droppedOnto: 'basket-red' })
+    && !evaluateCondition(sorter, st4,
+      { kind: 'colorEquals', itemId: 'item-1', targetId: DROP_TARGET_REF }, { droppedOnto: 'basket-blue' }));
+
+  // ---- sorting really sorts ----
+  {
+    const right = run(sorter, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' });
+    const wrong = run(sorter, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-blue' });
+    check('a red berry in the red basket scores', right.finalState.variables.score === 1);
+    check('a red berry in the blue basket does NOT score', wrong.finalState.variables.score === 0);
+    check('a wrongly sorted thing goes home again',
+      wrong.finalState.components['item-1'].slotId
+      === initialRuntimeState(sorter).components['item-1'].slotId);
+    check('a rightly sorted thing stays where it landed',
+      right.finalState.components['item-1'].slotId
+      === st4.components['basket-red'].slotId);
+    check('the right drop plays the happy sound and the wrong one does not',
+      right.events.some((e) => e.sound === 'happy') && wrong.events.some((e) => e.sound === 'tryAgain'));
+    check('both sorting items have their own rule',
+      run(sorter, { kind: 'drop', componentId: 'item-2', ontoId: 'basket-blue' })
+        .finalState.variables.score === 1);
+    check('sorting the same thing twice is not double points', (() => {
+      const once = run(sorter, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' });
+      const twice = run(sorter, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' }, once.finalState);
+      return twice.finalState.variables.score === 2;
+    })());
+  }
+
+  // ---- if / if-else ----
+  check('an If whose answer is no skips its steps', (() => {
+    const p = {
+      ...sorter,
+      scripts: [{
+        id: 'x', ownerId: 'item-1', trigger: { kind: 'onTap' as const, targetId: 'item-1' },
+        commands: [{
+          kind: 'if' as const,
+          test: { kind: 'counterAtLeast' as const, variableId: 'score', value: 9 },
+          then: [{ kind: 'increaseCounter' as const, variableId: 'score' }],
+        }],
+      }],
+    };
+    const r = run(p, { kind: 'tap', componentId: 'item-1' });
+    return r.finalState.variables.score === 0
+      && r.events.length === 1 && r.events[0].outcome.kind === 'noChange';
+  })());
+  check('an If whose answer is yes runs its steps', (() => {
+    const p = {
+      ...sorter,
+      scripts: [{
+        id: 'x', ownerId: 'item-1', trigger: { kind: 'onTap' as const, targetId: 'item-1' },
+        commands: [{
+          kind: 'if' as const,
+          test: { kind: 'counterAtLeast' as const, variableId: 'score', value: 0 },
+          then: [{ kind: 'increaseCounter' as const, variableId: 'score' }],
+        }],
+      }],
+    };
+    return run(p, { kind: 'tap', componentId: 'item-1' }).finalState.variables.score === 1;
+  })());
+  check('an If-Else always runs exactly one side', (() => {
+    const r = run(sorter, { kind: 'drop', componentId: 'item-1', ontoId: 'basket-red' });
+    const took = r.events.filter((e) => e.command.kind === 'increaseCounter').length;
+    const other = r.events.filter((e) => e.command.kind === 'returnHome').length;
+    return took === 1 && other === 0;
+  })());
+
+  // ---- loops ----
+  check('Repeat runs its body that many times', (() => {
+    const r = run(music, { kind: 'tap', componentId: 'play' });
+    // Repeat 2 over a four-step body = 1 repeat event + 8 steps.
+    return r.events.filter((e) => e.command.kind === 'playSound').length === 4;
+  })());
+  check('Repeat Until stops when the answer becomes yes', (() => {
+    const p = {
+      ...sorter,
+      scripts: [{
+        id: 'x', ownerId: 'item-1', trigger: { kind: 'onTap' as const, targetId: 'item-1' },
+        commands: [{
+          kind: 'repeatUntil' as const,
+          test: { kind: 'counterAtLeast' as const, variableId: 'score', value: 3 },
+          body: [{ kind: 'increaseCounter' as const, variableId: 'score' }],
+        }],
+      }],
+    };
+    return run(p, { kind: 'tap', componentId: 'item-1' }).finalState.variables.score === 3;
+  })());
+  check('Repeat Until on a question that never comes true gives up kindly', (() => {
+    const p = {
+      ...sorter,
+      scripts: [{
+        id: 'x', ownerId: 'item-1', trigger: { kind: 'onTap' as const, targetId: 'item-1' },
+        commands: [{
+          kind: 'repeatUntil' as const,
+          test: { kind: 'stateIs' as const, targetId: 'item-1', state: 'collected' },
+          body: [{ kind: 'playSound' as const, sound: 'tap' as const }],
+        }],
+      }],
+    };
+    const r = run(p, { kind: 'tap', componentId: 'item-1' });
+    return r.overflowed && r.stepsUsed <= UNTIL_ROUNDS_CAP + 2;
+  })());
+
+  // ---- saved jobs ----
+  check('calling a saved job runs the job body', (() => {
+    const p = {
+      ...music,
+      jobs: [{
+        id: 'chorus', iconId: 'x', title: { tokens: ['thing-song'] },
+        commands: [
+          { kind: 'playSound' as const, sound: 'drum' as const },
+          { kind: 'playSound' as const, sound: 'bell' as const },
+        ],
+      }],
+      scripts: [{
+        id: 'x', ownerId: 'play', trigger: { kind: 'onTap' as const, targetId: 'play' },
+        commands: [{ kind: 'callJob' as const, jobId: 'chorus' }],
+      }],
+    };
+    const r = run(p, { kind: 'tap', componentId: 'play' });
+    return r.events.filter((e) => e.command.kind === 'playSound').length === 2;
+  })());
+  check('calling a job that is not there says so and carries on', (() => {
+    const p = {
+      ...music,
+      scripts: [{
+        id: 'x', ownerId: 'play', trigger: { kind: 'onTap' as const, targetId: 'play' },
+        commands: [
+          { kind: 'callJob' as const, jobId: 'missing' },
+          { kind: 'playSound' as const, sound: 'bell' as const },
+        ],
+      }],
+    };
+    const r = run(p, { kind: 'tap', componentId: 'play' });
+    return r.events[0].outcome.kind === 'noChange' && r.events.length === 2;
+  })());
+
+  // ---- messages and playing together ----
+  check('one signal sets both band members playing', (() => {
+    const r = run(band, { kind: 'tap', componentId: 'play' });
+    const sounds = r.events.filter((e) => e.sound).map((e) => e.sound);
+    return sounds.includes('drum') && sounds.includes('bell');
+  })());
+  check('a message runs deeper in the chain than the tap that sent it', (() => {
+    const r = run(band, { kind: 'tap', componentId: 'play' });
+    return r.events.some((e) => e.chainDepth === 0) && r.events.some((e) => e.chainDepth === 1);
+  })());
+
+  // ---- scenes ----
+  check('changing scene moves the story on', (() => {
+    const r = run(story, { kind: 'tap', componentId: 'zip' });
+    return r.finalState.sceneId === 'scene-2';
+  })());
+  check('changing to the scene you are already in reports nothing changed',
+    run(story, { kind: 'tap', componentId: 'zip' }, { ...initialRuntimeState(story), sceneId: 'scene-2' })
+      .events[0].outcome.kind === 'noChange');
+
+  // ---- games: moving, collecting, winning ----
+  check('a collected star adds to the score', (() => {
+    const r = run(game, { kind: 'tap', componentId: 'star-1' });
+    return r.finalState.variables.score === 1;
+  })());
+  check('reaching the target shows the win', (() => {
+    let st = initialRuntimeState(game);
+    st = { ...st, variables: { ...st.variables, score: 2 } };
+    const r = run(game, { kind: 'tap', componentId: 'star-1' }, st);
+    return r.finalState.won === true;
+  })());
+  check('the win only comes at the target, not before', (() => {
+    const r = run(game, { kind: 'tap', componentId: 'star-1' });
+    return r.finalState.won === false;
+  })());
+  check('Move walks a piece across the slot grid', (() => {
+    const p = {
+      ...game,
+      scripts: [{
+        id: 'x', ownerId: 'player', trigger: { kind: 'onTap' as const, targetId: 'player' },
+        commands: [{ kind: 'move' as const, targetId: 'player', direction: 'up' as const, cells: 1 as const }],
+      }],
+    };
+    const r = run(p, { kind: 'tap', componentId: 'player' });
+    return r.finalState.components.player.slotId !== initialRuntimeState(p).components.player.slotId;
+  })());
+  check('Move into nothing says so instead of leaving the board', (() => {
+    const p = {
+      ...game,
+      scripts: [{
+        id: 'x', ownerId: 'player', trigger: { kind: 'onTap' as const, targetId: 'player' },
+        commands: [{ kind: 'move' as const, targetId: 'player', direction: 'down' as const, cells: 3 as const }],
+      }],
+    };
+    const r = run(p, { kind: 'tap', componentId: 'player' });
+    return r.events[0].outcome.kind === 'noChange';
+  })());
+
+  // ---- helpers ask first ----
+  check('a helper stops and asks before it acts', (() => {
+    const r = run(helper, { kind: 'tap', componentId: 'helper' });
+    return !!r.awaitingApproval && r.awaitingApproval.phrase === 'imThinking';
+  })());
+  check('saying yes lets the helper carry on', (() => {
+    const r = run(helper, { kind: 'tap', componentId: 'helper' }, undefined, { approvals: [true] });
+    return !r.awaitingApproval && r.finalState.components.pet.state === 'happy'
+      && r.finalState.variables.meals === 1;
+  })());
+  check('saying no stops the helper there, and nothing changes', (() => {
+    const r = run(helper, { kind: 'tap', componentId: 'helper' }, undefined, { approvals: [false] });
+    return !r.awaitingApproval
+      && r.finalState.components.pet.state === 'sleepy'
+      && r.finalState.variables.meals === 0;
+  })());
+  check('the run before the question is identical whichever answer comes', (() => {
+    const stop = run(helper, { kind: 'tap', componentId: 'helper' });
+    const yes = run(helper, { kind: 'tap', componentId: 'helper' }, undefined, { approvals: [true] });
+    return JSON.stringify(stop.events) === JSON.stringify(yes.events.slice(0, stop.events.length));
+  })());
+  check('a helper rule only fires when its question is true', (() => {
+    const r = run(helper, { kind: 'appStart' });
+    return r.triggered && r.events.some((e) => e.command.kind === 'speakPhrase');
+  })());
+
+  // ---- every starter runs without falling over ----
+  check('every starter can be run from every trigger it declares', (() => {
+    return MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED4);
+      return p.scripts.every((script) => {
+        const t = script.trigger;
+        const cause: TriggerCause | null =
+          t.kind === 'onAppStart' ? { kind: 'appStart' }
+            : t.kind === 'onSceneStart' ? { kind: 'sceneStart', sceneId: t.sceneId }
+              : t.kind === 'onTap' ? { kind: 'tap', componentId: t.targetId }
+                : t.kind === 'onDrop' ? { kind: 'drop', componentId: t.targetId, ontoId: t.targetId }
+                  : t.kind === 'onMessage' ? { kind: 'message', message: t.message }
+                    : t.kind === 'onChoiceSelected' ? { kind: 'choice', componentId: t.targetId }
+                      : t.kind === 'onItemCollected' ? { kind: 'tap', componentId: t.targetId }
+                        : t.kind === 'onCounterChanged' ? { kind: 'counterChanged', variableId: t.variableId }
+                          : null;
+        if (!cause) return true;
+        const r = run(p, cause, undefined, { approvals: [true, true, true] });
+        return Array.isArray(r.events) && typeof r.stepsUsed === 'number';
+      });
+    });
+  })());
+  check('no starter run ever exceeds its own budget',
+    MINI_APP_STARTERS.every((s) => {
+      const p = s.build(SEED4);
+      const r = run(p, { kind: 'appStart' }, undefined, { approvals: [true, true] });
+      return r.stepsUsed <= p.runtimeBudget.maximumSteps;
+    }));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

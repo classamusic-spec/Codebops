@@ -20,6 +20,7 @@ import { miniAppTemplate } from './miniAppTemplateRegistry';
 import { approvedAsset } from '../data/app-lab/approvedAssets';
 import { defaultAccessibilityLabel } from '../data/app-lab/approvedComponents';
 import type { MiniAppComponentType, SerializableValue } from './miniAppTypes';
+import { DROP_TARGET_REF } from './miniAppTypes';
 
 /** Everything the factory needs from the outside world. */
 export interface ProjectSeed {
@@ -222,21 +223,21 @@ const colorSorter = (seed: ProjectSeed): MiniAppProject => {
       components: [...items, ...baskets, score],
     }],
     variables: [counter('score', 'Score')],
-    scripts: [{
-      id: 'script-1', ownerId: 'item-1', trigger: { kind: 'onDrop', targetId: 'item-1' },
+    scripts: ['item-1', 'item-2'].map((id, i) => ({
+      id: `script-${i + 1}`, ownerId: id, trigger: { kind: 'onDrop' as const, targetId: id },
       commands: [{
-        kind: 'ifElse',
-        test: { kind: 'colorEquals', itemId: 'item-1', targetId: 'basket-red' },
+        kind: 'ifElse' as const,
+        test: { kind: 'colorEquals' as const, itemId: id, targetId: DROP_TARGET_REF },
         then: [
-          { kind: 'increaseCounter', variableId: 'score' },
-          { kind: 'playSound', sound: 'happy' },
+          { kind: 'increaseCounter' as const, variableId: 'score' },
+          { kind: 'playSound' as const, sound: 'happy' as const },
         ],
         otherwise: [
-          { kind: 'returnHome', targetId: 'item-1' },
-          { kind: 'playSound', sound: 'tryAgain' },
+          { kind: 'returnHome' as const, targetId: id },
+          { kind: 'playSound' as const, sound: 'tryAgain' as const },
         ],
       }],
-    }],
+    })),
     goalType: 'allSorted',
     goalTitle: title(['thing-sorter']),
     goalGlyph: '🧺',
@@ -265,7 +266,7 @@ const shapeMatch = (seed: ProjectSeed): MiniAppProject => {
       id: 'script-1', ownerId: 'item-1', trigger: { kind: 'onDrop', targetId: 'item-1' },
       commands: [{
         kind: 'ifElse',
-        test: { kind: 'shapeEquals', itemId: 'item-1', targetId: 'basket-square' },
+        test: { kind: 'shapeEquals', itemId: 'item-1', targetId: DROP_TARGET_REF },
         then: [{ kind: 'increaseCounter', variableId: 'score' }],
         otherwise: [{ kind: 'returnHome', targetId: 'item-1' }],
       }],
@@ -299,7 +300,7 @@ const berryBoltSort = (seed: ProjectSeed): MiniAppProject => {
       id: 'script-1', ownerId: 'item-1', trigger: { kind: 'onDrop', targetId: 'item-1' },
       commands: [{
         kind: 'ifElse',
-        test: { kind: 'typeEquals', itemId: 'item-1', targetId: 'basket-food' },
+        test: { kind: 'typeEquals', itemId: 'item-1', targetId: DROP_TARGET_REF },
         then: [{ kind: 'increaseCounter', variableId: 'score' }],
         otherwise: [{ kind: 'returnHome', targetId: 'item-1' }],
       }],
