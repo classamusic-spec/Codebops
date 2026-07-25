@@ -137,6 +137,9 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 }
 .stars-pill .star { font-size: clamp(20px, 2.4vw, 30px); color: #4a5aa8; transition: transform var(--dur-med) var(--ease-bounce), color var(--dur-med); text-shadow: 0 2px 0 var(--ink-line); }
 .stars-pill .star.earned { color: var(--yellow); text-shadow: 0 0 12px rgba(255,210,62,.7), 0 2px 0 var(--ink-line); }
+/* A pill you can TAP has to clear the 44px floor; a pill that only
+   displays a number does not, and stays as small as its type (§14). */
+button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: inherit; }
 
 /* ============================================================
    Goal card (cream card, reference left panel)
@@ -765,6 +768,348 @@ svg .cb-glitch-bit { animation: cb-glitch-bit 3.6s steps(1, end) infinite; }
    ============================================================ */
 .screen { animation: screen-in .38s var(--ease-out) both; }
 @keyframes screen-in { from { opacity: 0; transform: scale(1.03) } to { opacity: 1; transform: none } }
+
+/* ============================================================
+   Pick a Level — one island at a time
+
+   Replaces the old single scrolling list of every world. A strip of
+   world medallions up top, one island below it filling the screen, and
+   the levels as big round stepping stones. Nothing scrolls forever.
+   ============================================================ */
+.sel2-screen {
+  display: flex; flex-direction: column; overflow: hidden;
+  padding: max(12px, var(--sat)) max(12px, var(--sar)) 0 max(12px, var(--sal));
+  background: radial-gradient(130% 100% at 50% -10%, #7dd7ff 0%, #4ea9f0 42%, #2e7ce6 76%, #16225c 100%);
+}
+
+/* ---- header ---- */
+.sel2-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+}
+.sel2-title {
+  font-family: var(--font-display); font-weight: 800; color: #fff; margin: 0;
+  font-size: clamp(20px, 3vw, 32px); white-space: nowrap;
+  text-shadow: 0 3px 0 rgba(20,32,80,.45);
+}
+.sel2-pills { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* ---- today's puzzle, as a slim banner ---- */
+.sel2-daily {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 11px; width: 100%;
+  cursor: pointer; font: inherit; text-align: left; min-height: 44px;
+  background: linear-gradient(180deg, #fff6e2, #ffe9b8);
+  border: 3px solid #fff; border-radius: var(--r-xl);
+  padding: 8px 14px; margin-bottom: 10px;
+  box-shadow: 0 5px 0 rgba(20,32,80,.28);
+}
+.sel2-daily:active { transform: translateY(2px); box-shadow: 0 3px 0 rgba(20,32,80,.28); }
+.sel2-daily.done { background: linear-gradient(180deg, #e9f9ec, #cdefd6); }
+.sd-glyph { font-size: 24px; line-height: 1; flex: 0 0 auto; }
+.sd-mid { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.sd-title { color: #6b4a12; font-family: var(--font-display); font-weight: 800; font-size: 15px; }
+.sd-sub {
+  color: #8a6a2a; font-weight: 800; font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sd-streak {
+  flex: 0 0 auto; background: #fff; border-radius: 999px; padding: 3px 10px;
+  color: #d1620a; font-weight: 800; font-size: 12.5px;
+}
+
+/* ---- the world strip: horizontal, snapping, thumb-sized ---- */
+.sel2-strip-wrap { position: relative; flex: 0 0 auto; }
+/* Soft edges that say "there is more this way" — the only cue a child gets
+   that the strip scrolls, since a scrollbar is hidden and meaningless here. */
+.sel2-strip-wrap::before, .sel2-strip-wrap::after {
+  content: ''; position: absolute; top: 0; bottom: 10px; width: 34px;
+  pointer-events: none; opacity: 0; transition: opacity var(--dur-med); z-index: 2;
+}
+.sel2-strip-wrap::before {
+  left: -2px; background: linear-gradient(90deg, rgba(46,124,230,.85), transparent);
+}
+.sel2-strip-wrap::after {
+  right: -2px; background: linear-gradient(270deg, rgba(46,124,230,.85), transparent);
+}
+.sel2-strip-wrap.more-left::before, .sel2-strip-wrap.more-right::after { opacity: 1; }
+.sel2-strip {
+  display: flex; gap: 9px; overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 10px; margin: 0 -2px;
+  scrollbar-width: none;
+}
+.sel2-strip::-webkit-scrollbar { display: none; }
+.sel2-med {
+  flex: 0 0 auto; scroll-snap-align: center; cursor: pointer; font: inherit;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 86px; min-height: 44px; background: none; border: none; padding: 0;
+}
+.sel2-med-disc {
+  position: relative; width: 62px; height: 62px; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 4px solid rgba(255,255,255,.55);
+  box-shadow: 0 5px 0 rgba(20,32,80,.32), inset 0 -6px 14px rgba(0,0,0,.14);
+  transition: transform var(--dur-fast) var(--ease-bounce), border-color var(--dur-fast);
+}
+/* A glossy highlight, so a medallion reads as a bubble rather than a swatch. */
+.sel2-med-disc::before {
+  content: ''; position: absolute; inset: 5px 5px 46% 5px;
+  border-radius: 50%; background: linear-gradient(180deg, rgba(255,255,255,.55), transparent);
+}
+.sel2-med-glyph { font-size: 29px; line-height: 1; position: relative; }
+.sel2-med.on .sel2-med-disc {
+  transform: translateY(-4px) scale(1.08); border-color: #fff;
+  box-shadow: 0 8px 0 rgba(20,32,80,.34), 0 0 22px rgba(255,255,255,.5);
+}
+.sel2-med.locked .sel2-med-disc { filter: grayscale(.75) brightness(.8); }
+.sel2-med-lock {
+  position: absolute; right: -3px; bottom: -3px; font-size: 15px;
+  background: #fff6e3; border-radius: 50%; width: 24px; height: 24px;
+  display: grid; place-items: center; box-shadow: 0 2px 0 rgba(42,24,69,.3);
+}
+.sel2-med-new {
+  position: absolute; top: -7px; right: -10px;
+  background: linear-gradient(180deg, #ff8fb1, #e8437a); color: #fff;
+  border: 2px solid #fff; border-radius: 999px; padding: 1px 6px;
+  font-weight: 800; font-size: 9px; letter-spacing: .4px;
+}
+.sel2-med-name {
+  color: #eaf4ff; font-weight: 800; font-size: 10.5px; line-height: 1.15;
+  text-align: center; text-shadow: 0 2px 0 rgba(20,32,80,.4);
+}
+.sel2-med.on .sel2-med-name { color: #fff; }
+.sel2-med-stars { color: #ffdf8a; font-weight: 800; font-size: 10px; }
+
+/* Theme discs, matching each world's sky. */
+.th-meadow  { background: radial-gradient(circle at 50% 30%, #b8ecff, #58b6f0); }
+.th-bay     { background: radial-gradient(circle at 50% 30%, #a9f0ee, #3fb0bd); }
+.th-forest  { background: radial-gradient(circle at 50% 30%, #cdf0a8, #62b357); }
+.th-town    { background: radial-gradient(circle at 50% 30%, #cfd6ff, #7b86dd); }
+.th-academy { background: radial-gradient(circle at 50% 30%, #e2ccff, #9b6fdd); }
+.th-garage  { background: radial-gradient(circle at 50% 30%, #9aa6e0, #3b3573); }
+.th-applab  { background: radial-gradient(circle at 50% 30%, #a8f0e2, #37a89b); }
+.th-island  { background: radial-gradient(circle at 50% 30%, #ffe1a8, #eda13f); }
+
+/* ---- the island itself ---- */
+.sel2-island {
+  position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; touch-action: pan-y;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  border: 4px solid rgba(255,255,255,.5); border-bottom: none;
+  padding: 14px 12px max(20px, var(--sab));
+  animation: sel2IslandIn .34s var(--ease-out);
+  /* A column, so a short world can centre its stones instead of leaving a
+     field of empty colour under them on a big screen. */
+  display: flex; flex-direction: column;
+}
+/* A soft band along the bottom, so the island reads as ground or water
+   rather than as a panel that ran out of content. */
+.sel2-island::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 26%;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.16));
+  border-radius: 50% 50% 0 0 / 22% 22% 0 0; pointer-events: none;
+}
+@keyframes sel2IslandIn { from { opacity: 0; transform: translateY(10px); } }
+.sel2-island.th-meadow  { background: linear-gradient(180deg, #8ad8ff, #5fbb7a); }
+.sel2-island.th-bay     { background: linear-gradient(180deg, #7fe3e0, #2f8fa6); }
+.sel2-island.th-forest  { background: linear-gradient(180deg, #a9e88a, #3f8a52); }
+.sel2-island.th-town    { background: linear-gradient(180deg, #b6c0f5, #5a63b8); }
+.sel2-island.th-academy { background: linear-gradient(180deg, #d3b8f7, #6f4bb0); }
+.sel2-island.th-garage  { background: linear-gradient(180deg, #6d78bd, #262254); }
+.sel2-island.th-applab  { background: linear-gradient(180deg, #7fe0d2, #1f7d75); }
+.sel2-island.th-island  { background: linear-gradient(180deg, #ffd489, #e07c2f); }
+
+/* Scenery, pinned so a re-render never makes it jump. */
+.sel2-decor { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.sel2-leaf {
+  position: absolute; font-size: 30px; opacity: .32;
+  animation: sel2Drift 7s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 1.1s);
+}
+.sel2-leaf.d0 { top: 8%;  right: 6%; }
+.sel2-leaf.d1 { top: 42%; left: 3%; font-size: 24px; }
+.sel2-leaf.d2 { bottom: 8%; right: 12%; font-size: 26px; }
+.sel2-leaf.d3 { bottom: 22%; left: 9%; font-size: 22px; }
+@keyframes sel2Drift { 50% { transform: translateY(-9px) rotate(7deg); } }
+
+.sel2-island-head {
+  position: relative; z-index: 1; flex: 0 0 auto;
+  display: flex; align-items: center; gap: 11px; margin-bottom: 12px;
+}
+.sel2-island-glyph {
+  font-size: 32px; line-height: 1; flex: 0 0 auto;
+  filter: drop-shadow(0 3px 0 rgba(20,32,80,.28));
+}
+.sel2-island-titles { min-width: 0; }
+.sel2-island-titles h2 {
+  margin: 0; color: #fff; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(18px, 2.4vw, 26px); text-shadow: 0 3px 0 rgba(20,32,80,.4);
+}
+.sel2-island-titles p {
+  margin: 1px 0 0; color: rgba(255,255,255,.9); font-weight: 800; font-size: 12px;
+}
+.sel2-empty { color: #fff; font-weight: 800; text-align: center; padding: 24px 0; }
+
+/* ---- stepping stones ---- */
+.sel2-stones {
+  position: relative; z-index: 1;
+  display: grid; gap: 18px 8px;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  /* Capped and centred: on a wide screen a handful of stones should be a
+     tidy cluster, not five lonely discs strung across a football pitch. */
+  width: 100%; max-width: 620px; margin: 0 auto;
+  flex: 1 1 auto; align-content: center;
+}
+.sel2-cell {
+  position: relative; display: flex; justify-content: center;
+  /* Room above for the "Play!" flag, so it never sits on the badge. */
+  padding-top: 12px;
+  animation: sel2StoneIn .4s var(--ease-bounce) backwards;
+  animation-delay: calc(var(--i) * 0.035s);
+}
+@keyframes sel2StoneIn { from { opacity: 0; transform: scale(.8) translateY(10px); } }
+
+.sel2-stone {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; cursor: pointer; font: inherit; background: none; border: none;
+  padding: 0; min-height: 44px;
+}
+.sel2-disc {
+  position: relative; width: 74px; height: 74px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 28%, #fff9ec, #ffe0a8);
+  border: 4px solid #fff;
+  box-shadow: 0 6px 0 rgba(20,32,80,.34), inset 0 -7px 14px rgba(190,130,40,.22);
+  transition: transform var(--dur-fast) var(--ease-bounce);
+}
+.sel2-stone:active .sel2-disc { transform: translateY(3px); box-shadow: 0 3px 0 rgba(20,32,80,.34); }
+.sel2-disc-glyph { font-size: 33px; line-height: 1; }
+.sel2-badge {
+  position: absolute; top: -6px; left: -6px; min-width: 26px; height: 26px;
+  padding: 0 5px; border-radius: 999px; display: grid; place-items: center;
+  background: linear-gradient(180deg, #7ee79b, #3fae66); color: #06280f;
+  border: 3px solid #fff; font-weight: 800; font-size: 12px;
+  box-shadow: 0 2px 0 rgba(20,32,80,.3);
+}
+.sel2-stone-name {
+  color: #fff; font-family: var(--font-display); font-weight: 800;
+  font-size: 12.5px; line-height: 1.2; text-align: center;
+  text-shadow: 0 2px 0 rgba(20,32,80,.4);
+}
+.sel2-stone-note { color: rgba(255,255,255,.88); font-weight: 800; font-size: 10.5px; text-align: center; }
+.sel2-stone-stars { display: flex; gap: 2px; font-size: 13px; color: rgba(255,255,255,.42); }
+.sel2-stone-stars .on { color: var(--yellow); text-shadow: 0 0 8px rgba(255,210,62,.8); }
+
+/* done: a green tick and a calmer disc, so finished reads as finished */
+.sel2-stone.st-done .sel2-disc {
+  background: radial-gradient(circle at 50% 28%, #f2fff5, #cdefd6);
+}
+.sel2-stone-tick {
+  position: absolute; right: -5px; bottom: -3px; width: 26px; height: 26px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(180deg, #7ee79b, #3fae66); color: #fff;
+  border: 3px solid #fff; font-weight: 800; font-size: 13px;
+}
+
+/* next: the one thing to do now — a pulsing ring, a flag, and Zip */
+.sel2-stone.st-next .sel2-disc {
+  border-color: #ffe9a8;
+  box-shadow: 0 6px 0 rgba(20,32,80,.34), 0 0 0 5px rgba(255,233,168,.5), 0 0 26px rgba(255,220,120,.7);
+  animation: sel2Bob 1.9s ease-in-out infinite;
+}
+@keyframes sel2Bob { 50% { transform: translateY(-5px); } }
+.sel2-flag {
+  position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(180deg, #ffd95e, #f0a81e); color: #4a2c00;
+  border: 3px solid #fff; border-radius: 999px; padding: 1px 10px;
+  font-family: var(--font-display); font-weight: 800; font-size: 11px;
+  box-shadow: 0 3px 0 rgba(20,32,80,.3); z-index: 3; white-space: nowrap;
+}
+.sel2-zip {
+  position: absolute; right: -2px; top: 30px; width: 40px; height: 40px;
+  opacity: 0; transition: opacity var(--dur-med); pointer-events: none; z-index: 2;
+}
+.sel2-zip.ready { opacity: 1; animation: sel2ZipPeek 2.6s ease-in-out infinite; }
+.sel2-zip svg { width: 100%; height: 100%; }
+@keyframes sel2ZipPeek { 50% { transform: translateY(-4px) rotate(-6deg); } }
+
+/* locked / soon: quiet, never a scolding, and still tappable */
+.sel2-stone.st-locked .sel2-disc, .sel2-stone.st-soon .sel2-disc {
+  background: radial-gradient(circle at 50% 28%, #eef1f8, #c3cbdd);
+  box-shadow: 0 5px 0 rgba(20,32,80,.26), inset 0 -6px 12px rgba(60,70,110,.2);
+}
+.sel2-stone.st-locked .sel2-disc-glyph,
+.sel2-stone.st-soon .sel2-disc-glyph { filter: grayscale(.85); opacity: .55; }
+.sel2-stone.st-locked .sel2-badge, .sel2-stone.st-soon .sel2-badge {
+  background: linear-gradient(180deg, #b9c2d8, #8b95b4); color: #f4f7ff;
+}
+.sel2-stone.st-locked .sel2-stone-name,
+.sel2-stone.st-soon .sel2-stone-name { color: rgba(255,255,255,.72); }
+.sel2-stone-lock {
+  position: absolute; right: -5px; bottom: -3px; width: 26px; height: 26px;
+  border-radius: 50%; display: grid; place-items: center;
+  background: #fff6e3; border: 3px solid #fff; font-size: 13px;
+  box-shadow: 0 2px 0 rgba(42,24,69,.28);
+}
+.sel2-stone.shake { animation: shake .42s ease; }
+
+/* deleting a level the child built */
+.sel2-stone-del {
+  position: absolute; top: -6px; right: 2px; width: 28px; height: 28px;
+  border-radius: 50%; cursor: pointer; font: inherit; z-index: 3;
+  background: linear-gradient(180deg, #ff8f8f, #d84343); color: #fff;
+  border: 3px solid #fff; font-weight: 800; font-size: 12px;
+  display: grid; place-items: center; box-shadow: 0 2px 0 rgba(20,32,80,.3);
+}
+
+.sel2-toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 20; }
+
+/* Wider screens: bigger stones, more per row, roomier chrome. */
+@media (min-width: 760px) {
+  .sel2-screen { padding-left: max(20px, var(--sal)); padding-right: max(20px, var(--sar)); }
+  .sel2-stones { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 22px 14px; max-width: 700px; }
+  .sel2-disc { width: 86px; height: 86px; }
+  .sel2-disc-glyph { font-size: 38px; }
+  .sel2-stone-name { font-size: 13.5px; }
+  .sel2-med { width: 96px; }
+  .sel2-med-disc { width: 70px; height: 70px; }
+  .sel2-med-glyph { font-size: 33px; }
+  .sel2-med-name { font-size: 11.5px; }
+  .sel2-island { padding: 18px 20px max(24px, var(--sab)); }
+}
+
+/* Short landscape: the banner and strip give up height, stones stay big. */
+@media (max-height: 540px) and (orientation: landscape) {
+  .sel2-daily { padding: 5px 12px; margin-bottom: 6px; }
+  .sd-sub { display: none; }
+  .sel2-strip { padding-bottom: 6px; }
+  .sel2-med { width: 74px; }
+  .sel2-med-disc { width: 50px; height: 50px; border-width: 3px; }
+  .sel2-med-glyph { font-size: 24px; }
+  .sel2-island-head { margin-bottom: 8px; }
+  .sel2-island-titles p { display: none; }
+}
+
+/* Calm mode and reduce-motion: everything arrives, nothing loops. */
+@media (prefers-reduced-motion: reduce) {
+  .sel2-cell, .sel2-island, .sel2-leaf, .sel2-zip.ready { animation: none !important; }
+  .sel2-stone.st-next .sel2-disc { animation: none; }
+}
+.calm-mode .sel2-cell, .calm-mode .sel2-leaf, .calm-mode .sel2-zip.ready { animation: none; }
+.calm-mode .sel2-stone.st-next .sel2-disc { animation: none; }
+
+/* High contrast: edges everywhere, and "not yet" carried by more than grey. */
+body.high-contrast .sel2-med-disc, body.high-contrast .sel2-disc,
+body.high-contrast .sel2-daily, body.high-contrast .sel2-island { border-color: #fff; }
+body.high-contrast .sel2-med-name, body.high-contrast .sel2-stone-name,
+body.high-contrast .sel2-island-titles p, body.high-contrast .sel2-stone-note { color: #fff; }
+body.high-contrast .sel2-stone.st-locked .sel2-disc,
+body.high-contrast .sel2-stone.st-soon .sel2-disc { border-style: dashed; }
+body.high-contrast .sel2-med.locked .sel2-med-disc { filter: none; border-style: dashed; }
+
+/* Left-handed: the header controls flip, the stones do not (reading order
+   in the DOM is untouched either way). */
+body.left-handed .sel2-head { flex-direction: row-reverse; }
+body.left-handed .sel2-pills { margin-left: 0; margin-right: auto; }
 
 .select-wrap {
   position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;

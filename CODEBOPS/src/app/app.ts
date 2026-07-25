@@ -4,7 +4,7 @@ import { GameScreen } from './gameScreen';
 import { ALL_LEVELS } from '../data/levels';
 import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
-import { loadCustomLevels, deleteCustomLevel } from '../storage/customLevels';
+import { deleteCustomLevel } from '../storage/customLevels';
 import { inlineSvgInto, startMascotLife, loadSvg } from '../rendering/spriteCharacter';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
@@ -25,27 +25,17 @@ import { GearworksDeliveryScreen } from './gearworksDeliveryScreen';
 import { GearworksPaintScreen } from './gearworksPaintScreen';
 import { GearworksStoryScreen } from './gearworksStoryScreen';
 import { GearworksMakerScreen } from './gearworksMakerScreen';
-import { GEARWORKS_WORLD, GEARWORKS_PICKER, GEARWORKS_SEQUENCE, gwEntryId } from '../data/gearworks/world';
-import { APP_LAB_WORLD } from '../data/app-lab/appLabDefinition';
-import { garageTotals } from '../data/gearworks/progress';
+import { GEARWORKS_SEQUENCE } from '../data/gearworks/world';
 import { GearworksTrophyScreen } from './gearworksTrophyScreen';
 import { createCampfireGate, showCampfire } from './campfire';
 import { applyAccessibility, stopSpeaking } from '../ui/a11y';
 import { JourneyScreen } from './journeyScreen';
+import { LevelSelectScreen } from './levelSelectScreen';
 import { AppLabScreen } from './appLabScreen';
 import { AppCreatorScreen } from './appCreatorScreen';
 import { AppLibraryScreen } from './appLibraryScreen';
 import type { MiniAppProject } from '../creator/miniAppProject';
 import type { AppKitDefinition } from '../data/app-lab/appLabDefinition';
-
-const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
-  'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
-  'bubble-bay': { emoji: '🐚', name: 'Bubble Bay', theme: 'bay' },
-  'pattern-forest': { emoji: '🌸', name: 'Pattern Forest', theme: 'forest' },
-  'robot-town': { emoji: '🤖', name: 'Robot Town', theme: 'town' },
-  'agent-academy': { emoji: '🎓', name: 'Agent Academy', theme: 'academy' },
-};
-const WORLD_ORDER = ['sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town', 'agent-academy'];
 
 /**
  * Today's featured level for the Daily Bop (stable per LOCAL calendar day,
@@ -65,6 +55,7 @@ export class App {
   private garden: GardenScreen | null = null;
   private trophy: GearworksTrophyScreen | null = null;
   private journey: JourneyScreen | null = null;
+  private select: LevelSelectScreen | null = null;
   private appLab: AppLabScreen | null = null;
   private creator: AppCreatorScreen | null = null;
   private library: AppLibraryScreen | null = null;
@@ -107,6 +98,8 @@ export class App {
     this.trophy = null;
     this.journey?.dispose();
     this.journey = null;
+    this.select?.dispose();
+    this.select = null;
     this.appLab?.dispose();
     this.appLab = null;
     this.creator?.dispose();
@@ -218,224 +211,31 @@ export class App {
     this.clearHost();
     this.store = new SaveStore(); // re-read stars earned in the last session
     const screen = el('section', 'screen', this.host);
-    const wrap = el('div', 'select-wrap', screen);
-    for (const cls of ['c1', 'c2']) el('div', `title-cloud select-cloud ${cls}`, wrap);
-
-    const header = el('div', 'select-header', wrap);
-    const back = el('button', 'circle-btn', header, '←');
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to title');
-    back.addEventListener('click', () => this.showTitle());
-    el('h1', undefined, header, 'Pick a Level!');
-    const totalStars = Object.values(this.store.stars).reduce((a, b) => a + b, 0);
-    const pill = el('div', 'stars-pill', header);
-    pill.style.marginLeft = 'auto';
-    el('span', 'star earned', pill, '★');
-    el('span', undefined, pill, ` ${totalStars}`);
-    const gardenPill = el('button', 'stars-pill garden-pill', header) as HTMLButtonElement;
-    gardenPill.type = 'button';
-    gardenPill.setAttribute('aria-label', 'Visit the Bop Garden');
-    el('span', undefined, gardenPill, '🌻');
-    el('span', undefined, gardenPill, ` ${this.store.daily.totalCompleted}`);
-    gardenPill.addEventListener('click', () => this.showGarden());
-
-    // --- Daily Bop card ---
+    screen.id = 'screen-select';
     const dailyIdx = dailyLevelIndex();
-    const dailyLevel = ALL_LEVELS[dailyIdx];
-    const doneToday = this.store.daily.lastCompleted === dayStamp();
-    const daily = el('button', `daily-card${doneToday ? ' done' : ''}`, wrap) as HTMLButtonElement;
-    daily.type = 'button';
-    el('span', 'dc-emoji', daily, doneToday ? '✅' : '📅');
-    const dcMid = el('span', 'dc-mid', daily);
-    el('span', 'dc-title', dcMid, doneToday ? 'Daily Bop — done!' : 'Daily Bop');
-    el('span', 'dc-sub', dcMid, doneToday
-      ? `Come back tomorrow — 🔥 ${this.store.daily.streak} day streak!`
-      : `Today's puzzle: ${dailyLevel.shortTitle} ${dailyLevel.brief.emoji}`);
-    el('span', 'dc-streak', daily, `🔥 ${this.store.daily.streak}`);
-    if (!doneToday) {
-      daily.addEventListener('click', () => this.showGame(dailyIdx, {
+    this.select = new LevelSelectScreen(screen, this.store, {
+      onBack: () => this.showTitle(),
+      onPlayLevel: (index) => this.showGame(index),
+      onPlayDaily: (index) => this.showGame(index, {
         onSuccess: () => {
           const streak = this.store.completeDaily();
           // Land the streak toast after the celebration dialog mounts.
           window.setTimeout(() => this.streakToast(streak), 900);
         },
-      }));
-    }
-
-    // --- world sections ---
-    let globalIndex = 0;
-    for (const worldId of WORLD_ORDER) {
-      const levels = ALL_LEVELS.filter((l) => l.worldId === worldId);
-      if (levels.length === 0) continue;
-      const meta = WORLD_META[worldId];
-      const firstIdx = globalIndex;
-      // A grown-up can open a world by hand from the Campfire (§7); that
-      // only ever adds access on top of the normal star-based unlocking.
-      const openedByGrownUp = this.store.isWorldUnlocked(worldId);
-      const worldUnlocked = openedByGrownUp
-        || firstIdx === 0 || (this.store.stars[ALL_LEVELS[firstIdx - 1].id] ?? 0) >= 1;
-      const section = el('div', `world-panel wp-${meta.theme}${worldUnlocked ? '' : ' locked'}`, wrap);
-      const title = el('div', 'world-title', section);
-      el('span', 'wemoji', title, meta.emoji);
-      el('span', undefined, title, meta.name);
-      if (!worldUnlocked) el('span', 'world-lock', title, '🔒');
-      const list = el('div', 'level-list', section);
-
-      for (const level of levels) {
-        const idx = globalIndex;
-        const unlocked = openedByGrownUp
-          || idx === 0 || (this.store.stars[ALL_LEVELS[idx - 1].id] ?? 0) >= 1;
-        const stars = this.store.stars[level.id] ?? 0;
-        const row = el('button', `level-item${unlocked ? '' : ' locked'}${level.prefill ? ' debug' : ''}`, list) as HTMLButtonElement;
-        row.type = 'button';
-        row.setAttribute('aria-label', unlocked ? `Play ${level.shortTitle}` : `${level.shortTitle} — locked`);
-        const num = el('span', 'li-num', row);
-        el('span', 'li-num-text', num, String(idx + 1));
-        el('span', 'li-leaf', num, '🍃');
-        el('span', 'li-emoji', row, level.brief.emoji);
-        el('span', 'li-name', row, level.shortTitle);
-        const right = el('span', 'li-right', row);
-        if (!unlocked) el('span', 'li-lock', right, '🔒');
-        const starRow = el('span', 'li-stars', right);
-        for (let s = 0; s < 3; s++) el('span', s < stars ? 'on' : '', starRow, '★');
-        if (unlocked) {
-          row.addEventListener('click', () => this.showGame(idx));
-        } else {
-          // Locked rows still respond — wiggle + a friendly hint.
-          row.addEventListener('click', () => {
-            sharedSfx.play('bump');
-            row.classList.remove('shake');
-            void row.offsetWidth;
-            row.classList.add('shake');
-            this.hintToast('⭐ Win the level before this one to unlock it!');
-          });
-        }
-        globalIndex++;
-      }
-    }
-
-    // --- Gearworks Garage (new world — Phase 1 shell) ---
-    {
-      const section = el('div', 'world-panel wp-garage', wrap);
-      const title = el('div', 'world-title', section);
-      el('span', 'wemoji', title, GEARWORKS_WORLD.emoji);
-      el('span', undefined, title, GEARWORKS_WORLD.name);
-      el('span', 'gw-new-badge', title, 'NEW!');
-      const list = el('div', 'level-list', section);
-      const garageOpened = this.store.isWorldUnlocked('gearworks-garage');
-      let seqIdx = 0;
-      GEARWORKS_PICKER.forEach((entry, i) => {
-        // The Trophy Room is a special always-open golden capstone row.
-        if (entry.kind === 'trophy') {
-          const totals = garageTotals(this.store.stars);
-          const row = el('button', `level-item gw-trophy-row${totals.allComplete ? ' complete' : ''}`, list) as HTMLButtonElement;
-          row.type = 'button';
-          row.setAttribute('aria-label', 'Open the Inventor\'s Trophy Room');
-          const num = el('span', 'li-num gw-num', row);
-          el('span', 'li-num-text', num, String(i + 1));
-          el('span', 'li-leaf', num, '🏆');
-          el('span', 'li-emoji', row, entry.emoji);
-          el('span', 'li-name', row, entry.shortTitle);
-          const right = el('span', 'li-right', row);
-          const pill = el('span', 'stars-pill gw-trophy-pill', right);
-          el('span', 'star earned', pill, '★');
-          el('span', undefined, pill, ` ${totals.earned}/${totals.total}`);
-          row.addEventListener('click', () => { sharedSfx.play('bop'); this.showGearworksTrophy(); });
-          return;
-        }
-        const playable = entry.kind !== 'soon';
-        const thisSeqIdx = seqIdx;
-        // Playable levels unlock in order (first is always open).
-        const unlocked = playable && (garageOpened || thisSeqIdx === 0 ||
-          (this.store.stars[gwEntryId(GEARWORKS_SEQUENCE[thisSeqIdx - 1])] ?? 0) >= 1);
-        if (playable) seqIdx++;
-        const label = entry.kind === 'soon' ? entry.shortTitle : entry.level.shortTitle;
-        const emoji = entry.kind === 'soon' ? entry.emoji : entry.level.emoji;
-        const row = el('button', `level-item${unlocked ? '' : ' locked'}`, list) as HTMLButtonElement;
-        row.type = 'button';
-        row.setAttribute('aria-label', unlocked ? `Play ${label}` : `${label} — locked`);
-        const num = el('span', 'li-num gw-num', row);
-        el('span', 'li-num-text', num, String(i + 1));
-        el('span', 'li-leaf', num, '⚙️');
-        el('span', 'li-emoji', row, emoji);
-        el('span', 'li-name', row, label);
-        const right = el('span', 'li-right', row);
-        if (!unlocked) el('span', 'li-lock', right, '🔒');
-        const stars = entry.kind === 'soon' ? 0 : (this.store.stars[entry.level.id] ?? 0);
-        const starRow = el('span', 'li-stars', right);
-        for (let s = 0; s < 3; s++) el('span', s < stars ? 'on' : '', starRow, '★');
-        if (unlocked) {
-          row.addEventListener('click', () => this.showGearworks(thisSeqIdx));
-        } else {
-          row.addEventListener('click', () => {
-            sharedSfx.play('bump');
-            row.classList.remove('shake');
-            void row.offsetWidth;
-            row.classList.add('shake');
-            this.hintToast(playable
-              ? '⭐ Win the machine before this one to unlock it!'
-              : '🔧 Zip is still building this machine!');
-          });
-        }
-      });
-    }
-
-    // --- Zip's App Lab — the creative capstone ---
-    {
-      const lab = el('div', 'world-panel wp-applab', wrap);
-      const labTitle = el('div', 'world-title', lab);
-      el('span', 'wemoji', labTitle, APP_LAB_WORLD.glyph);
-      el('span', undefined, labTitle, APP_LAB_WORLD.name);
-      el('span', 'gw-new-badge', labTitle, 'NEW!');
-      const labList = el('div', 'level-list', lab);
-      const row = el('button', 'level-item applab-row', labList) as HTMLButtonElement;
-      row.type = 'button';
-      row.setAttribute('aria-label', "Open Zip's App Lab");
-      const num = el('span', 'li-num gw-num', row);
-      el('span', 'li-num-text', num, '★');
-      el('span', 'li-leaf', num, '🧪');
-      el('span', 'li-emoji', row, '🛠️');
-      const mid = el('span', 'li-name', row, 'Build your own app');
-      mid.title = APP_LAB_WORLD.tagline;
-      const right = el('span', 'li-right', row);
-      el('span', 'stars-pill applab-pill', right, APP_LAB_WORLD.tagline);
-      row.addEventListener('click', () => { sharedSfx.play('bop'); this.showAppLab(); });
-    }
-
-    // --- Imagination Island ---
-    const customs = loadCustomLevels();
-    const section = el('div', 'world-panel wp-island', wrap);
-    const title = el('div', 'world-title', section);
-    el('span', 'wemoji', title, '🏝️');
-    el('span', undefined, title, 'Imagination Island');
-    const list = el('div', 'level-list', section);
-    const create = el('button', 'level-item create-item', list) as HTMLButtonElement;
-    create.type = 'button';
-    el('span', 'li-emoji', create, '＋');
-    el('span', 'li-name', create, 'Build a Level');
-    create.addEventListener('click', () => this.showEditor());
-    for (const custom of customs) {
-      const row = el('button', 'level-item custom-item', list) as HTMLButtonElement;
-      row.type = 'button';
-      el('span', 'li-emoji', row, '🛠️');
-      el('span', 'li-name', row, custom.shortTitle);
-      row.addEventListener('click', () => this.showCustomGame(custom));
-      const del = el('span', 'lv-del', row, '✕');
-      del.setAttribute('aria-label', `Delete ${custom.shortTitle}`);
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteCustomLevel(custom.id);
-        this.showSelect();
-      });
-    }
-
-  }
-
-  /** Floating toast over whatever screen is active. */
-  private hintToast(text: string): void {
-    document.querySelector('.app-toast')?.remove();
-    const t = el('div', 'toast app-toast', this.host, text);
-    window.setTimeout(() => t.remove(), 2200);
+      }),
+      onPlayGearworks: (seqIndex) => this.showGearworks(seqIndex),
+      onGearworksTrophy: () => { sharedSfx.play('bop'); this.showGearworksTrophy(); },
+      onAppLab: () => { sharedSfx.play('bop'); this.showAppLab(); },
+      onGarden: () => this.showGarden(),
+      onEditor: () => this.showEditor(),
+      onCustom: (custom) => this.showCustomGame(custom),
+      onDeleteCustom: (id) => { deleteCustomLevel(id); this.showSelect(); },
+    }, {
+      index: dailyIdx,
+      level: ALL_LEVELS[dailyIdx],
+      doneToday: this.store.daily.lastCompleted === dayStamp(),
+    });
+    this.select.enter();
   }
 
   private streakToast(streak: number): void {

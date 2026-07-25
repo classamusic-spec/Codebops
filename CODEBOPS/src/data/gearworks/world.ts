@@ -340,3 +340,63 @@ export const GEARWORKS_PICKER: readonly GearworksPickerEntry[] = [
   ...GEARWORKS_SEQUENCE,
   { kind: 'trophy', id: 'gw-trophy-room', shortTitle: 'Inventor\'s Trophies', emoji: '🏆' },
 ];
+
+/**
+ * The garage in workshops (level select §layout).
+ *
+ * Forty-six machines in one list is a wall, however nicely it is drawn.
+ * These are the same levels in the same order, cut where the ideas
+ * actually change, so the picker can show one workshop at a time.
+ *
+ * `count` is how many entries of GEARWORKS_SEQUENCE the workshop covers.
+ * A test asserts the counts add up to the sequence exactly, so a level
+ * added to any group cannot silently fall off the end of the picker.
+ */
+export interface GearworksWorkshop {
+  readonly id: string;
+  readonly name: string;
+  readonly emoji: string;
+  readonly tagline: string;
+  readonly count: number;
+}
+
+export const GEARWORKS_WORKSHOPS: readonly GearworksWorkshop[] = [
+  {
+    id: 'gw-first', name: 'First Machines', emoji: '🔧',
+    tagline: 'Motors, gears and belts',
+    count: GEARWORKS_MACHINE_LEVELS.length + GEARWORKS_CHAIN_LEVELS.length,
+  },
+  {
+    id: 'gw-again', name: 'Again and Again', emoji: '🔁',
+    tagline: 'Loops, sensors and waiting',
+    count: GEARWORKS_LOOP_LEVELS.length + GEARWORKS_SENSOR_LEVELS.length,
+  },
+  {
+    id: 'gw-sorting', name: 'Sorting Shed', emoji: '🧺',
+    tagline: 'Choices and counting',
+    count: GEARWORKS_SORTER_LEVELS.length + GEARWORKS_COUNTER_LEVELS.length,
+  },
+  {
+    id: 'gw-band', name: 'Jam Room', emoji: '🥁',
+    tagline: 'Saved jobs and signals',
+    count: GEARWORKS_JAM_LEVELS.length + GEARWORKS_JOB_LEVELS.length
+      + GEARWORKS_SIGNAL_LEVELS.length,
+  },
+  {
+    id: 'gw-fixing', name: 'Fixing Bay', emoji: '🛠️',
+    tagline: 'Finding what went wrong',
+    count: GEARWORKS_DEBUG_LEVELS.length,
+  },
+  {
+    id: 'gw-factory', name: 'Big Factory', emoji: '🏭',
+    tagline: 'Conveyors, lights and queues',
+    count: GEARWORKS_FACTORY_LEVELS.length + GEARWORKS_ORCHESTRA_LEVELS.length
+      + GEARWORKS_LIGHTHOUSE_LEVELS.length + GEARWORKS_DELIVERY_LEVELS.length,
+  },
+  {
+    id: 'gw-studio', name: 'Paint & Story', emoji: '🎨',
+    tagline: 'Loops in loops, and scenes',
+    count: GEARWORKS_PAINT_LEVELS.length + GEARWORKS_STORY_LEVELS.length
+      + GEARWORKS_MAKER_LEVELS.length,
+  },
+];

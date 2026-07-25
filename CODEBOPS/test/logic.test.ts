@@ -204,6 +204,9 @@ import {
 } from '../src/data/app-lab/creatorRewards';
 import type { MakerRecord } from '../src/data/app-lab/creatorRewards';
 import { isApprovedTheme } from '../src/data/app-lab/approvedAssets';
+// ---- level select redesign ----
+import { GEARWORKS_WORKSHOPS } from '../src/data/gearworks/world';
+import { WORLD_META, WORLD_ORDER } from '../src/app/levelSelectScreen';
 // ---- App Lab Phase 14 ----
 import { TEST_SPEEDS, speedFactor, isTestSpeed } from '../src/ui/a11y';
 // ---- App Lab Phase 2 ----
@@ -3453,6 +3456,55 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const readme = readFileSync('docs/app-lab/README.md', 'utf8');
     const linked = [...readme.matchAll(/\]\(([a-z-]+\.md)\)/g)].map((m) => m[1]);
     return linked.length >= 7 && linked.every((f) => existsSync(`docs/app-lab/${f}`));
+  })());
+}
+
+// ============================================================
+// Pick a Level — one island at a time
+// ============================================================
+{
+  check('the garage workshops cover the sequence exactly, with nothing lost', (() => {
+    // If a level is added to any GEARWORKS_*_LEVELS group and no workshop
+    // claims it, it would silently vanish from the picker. This is the
+    // check that makes that impossible.
+    const covered = GEARWORKS_WORKSHOPS.reduce((a, w) => a + w.count, 0);
+    return covered === GEARWORKS_SEQUENCE.length;
+  })());
+  check('every workshop holds at least one machine',
+    GEARWORKS_WORKSHOPS.every((w) => w.count > 0));
+  check('no workshop is big enough to be a wall again',
+    GEARWORKS_WORKSHOPS.every((w) => w.count <= 12));
+  check('workshop ids are unique', (() => {
+    const ids = GEARWORKS_WORKSHOPS.map((w) => w.id);
+    return new Set(ids).size === ids.length;
+  })());
+  check('workshop names and taglines are child words, never grades',
+    GEARWORKS_WORKSHOPS.every((w) =>
+      !/\d|level|hard|easy|advanced|beginner|%/i.test(`${w.name} ${w.tagline}`)));
+
+  check('every story level lands in exactly one island', (() => {
+    const claimed = WORLD_ORDER.flatMap((id) => ALL_LEVELS.filter((l) => l.worldId === id));
+    return claimed.length === ALL_LEVELS.length
+      && new Set(claimed.map((l) => l.id)).size === ALL_LEVELS.length;
+  })());
+  check('every world in the strip has a theme with scenery and a disc colour', (() => {
+    const src = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const themes = [...new Set([
+      ...Object.values(WORLD_META).map((m) => m.theme), 'garage', 'applab', 'island',
+    ])];
+    return themes.every((t) =>
+      src.includes(`  ${t}: [`) && css.includes(`.th-${t}`) && css.includes(`.sel2-island.th-${t}`));
+  })());
+  check('the select screen never scrolls the page — the island scrolls', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.sel2-screen {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /overflow:\s*hidden/.test(block);
+  })());
+  check('a tappable pill clears the 44px floor', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return /button\.stars-pill\s*\{[^}]*min-height:\s*44px/.test(css);
   })());
 }
 
