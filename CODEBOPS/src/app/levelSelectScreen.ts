@@ -14,14 +14,14 @@
  * badly:
  *  - the island opens on the world holding the next thing to play, not on
  *    world one;
- *  - one bubble is marked as next, with Zip standing beside it.
+ *  - one bubble is flagged as next.
  *
  * Locked stones still respond. They wiggle and say what opens them, which
  * is the difference between a closed door and a wall.
  */
 import { el } from '../ui/dom';
 import { sharedSfx } from '../audio/sfx';
-import { mountMascot, preloadMascot } from '../rendering/mascotRig';
+import { preloadMascot } from '../rendering/mascotRig';
 import { mountSkyScene } from '../ui/skyScene';
 import { flowerSvg, SPLASH_FLOWERS } from '../ui/splashFlora';
 import type { SaveStore } from '../storage/saveStore';
@@ -126,8 +126,8 @@ export class LevelSelectScreen {
     // Both bops are about to be needed: whichever level is picked opens
     // with Zip and Mixy standing in it. Rasterising their layers takes
     // real time, and a child browsing the island is the moment when
-    // nobody is waiting for anything. Zip warms anyway via the peeker;
-    // Mixy would otherwise land in the middle of a level opening.
+    // nobody is waiting for anything. Neither is on this screen, so
+    // without this both would rasterise as the level opens.
     preloadMascot('zip');
     preloadMascot('mixy');
     this.worlds = this.buildWorlds();
@@ -478,13 +478,10 @@ export class LevelSelectScreen {
     el('span', `sel2-go${locked ? ' locked' : ''}`, btn,
       locked ? '🔒 Not yet' : (stone.state === 'done' ? '↻ Play again' : '▶ Play'));
 
-    if (stone.state === 'next') {
-      // Zip stands beside the orb that is next, and hops when it is picked.
-      const zip = el('span', 'sel2-zip', cell);
-      zip.setAttribute('aria-hidden', 'true');
-      const mascot = mountMascot(zip, 'zip', { calm: this.store.settings.calmMode });
-      this.mascotStops.push(() => mascot.destroy());
-    }
+    // Zip used to peek out from behind the orb that was next. At the size
+    // he fitted he was a thumbnail of a face — too small to read as a
+    // character and close enough to the orb to look like a smudge on it.
+    // The "Play next!" flag says the same thing without the clutter.
 
     if (stone.onPlay) {
       btn.addEventListener('click', () => { sharedSfx.play('bop'); stone.onPlay?.(); });
