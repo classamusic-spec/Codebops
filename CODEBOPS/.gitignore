@@ -1,2 +1,6 @@
 node_modules/
 dist-standalone/
+
+# Vercel — deploy-time state, never in git.
+.vercel/
+.vercel
