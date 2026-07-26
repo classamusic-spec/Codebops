@@ -110,16 +110,6 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 .logo-chip .logo-glyph svg { display: block; height: .92em; width: auto; }
 .logo-chip .logo-zip svg { height: 1.05em; transform: translateY(.04em); }
 
-.title-pill {
-  display: flex; align-items: center; gap: 10px;
-  background: linear-gradient(180deg, var(--ink-600), var(--ink-800));
-  border: 3px solid rgba(255,255,255,.16);
-  border-radius: var(--r-pill); padding: 10px 26px;
-  font-family: var(--font-display); font-weight: 600; font-size: clamp(16px, 2.2vw, 26px);
-  box-shadow: 0 5px 0 var(--ink-line), var(--shadow-soft);
-  white-space: nowrap;
-}
-.title-pill .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 10px var(--blue); }
 
 .stars-pill {
   display: flex; align-items: center; gap: 6px;
@@ -170,7 +160,11 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
      stay, because a notch is not decoration. */
   position: absolute; left: var(--sal); right: var(--sar);
   bottom: max(10px, var(--sab));
-  display: flex; align-items: stretch; gap: 14px;
+  /* Centred, not stretched. The panel used to fill the row, so on a wide
+     screen the tiles sat in the middle third of a slab of navy with a
+     third of it empty on either side. It is as wide as what is in it now,
+     which also hands the board back the height the deck was reserving. */
+  display: flex; align-items: stretch; justify-content: center; gap: 14px;
 }
 /**
  * The plan reads top-down: the program slots sit ABOVE the tile choices,
@@ -178,14 +172,15 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
  * a divider. Same shape on every screen size.
  */
 .deck-panel {
-  flex: 1 1 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  flex: 0 1 auto; max-width: 100%;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
   background: linear-gradient(180deg, #202f77 0%, var(--ink-800) 70%);
   border: 3px solid rgba(255,255,255,.14);
   border-radius: var(--r-xl);
   /* Tight on purpose. The slot row and tile row bring their own padding,
      so anything generous here is doubled — and every pixel spent on the
      navy card is a pixel the 3D stage does not get. */
-  padding: 6px 6px 8px;
+  padding: 4px 10px 6px;
   box-shadow: 0 6px 0 var(--ink-line), var(--shadow-card);
   min-height: 0;
   min-width: 0;
@@ -200,7 +195,7 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   justify-content: center; align-items: center;
   /* Top padding only, and only enough to clear the slot numbers that
      hang above the row. */
-  padding: 9px 2px 0;
+  padding: 8px 2px 0;
   overflow-x: auto; overflow-y: visible;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
@@ -286,7 +281,7 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
      wide slab of it was mostly padding either side of the word. Squaring
      it turns that padding into target: the label sits over the arrow and
      both get bigger. */
-  height: clamp(96px, 11vw, 150px); aspect-ratio: 1; padding: 0;
+  height: clamp(104px, 12.5vw, 172px); aspect-ratio: 1; padding: 0;
   border-radius: 30%;
   background: linear-gradient(180deg, #56e576 0%, var(--green) 55%, #2bbf52 100%);
   box-shadow: 0 8px 0 var(--green-deep), 0 18px 34px rgba(13,20,55,.45), 0 0 0 4px rgba(255,255,255,.14) inset;
@@ -538,7 +533,7 @@ body.high-contrast .rh-card p { color: #fff; }
 }
 @media (max-width: 1500px) {
   .tile, .slot, .drag-ghost { width: clamp(48px, 5.4vw, 84px); height: clamp(48px, 5.4vw, 84px); }
-  .bop-btn { height: clamp(84px, 9vw, 120px); font-size: clamp(22px, 2.6vw, 34px); }
+  .bop-btn { height: clamp(92px, 10vw, 132px); font-size: clamp(23px, 2.7vw, 36px); }
   .deck-panel { gap: 8px; padding: 8px 10px; }
 }
 @media (min-width: 1600px) {
@@ -567,7 +562,7 @@ body.high-contrast {
   --ink-800: #0a1140; --ink-600: #16225c;
   --cream: #ffffff;
 }
-body.high-contrast .deck-panel, body.high-contrast .title-pill, body.high-contrast .stars-pill { border-color: #fff; }
+body.high-contrast .deck-panel, body.high-contrast .stars-pill { border-color: #fff; }
 body.high-contrast .slot { border-color: rgba(255,255,255,.8); }
 
 /* ---- App Lab in high contrast (§14): edges everywhere, no faint text ---- */
@@ -1289,12 +1284,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   /* The glyph shrinks on a small screen; the tap target does not. 44px is
      the floor everywhere, including the crowded play bar (§14). */
   .circle-btn { font-size: 20px; }
-  .logo-chip, .top-bar-spacer, .title-pill .t-world { display: none; }
-  .title-pill {
-    flex: 1; min-width: 0; padding: 8px 14px; font-size: 14px; justify-content: flex-start;
-  }
-  .title-pill .t-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .title-pill .dot { width: 9px; height: 9px; flex: 0 0 auto; }
+  .logo-chip, .top-bar-spacer { display: none; }
   .stars-pill { padding: 6px 10px; flex: 0 0 auto; }
   .stars-pill .star { font-size: 17px; }
 
@@ -1337,8 +1327,8 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .slot .count-badge { width: 24px; height: 24px; font-size: 11px; top: -9px; right: -7px; }
   .bop-wrap { gap: 6px; justify-content: flex-end; }
   .bop-btn {
-    height: clamp(78px, 22vw, 108px); aspect-ratio: 1; flex: 0 0 auto;
-    padding: 0; font-size: 21px; border-radius: 30%; gap: 3px;
+    height: clamp(84px, 24vw, 118px); aspect-ratio: 1; flex: 0 0 auto;
+    padding: 0; font-size: 22px; border-radius: 30%; gap: 3px;
   }
   .bop-btn .tri { border-left-width: 15px; border-top-width: 10px; border-bottom-width: 10px; }
   .deck-tools { bottom: calc(100% + 6px); right: 2px; gap: 6px; }
@@ -1384,7 +1374,6 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
 @media (max-height: 540px) and (orientation: landscape) {
   .top-bar { top: max(6px, var(--sat)); }
   .circle-btn { font-size: 18px; }
-  .title-pill { padding: 6px 16px; font-size: 14px; }
   .stars-pill { padding: 4px 12px; }
   .stars-pill .star { font-size: 16px; }
   .goal-card {
@@ -1396,13 +1385,19 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .goal-visual { font-size: 20px; gap: 4px; }
   .goal-visual img { height: 24px; }
   .goal-text { font-size: 11px; text-align: left; }
-  .deck-panel { min-height: 0; padding: 4px 10px 5px; gap: 2px; }
-  .deck-sequence { padding: 9px 6px 0; }
+  /* Every pixel of deck here is a pixel of board. A landscape phone is only
+     390px tall, the deck sits across the middle where the board is, and the
+     top bar and its headroom band take another 90 — so the deck is the one
+     panel whose height decides how big the toy can be. Two rows of 42px
+     tiles still clear the 44px tap floor with their padding, and buy the
+     board back about 15% of its height. */
+  .deck-panel { min-height: 0; padding: 3px 8px 4px; gap: 1px; }
+  .deck-sequence { padding: 6px 6px 0; }
   .deck-tray { padding: 0; }
-  .tile, .slot, .drag-ghost { width: 46px; height: 46px; }
-  .tile .ico { font-size: 20px; }
-  .tile .lbl { font-size: 7.5px; }
-  .bop-btn { height: 88px; font-size: 20px; }
+  .tile, .slot, .drag-ghost { width: 42px; height: 42px; }
+  .tile .ico { font-size: 18px; }
+  .tile .lbl { font-size: 7px; }
+  .bop-btn { height: 96px; font-size: 21px; }
   .deck-tray, .deck-sequence { overflow-x: auto; scrollbar-width: none; }
   .deck-tray::-webkit-scrollbar, .deck-sequence::-webkit-scrollbar { display: none; }
   .dialog { padding: 14px 20px 16px; gap: 10px; max-height: 92vh; overflow-y: auto; }
@@ -4342,8 +4337,11 @@ button.stars-pill:active { transform: translateY(3px); }
   .tile, .slot, .drag-ghost { width: clamp(44px, 11.6vw, 54px); height: clamp(44px, 11.6vw, 54px); }
   .deck-tray { gap: 6px; }
   .deck-sequence { gap: 6px; justify-content: flex-start; }
-  /* Still well over the 44px floor, 12px shorter than before. */
-  .bop-btn { height: auto; min-height: 56px; font-size: 21px; padding: 0 14px;
+  /* A square BOP cannot work here: beside four columns of tiles on a 390px
+     screen it would leave the tiles nothing. It becomes a full-width bar
+     instead — and since it is the one control a child presses every turn,
+     it gets the height a square would have given it. */
+  .bop-btn { height: auto; min-height: 72px; font-size: 24px; padding: 0 14px;
     aspect-ratio: auto; flex-direction: row; gap: 12px; border-radius: var(--r-xl); }
   .bop-wrap { flex: 0 0 auto; }
 }

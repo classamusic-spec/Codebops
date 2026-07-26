@@ -3569,6 +3569,93 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return /left:\s*var\(--sal\)/.test(block) && /right:\s*var\(--sar\)/.test(block);
   })());
 
+  // The deck was a full-width navy slab holding eight small slots, so most
+  // of the bottom of the screen was empty panel. It shrink-wraps its slots
+  // and centres now, which is only true while it is allowed to shrink AND
+  // is not stretched by the flex line it sits on.
+  check('the deck shrink-wraps its slots rather than filling the screen', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.deck-panel {');
+    const block = css.slice(at, css.indexOf('}', at));
+    const deck = css.slice(css.indexOf('.bottom-deck {'), css.indexOf('}', css.indexOf('.bottom-deck {')));
+    return /flex:\s*0 1 auto/.test(block) && /justify-content:\s*center/.test(deck);
+  })());
+
+  // The one button a child presses most should be the biggest thing they
+  // can hit, and square — a wide pill reads as a label, not a trigger.
+  check('BOP is a large square', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.bop-btn {');
+    const block = css.slice(at, css.indexOf('}', at));
+    const h = /height:\s*clamp\((\d+)px/.exec(block);
+    return /aspect-ratio:\s*1/.test(block) && h !== null && Number(h[1]) >= 100;
+  })());
+
+  // The pill was the widest element on the level screen and carried a name
+  // the child had just tapped. It went; the name must not go with it, or
+  // a screen reader loses the only statement of which level is open.
+  check('the level name reaches assistive tech without a title pill', (() => {
+    const bar = readFileSync('src/ui/topBar.ts', 'utf8');
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return /this\.root\.setAttribute\('aria-label', title\)/.test(bar)
+      && !/'title-pill'/.test(bar) && !/\.title-pill\b/.test(css);
+  })());
+
+  // The fit used to break out of its loop the moment the frame fitted, so
+  // the arbitrary starting distance was a ceiling: a board that already
+  // fitted at 11 units stayed there and left the free area half empty.
+  check('the camera fit converges in both directions', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    const at = src.indexOf('private applyFrame()');
+    const body = src.slice(at, src.indexOf('\n  }', at));
+    // A bare `if (need <= 1) break` is the bug — it can only dolly out.
+    return !/if \(need <= 1[^)]*\) break/.test(body)
+      && /need > 0\.98 && need <= 1/.test(body)
+      && /dist = Math\.min\(60, Math\.max\(4, dist \* need\)\)/.test(body);
+  })());
+
+  // The deck is opaque and centred, and so is the board. Weighting its
+  // inset by how much of the width it spans hid the front row of tiles
+  // behind it on a landscape phone — the row a child is about to walk on.
+  check('a centred bottom panel is reserved in full, side panels are not', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    const at = src.indexOf('private measureChrome()');
+    const body = src.slice(at, src.indexOf('\n  private ', at + 10));
+    return /edge === 'bottom' && r\.left <= mid && r\.right >= mid/.test(body)
+      && /const cover = underBoard \? 1/.test(body)
+      // Naming a layout wrapper instead of the panel that paints makes the
+      // inset claim the whole width and over-reserve by ~60px.
+      && /bottom: \['\.deck-panel'/.test(src) && !/'\.bottom-deck'/.test(src);
+  })());
+
+  // ---- the characters ----
+  // A bop that only floats reads as a picture of a bop. The idle hop is the
+  // difference, and two things have to hold for it to look deliberate
+  // rather than frantic: it is spaced in the rig's own clamped clock (a
+  // wall-clock timer drains faster than the clip it spaces out as soon as
+  // the frame rate drops, and the gap collapses — measured at 97% of frames
+  // mid-hop on a software renderer), and it only ever starts from idle, so
+  // it cannot restack on itself or clip the tail of a game-driven clip.
+  check('the idle hop is paced in rig time and starts only from idle', (() => {
+    const src = readFileSync('src/rendering/spriteCharacter.ts', 'utf8');
+    const at = src.indexOf('this.hopClock -=');
+    const block = src.slice(at, at + 600);
+    return /this\.hopClock -= Math\.min\(0\.05,/.test(block)
+      && /this\.currentClip\(\) === 'idle'/.test(block)
+      && /play\('bounce', \{ restart: true \}\)/.test(block);
+  })());
+
+  // `rig.pose` is a channel map of NUMBERS — `pose.base` is a blend weight.
+  // Reading it as the clip name typechecks nowhere and, cast away, would
+  // silently label every character "0".
+  check('the clip name is read from rig state, never from the pose map', (() => {
+    const src = readFileSync('src/rendering/spriteCharacter.ts', 'utf8');
+    const decl = readFileSync('src/vendor/codebops-rig/codebops-rig.d.ts', 'utf8');
+    return /interface Pose \{ \[channel: string\]: number \}/.test(decl)
+      && /\{ s\?: \{ base\?: string \} \}/.test(src)
+      && !/\.pose\.base/.test(src);
+  })());
+
   // ---- the splash ----
   // Play is the only button on it now. That is only safe while the two
   // it replaced still have a door somewhere else: the Garden opens from

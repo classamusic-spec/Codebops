@@ -162,14 +162,22 @@ export class GameScreen {
       // while the frame had slack, and stopped being enough the moment it
       // was tightened: measured, her silhouette hung 22px past the right
       // edge in eight of fifteen world x viewport combinations. Half a
-      // body width either side, ground to head, and she is whole.
+      // body width either side and she is whole across the frame.
       const perch = this.world.mixyLookout().clone();
       perch.y = 0.2;
       const HALF_W = 0.9;
-      const HEAD_Y = 1.75;
+      // Her SHOULDERS, not the top of her antennae. Her perch is off the
+      // side of the board, so a point at head height projects higher than
+      // anything on the board does, and the fit then treats it exactly like
+      // the back-row head point the note below rejects: it was the binding
+      // constraint on a landscape phone, holding the board to 27% of the
+      // screen when the free area had room for 45%. Her head lives in the
+      // band the Stage reserves under the top bar, which is what that band
+      // is for.
+      const SHOULDER_Y = 0.55;
       for (const dx of [-HALF_W, HALF_W]) {
         framePts.push(perch.clone().setX(perch.x + dx));
-        framePts.push(perch.clone().setX(perch.x + dx).setY(HEAD_Y));
+        framePts.push(perch.clone().setX(perch.x + dx).setY(SHOULDER_Y));
       }
       // Head room for a bop standing on the back row is NOT declared here.
       // A point two units above the furthest row projects near the top of

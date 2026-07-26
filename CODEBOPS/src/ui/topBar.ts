@@ -1,4 +1,4 @@
-/** Top bar: back · logo · level title pill · star progress · settings. */
+/** Top bar: back · logo · star progress · settings. */
 import { el } from './dom';
 
 export interface TopBarEvents {
@@ -21,18 +21,12 @@ export class TopBar {
     mark.src = './art/logo.svg';
     mark.alt = 'CodeBops';
 
-    el('div', 'top-bar-spacer', this.root);
-
-    const pill = el('div', 'title-pill', this.root);
-    el('span', 'dot', pill);
-    // Split "World X: Name · Level" so small screens can drop the prefix.
-    const sep = title.indexOf(' · ');
-    if (sep > 0) {
-      el('span', 't-world', pill, `${title.slice(0, sep)} · `);
-      el('span', 't-text', pill, title.slice(sep + 3));
-    } else {
-      el('span', 't-text', pill, title);
-    }
+    // The level's name used to ride in a pill across the middle of the bar.
+    // A child who just tapped a level knows which level they tapped, and
+    // the pill was the widest thing on the screen that nobody reads —
+    // sitting over the board and taking the top off the world. The name
+    // still reaches a screen reader through the bar's own label.
+    this.root.setAttribute('aria-label', title);
 
     el('div', 'top-bar-spacer', this.root);
 

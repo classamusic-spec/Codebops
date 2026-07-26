@@ -198,10 +198,20 @@ export class Stage {
     this.resize();
   }
 
-  /** Chrome selectors, by the edge they occupy. */
+  /**
+   * Chrome selectors, by the edge they occupy.
+   *
+   * Name what actually PAINTS, never its layout wrapper. The bottom used to
+   * name `.bottom-deck`, which is a full-width flex row holding a panel that
+   * only covers the middle of it. Because the inset is weighted by how much
+   * of the edge a panel spans, the wrapper claimed the whole width and
+   * reserved 149px of a 390px landscape phone — nearly twice the 88px the
+   * visible panel needs — and the board was fitted into 39% of the screen
+   * height with the world plainly visible either side of the deck.
+   */
   private static readonly CHROME = {
     top: ['.top-bar', '.gw-sky-board', '.gw-queue-strip', '.gw-state-map'],
-    bottom: ['.bottom-deck', '.beat-seq'],
+    bottom: ['.deck-panel', '.bop-btn', '.beat-seq'],
     left: ['.goal-card', '.gw-jobcard', '.gw-paint-board'],
     right: ['.gw-trail'],
   };
@@ -221,13 +231,31 @@ export class Stage {
             : edge === 'bottom' ? box.bottom - r.top
               : edge === 'left' ? r.right - box.left
                 : box.right - r.left;
-          // Weight by how much of that edge the panel actually spans: a
-          // full-width bar blocks the view completely, but a small corner
-          // card only clips a corner — reserving its full width would
-          // shove the puzzle off-centre for no reason.
-          const cover = (edge === 'top' || edge === 'bottom')
-            ? r.width / box.width
-            : r.height / box.height;
+          // How much of the view this panel really takes away.
+          //
+          // Weighted by how much of its edge the panel spans: a full-width
+          // bar blocks the view completely, but a small corner card only
+          // clips a corner, and reserving its full depth would shove the
+          // puzzle off-centre for no reason.
+          //
+          // The floor of the screen is the exception. The command deck is
+          // centred and opaque, and so is the board — so whatever the deck
+          // spans horizontally, it is in front of the front row of tiles,
+          // which is the row a child is about to walk onto. Weighted, it
+          // under-reserved by 57px on a landscape phone and the front row
+          // vanished behind it. Reserve a centred bottom panel in full.
+          //
+          // Deliberately NOT applied to the other three edges. Tried, and
+          // the goal card — which straddles the middle of the left edge on
+          // a desktop — went from claiming 55px to claiming 262px, became
+          // the binding constraint, and took a third off the board. It sits
+          // beside the board rather than under it, so the weighting is the
+          // honest measure there.
+          const across = edge === 'top' || edge === 'bottom';
+          const mid = box.left + box.width / 2;
+          const underBoard = edge === 'bottom' && r.left <= mid && r.right >= mid;
+          const cover = underBoard ? 1
+            : across ? r.width / box.width : r.height / box.height;
           next[edge] = Math.max(next[edge], d * Math.min(1, cover));
         }
       }
@@ -256,8 +284,16 @@ export class Stage {
 
   /**
    * Fit-by-projection: place the camera along the view direction, project
-   * every frame point, and dolly out until all of them land inside the
-   * viewport with margin. Iterative (4 passes converge) and aspect-proof.
+   * every frame point, and dolly until all of them land exactly inside the
+   * free area with margin. Iterative and aspect-proof.
+   *
+   * Note "dolly", not "dolly out". This used to break out of the loop the
+   * moment the points fitted, which meant the starting distance was a
+   * ceiling on how big the board could ever be: a level whose frame already
+   * fitted at 11 units stayed at 11 and left the free area half empty. On a
+   * landscape phone the board came out at 27% of the screen height when
+   * there was room for 45%. It converges both ways now, so the frame always
+   * fills the space it is given whatever the viewport.
    */
   private applyFrame(): void {
     // Chrome is reserved via insets now, so this is just breathing room
@@ -265,7 +301,7 @@ export class Stage {
     const margin = 1.02;
     let dist = 11;
     const cam = this.camera;
-    for (let pass = 0; pass < 5; pass++) {
+    for (let pass = 0; pass < 8; pass++) {
       cam.position.copy(this.frameCenter).addScaledVector(this.viewDir, dist);
       // Vertical centering follows the caller's frame center (grid worlds
       // pass y=0.2 for ground focus; the Gearworks bench passes bench height).
@@ -294,9 +330,14 @@ export class Stage {
           Math.abs(p.x - this.centerX) / this.fitX,
           Math.abs(p.y - this.centerY) / this.fitY);
       }
+      if (this.framePoints.length === 0) break;
       const need = worst * margin / this.zoom;
-      if (need <= 1 || this.framePoints.length === 0) break;
-      dist *= need;
+      // Converged. A loose tolerance on the "pull in" side only: being 2%
+      // short of the edge is invisible, and chasing it would let one frame
+      // point's rounding push the camera back and forth forever.
+      if (need > 0.98 && need <= 1) break;
+      // Never inside the geometry, and never so far that fog eats the board.
+      dist = Math.min(60, Math.max(4, dist * need));
     }
   }
 

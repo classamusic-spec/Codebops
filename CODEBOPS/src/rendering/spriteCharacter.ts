@@ -114,6 +114,19 @@ export class SpriteCharacter {
    */
   private settle = 0;
   private lookClock = 5 + Math.random() * 4;
+  /**
+   * Seconds until the next idle hop, and how long the current one has
+   * left. A bop that only floats reads as a picture of a bop; one that
+   * hops on the spot while it waits reads as something waiting FOR you.
+   * Staggered per character so the two of them never bounce in lockstep.
+   */
+  private hopClock = 1.6 + Math.random() * 2.6;
+  /**
+   * Counts down while a clip the game asked for is playing. The idle hop
+   * never interrupts a walk, a celebration or a glitch — it only fills the
+   * gaps between them.
+   */
+  private busy = 0;
   /** Art-box width / height, so the label anchor matches the silhouette. */
   private aspect = 1;
   private readonly ready: Promise<void>;
@@ -238,6 +251,18 @@ export class SpriteCharacter {
     scene.add(this.shadow);
   }
 
+  /**
+   * The name of the clip the rig is playing right now.
+   *
+   * `rig.pose` is a numeric channel map — `pose.base` is a blend weight, not
+   * a name — so the only place the name exists is the rig's internal state,
+   * which its declarations do not expose. Narrow cast rather than a change
+   * to the vendored engine, which is kept byte-identical to upstream.
+   */
+  private currentClip(): string | undefined {
+    return (this.rig as unknown as { s?: { base?: string } } | null)?.s?.base;
+  }
+
   /** Something changed: let the rig animate it through, even in calm mode. */
   private touch(seconds = 1.2): void {
     this.settle = Math.max(this.settle, seconds);
@@ -274,6 +299,8 @@ export class SpriteCharacter {
     const rig = this.rig;
     if (!rig) return;
     this.touch(2.0);
+    // A held mood (thinking, surprised) owns the body until it clears.
+    if (mood !== 'idle') this.busy = Math.max(this.busy, 1.6);
     rig.setFace(MOOD_FACE[mood]);
     if (mood === 'thinking') rig.play('thinking');
     else if (mood === 'surprised') rig.play('surprised');
@@ -311,6 +338,7 @@ export class SpriteCharacter {
     // The clip supplies the air tilt and the landing squash; the tween
     // supplies the travel. Together they read as one jump.
     this.touch(duration + 1.4);
+    this.busy = duration + 1.4;
     if (!this.calm) this.rig?.play('hop', { restart: true });
     await this.tweener.tween(duration, (k) => {
       this.root.position.lerpVectors(from, to, k);
@@ -322,6 +350,7 @@ export class SpriteCharacter {
   async bumpShake(): Promise<void> {
     this.flashMood('surprised', 900);
     this.touch(1.8);
+    this.busy = 1.8;
     this.rig?.play('surprised', { restart: true });
     await new Promise((r) => setTimeout(r, 320));
   }
@@ -342,6 +371,7 @@ export class SpriteCharacter {
   }
 
   async celebrate(): Promise<void> {
+    this.busy = this.calm ? 0.6 : 2.4;
     this.setMood('excited');
     await new Promise((r) => setTimeout(r, this.calm ? 400 : 1600));
     this.setMood('idle');
@@ -352,6 +382,7 @@ export class SpriteCharacter {
     // scanline band. Zip has none, and shouldn't: he does not glitch.
     const rig = this.rig;
     this.touch(duration + 1.2);
+    this.busy = duration + 1.2;
     if (rig?.animations.includes('glitch')) rig.play('glitch', { restart: true });
     await new Promise((r) => setTimeout(r, duration * 1000));
     rig?.play('idle');
@@ -373,6 +404,26 @@ export class SpriteCharacter {
 
     // Occasional glances, so a resting bop is never a statue. Calm mode
     // is exactly the case where a statue is what was asked for.
+    if (this.busy > 0) this.busy -= dt;
+    // Hop on the spot between jobs. `bounce` is the rig's in-place clip —
+    // an anticipation crouch, a jump and a landing settle — as opposed to
+    // `hop`, which travels and belongs to hopTo().
+    if (!this.calm && this.busy <= 0) {
+      // Paced in RIG time, not wall time. The rig's clock is clamped to
+      // 0.05 per frame (see below), so on anything slower than 20fps a
+      // wall-clock timer drains faster than the clip it is spacing out and
+      // the gap between hops collapses. Measured at 97% of frames mid-hop
+      // on a software renderer before this was clamped.
+      this.hopClock -= Math.min(0.05, dt > 0 ? dt : 0);
+      // ...and only ever from a standing start, so a hop can neither
+      // restack on itself nor cut off the tail of a clip the game asked for
+      // in the frame where `busy` happened to run out.
+      if (this.hopClock <= 0 && this.currentClip() === 'idle') {
+        this.hopClock = 2.6 + Math.random() * 3.4;
+        this.rig?.play('bounce', { restart: true });
+        this.touch(2.0);
+      }
+    }
     if (!this.calm) this.lookClock -= dt;
     if (this.lookClock <= 0 && !this.calm) {
       const dirs: LookDir[] = ['left', 'right', null, 'up'];
@@ -409,6 +460,13 @@ export class SpriteCharacter {
         : Math.sin(elapsed * 2.2 + this.bobPhase) * this.opts.height * 0.012;
     }
 
+    // Which clip is playing, on the label anchor. The character is pixels
+    // in a WebGL canvas, so this is the only way anything outside can see
+    // what it is doing — and "is the idle hop actually firing" is not a
+    // question a screenshot can answer: the rig redraws every layer every
+    // frame either way, so pixel diffs say "animating" and nothing more.
+    const playing = this.currentClip();
+    if (playing) this.el.dataset.clip = playing;
     this.syncLabel();
   }
 
