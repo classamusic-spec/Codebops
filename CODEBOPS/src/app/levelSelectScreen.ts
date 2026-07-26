@@ -22,6 +22,8 @@
 import { el } from '../ui/dom';
 import { sharedSfx } from '../audio/sfx';
 import { mountMascot, preloadMascot } from '../rendering/mascotRig';
+import { mountSkyScene } from '../ui/skyScene';
+import { flowerSvg, SPLASH_FLOWERS } from '../ui/splashFlora';
 import type { SaveStore } from '../storage/saveStore';
 import type { LevelDef } from '../data/schemas/level';
 import { ALL_LEVELS } from '../data/levels';
@@ -43,18 +45,6 @@ export const WORLD_META: Record<string, { emoji: string; name: string; theme: st
 export const WORLD_ORDER = [
   'sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town', 'agent-academy',
 ];
-
-/** Little decorations per theme. Purely scenery — always aria-hidden. */
-const THEME_DECOR: Record<string, readonly string[]> = {
-  meadow: ['🌸', '🌼', '🦋', '🌿'],
-  bay: ['🫧', '🐚', '🌊', '🐠'],
-  forest: ['🍄', '🌲', '🌸', '🍃'],
-  town: ['🔧', '🤖', '📦', '⚡'],
-  academy: ['📘', '🎓', '✨', '🧠'],
-  garage: ['⚙️', '🔩', '🛠️', '💡'],
-  applab: ['🧪', '✨', '🛠️', '💡'],
-  island: ['🏝️', '🌴', '⭐', '🐚'],
-};
 
 type StoneState = 'done' | 'open' | 'next' | 'locked' | 'soon';
 
@@ -128,6 +118,11 @@ export class LevelSelectScreen {
 
   enter(): void {
     this.root.classList.add('sel2-screen');
+    // The same world the splash builds, so pressing Play feels like
+    // walking further into one place rather than cutting to a menu. The
+    // land is a strip along the bottom here: this screen has content to
+    // hold and cannot spare half the height for hills.
+    mountSkyScene(this.root, { compact: true });
     // Both bops are about to be needed: whichever level is picked opens
     // with Zip and Mixy standing in it. Rasterising their layers takes
     // real time, and a child browsing the island is the moment when
@@ -185,7 +180,8 @@ export class LevelSelectScreen {
     const garden = el('button', 'stars-pill garden-pill', pills) as HTMLButtonElement;
     garden.type = 'button';
     garden.setAttribute('aria-label', 'Visit the Bop Garden');
-    el('span', undefined, garden, '🌻');
+    const gicon = el('span', 'gp-flower', garden);
+    gicon.innerHTML = flowerSvg(SPLASH_FLOWERS[3], 1);
     el('span', undefined, garden, ` ${this.store.daily.totalCompleted}`);
     garden.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onGarden(); });
   }
@@ -195,14 +191,25 @@ export class LevelSelectScreen {
     const done = this.daily.doneToday;
     const banner = el('button', `sel2-daily${done ? ' done' : ''}`, this.root) as HTMLButtonElement;
     banner.type = 'button';
-    el('span', 'sd-glyph', banner, done ? '✅' : '📅');
+    const badge = el('span', `sd-glyph${done ? ' done' : ''}`, banner);
+    badge.innerHTML = done
+      ? '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" fill="#43d366" stroke="#002152" stroke-width="4"/>'
+        + '<path d="M12 20.5 17.5 26 28 14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg viewBox="0 0 40 40" aria-hidden="true"><g stroke="#002152" stroke-width="3.4" stroke-linecap="round">'
+        + '<path d="M20 3v5M20 32v5M3 20h5M32 20h5M8 8l3.5 3.5M28.5 28.5 32 32M32 8l-3.5 3.5M11.5 28.5 8 32"/></g>'
+        + '<circle cx="20" cy="20" r="10" fill="#ffd23e" stroke="#002152" stroke-width="4"/></svg>';
     const mid = el('span', 'sd-mid', banner);
     el('span', 'sd-title', mid, done ? 'Daily Bop — done!' : 'Daily Bop');
     el('span', 'sd-sub', mid, done
       ? 'Come back tomorrow for a new one.'
       : `Today: ${this.daily.level.shortTitle} ${this.daily.level.brief.emoji}`);
     if (this.store.daily.streak > 0) {
-      el('span', 'sd-streak', banner, `🔥 ${this.store.daily.streak}`);
+      const streak = el('span', 'sd-streak', banner);
+      streak.innerHTML = '<svg viewBox="0 0 24 32" aria-hidden="true">'
+        + '<path d="M12 1c3 6-1 8 1 12 1.6-1 2-3 2-4 4 3 6 7 6 11 0 6-4.5 11-9 11S3 26 3 20c0-5 4-8 6-12 1 2 1 3 3 4-1-4-3-6 0-11Z"'
+        + ' fill="#ff7402" stroke="#002152" stroke-width="2.4" stroke-linejoin="round"/>'
+        + '<path d="M12 14c1.6 3 3 4 3 7 0 2.6-1.6 4.4-3 4.4S9 23.6 9 21c0-3 1.4-4 3-7Z" fill="#ffd23e"/></svg>';
+      el('span', undefined, streak, String(this.store.daily.streak));
     }
     banner.setAttribute('aria-label', done
       ? 'Daily Bop is done for today'
@@ -210,7 +217,7 @@ export class LevelSelectScreen {
     if (done) {
       banner.addEventListener('click', () => {
         sharedSfx.play('tap');
-        this.toast('✅ All done for today — a new one arrives tomorrow!');
+        this.toast('All done for today — a new one arrives tomorrow!');
       });
     } else {
       banner.addEventListener('click', () => {
@@ -273,14 +280,10 @@ export class LevelSelectScreen {
     if (!world) return;
     this.island.className = `sel2-island th-${world.theme}`;
 
-    // Scenery. Fixed positions per index so it never jitters on re-render.
-    const decor = el('div', 'sel2-decor', this.island);
-    decor.setAttribute('aria-hidden', 'true');
-    (THEME_DECOR[world.theme] ?? []).forEach((glyph, i) => {
-      const s = el('span', `sel2-leaf d${i}`, decor, glyph);
-      s.style.setProperty('--i', String(i));
-    });
-
+    // No scattered emoji here any more. Four floating glyphs per theme
+    // was a different flower on every platform and a different one again
+    // in each world — decoration that read as clutter. The sky scene
+    // behind the screen carries the scenery now, drawn to match.
     const head = el('div', 'sel2-island-head', this.island);
     el('span', 'sel2-island-glyph', head, world.emoji);
     const titles = el('div', 'sel2-island-titles', head);

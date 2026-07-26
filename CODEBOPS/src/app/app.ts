@@ -6,7 +6,7 @@ import type { LevelDef } from '../data/schemas/level';
 import { SaveStore, dayStamp } from '../storage/saveStore';
 import { deleteCustomLevel } from '../storage/customLevels';
 import { loadSvg } from '../rendering/svgAsset';
-import { SPLASH_FLOWERS, flowerSvg } from '../ui/splashFlora';
+import { mountSkyScene } from '../ui/skyScene';
 import { sharedSfx } from '../audio/sfx';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
@@ -139,36 +139,13 @@ export class App {
     // nothing moving, by turning the same animations off.
     screen.classList.add('title-build');
 
-    const sky = el('div', 'title-sky', screen);
-    sky.setAttribute('aria-hidden', 'true');
-    const sun = el('div', 'title-sun', sky);
-    el('div', 'title-sun-core', sun);
-    el('div', 'title-rays', sun);
-    // Two banks of cloud that drift in from opposite edges.
-    for (const cls of ['c1', 'c2', 'c3', 'c4']) el('div', `title-cloud ${cls}`, sky);
-    const deco = ['⭐', '✨', '⬡', '✦', '💧', '⭐', '✨'];
-    deco.forEach((d, i) => el('span', `title-spark s${i}`, sky, d));
-
-    // The land rises up from the bottom edge, and the trees grow on it.
-    const ground = el('div', 'title-ground', screen);
-    ground.setAttribute('aria-hidden', 'true');
-    el('div', 'title-hill h1', ground);
-    el('div', 'title-hill h2', ground);
-    for (const cls of ['t1', 't2', 't3', 't4', 't5']) {
-      const tree = el('div', `title-tree ${cls}`, ground);
-      el('div', 'tree-trunk', tree);
-      // Three stacked blobs: the same chunky toy tree the worlds use.
-      el('div', 'tree-leaf l1', tree);
-      el('div', 'tree-leaf l2', tree);
-      el('div', 'tree-leaf l3', tree);
-    }
-    for (const cls of ['b1', 'b2', 'b3', 'b4']) el('div', `title-bush ${cls}`, ground);
-    // Drawn flowers, not emoji: the same navy outline as the wordmark, and
-    // each one sways on its own stem at its own speed.
-    SPLASH_FLOWERS.forEach((style, i) => {
-      const f = el('div', `title-flower f${i}`, ground);
-      f.innerHTML = flowerSvg(style, i);
-    });
+    mountSkyScene(screen);
+    // Specks of light in the sky. These stay emoji: they are two-pixel
+    // twinkles, not artwork, and drawing them would be five more nodes to
+    // say what a sparkle already says.
+    const sparks = el('div', 'title-sparks', screen);
+    sparks.setAttribute('aria-hidden', 'true');
+    ['⭐', '✨', '⬡', '✦', '💧', '⭐', '✨'].forEach((d, i) => el('span', `title-spark s${i}`, sparks, d));
 
     const card = el('div', 'title-card', screen);
     // The logo is the hero now — the mascots used to flank it and on a

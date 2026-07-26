@@ -3533,11 +3533,27 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   // Emoji render in a different art style on every platform, so a splash
   // built from them looks like four illustrators disagreeing. The flowers
   // are drawn to match the wordmark instead.
-  check('the splash draws its flowers rather than borrowing the platform\'s', (() => {
+  check('the scene draws its flowers rather than borrowing the platform\'s', (() => {
+    const scene = readFileSync('src/ui/skyScene.ts', 'utf8');
     const app = readFileSync('src/app/app.ts', 'utf8');
     const splash = app.slice(app.indexOf('private showTitle'), app.indexOf('// ---------- level select'));
     // Sparkles are still emoji on purpose — they are specks, not artwork.
-    return /flowerSvg\(/.test(splash) && !/[\u{1F330}-\u{1F33F}]/u.test(splash);
+    return /flowerSvg\(/.test(scene) && !/[\u{1F330}-\u{1F33F}]/u.test(splash);
+  })());
+
+  // Both screens mount the same scene. If the menu ever stops, it goes
+  // back to being a flat gradient that looks like a different app.
+  check('the splash and the menu stand in the same world', (() => {
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    const select = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+    return /mountSkyScene\(screen\)/.test(app)
+      && /mountSkyScene\(this\.root, \{ compact: true \}\)/.test(select);
+  })());
+
+  // The scatter of theme emoji is gone from the menu.
+  check('the menu scatters no decorative emoji of its own', (() => {
+    const src = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+    return !/THEME_DECOR/.test(src) && !/sel2-leaf/.test(src);
   })());
 
   check('every splash flower has petals, a heart and a stem', (() => {
@@ -3681,14 +3697,25 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return claimed.length === ALL_LEVELS.length
       && new Set(claimed.map((l) => l.id)).size === ALL_LEVELS.length;
   })());
-  check('every world in the strip has a theme with scenery and a disc colour', (() => {
-    const src = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+  // The per-theme scatter of emoji is gone — the sky scene carries the
+  // scenery now — so a theme needs two things: a disc colour for its
+  // medallion, and a glow colour for the island it opens.
+  check('every world in the strip has a disc colour and an island glow', (() => {
     const css = readFileSync('src/styles/main.css', 'utf8');
     const themes = [...new Set([
       ...Object.values(WORLD_META).map((m) => m.theme), 'garage', 'applab', 'island',
     ])];
     return themes.every((t) =>
-      src.includes(`  ${t}: [`) && css.includes(`.th-${t}`) && css.includes(`.sel2-island.th-${t}`));
+      css.includes(`.sel2-med-disc.th-${t}`) && css.includes(`.sel2-island.th-${t}`));
+  })());
+
+  // The disc gradients and the island glow both hang off the same th-*
+  // class. While those gradients were unscoped, opening a world painted a
+  // medallion's background across the whole island — which is what was
+  // hiding the sky scene behind it.
+  check('a theme gradient paints a medallion disc, never the island', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return !/^\.th-[a-z]+\s/m.test(css);
   })());
   check('the select screen never scrolls the page — the island scrolls', (() => {
     const css = readFileSync('src/styles/main.css', 'utf8');
