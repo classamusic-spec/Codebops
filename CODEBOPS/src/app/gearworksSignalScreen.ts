@@ -17,7 +17,8 @@ import { SpriteCharacter } from '../rendering/spriteCharacter';
 import { TopBar } from '../ui/topBar';
 import { ThinkTrailPanel, ThinkTrailStep } from '../ui/gearworks/statePanel';
 import { ParallelDeck } from '../ui/gearworks/parallelDeck';
-import { showBrief, showCelebration, showSettings } from '../ui/dialogs';
+import { showBrief, showCelebration, showSettings, showHintCard } from '../ui/dialogs';
+import { benchHints } from '../gameplay/hints';
 import { sharedSfx } from '../audio/sfx';
 import { SaveStore } from '../storage/saveStore';
 import { el } from '../ui/dom';
@@ -96,6 +97,11 @@ export class GearworksSignalScreen {
     this.topBar = new TopBar(this.ui, `${this.level.title} · ${this.level.shortTitle}`, {
       onBack: this.events.onExit,
       onSettings: () => showSettings(this.ui, this.events.store, sharedSfx, () => this.applySettings()),
+      // Same ? button as every other level. The bench levels are not
+      // grids, so there is nothing to walk — but each one already
+      // carries a coach hint written for the Think Trail, which is
+      // exactly the nudge this wants.
+      onHint: () => showHintCard(this.ui, sharedSfx, benchHints(this.level)),
     });
     this.topBar.setStars(this.events.store.stars[this.level.id] ?? 0);
 

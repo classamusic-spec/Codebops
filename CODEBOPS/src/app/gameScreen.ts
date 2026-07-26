@@ -19,8 +19,9 @@ import { GoalCard } from '../ui/goalCard';
 import { ProgramDeck } from '../ui/programDeck';
 import {
   showPrediction, showCelebration, showGlitchReplay, showSettings,
-  showToast, showBrief, showFredDialog,
+  showToast, showBrief, showFredDialog, showHintCard,
 } from '../ui/dialogs';
+import { levelHints } from '../gameplay/hints';
 import { sharedSfx } from '../audio/sfx';
 import { SaveStore } from '../storage/saveStore';
 import { assertLevelValid } from '../data/schemas/level';
@@ -194,6 +195,9 @@ export class GameScreen {
     this.topBar = new TopBar(ui, `${this.level.title} · ${this.level.shortTitle}`, {
       onBack: this.events.onExit,
       onSettings: () => showSettings(ui, this.store, this.sfx, () => this.applySettings()),
+      // Worked out fresh on every tap, from the plan as it stands right
+      // now — that is the whole point of it, so it must not be captured.
+      onHint: () => showHintCard(ui, this.sfx, levelHints(this.level, this.program, this.selectedRule)),
     });
     this.topBar.setStars(this.store.stars[this.level.id] ?? 0);
     new GoalCard(ui, this.level.goalText, ITEM_EMOJI[this.level.items[0]?.kind ?? 'strawberry']);

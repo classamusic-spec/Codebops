@@ -101,6 +101,22 @@ button { font-family: inherit; border: 0; cursor: pointer; }
 .circle-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #5e2fa8; }
 .circle-btn.blue { background: linear-gradient(180deg, #5fc9ff 0%, var(--blue-deep) 100%); box-shadow: 0 5px 0 #1c55ab, var(--shadow-soft); }
 .circle-btn.blue:active { box-shadow: 0 1px 0 #1c55ab; }
+
+/* The hint button. Sunny yellow so it reads as help rather than as
+   another chrome control, and a slow breathing glow so a child who is
+   stuck and scanning the screen finds it without being told. */
+.circle-btn.hint-btn {
+  background: linear-gradient(180deg, #ffd85e 0%, #f5a300 100%);
+  box-shadow: 0 5px 0 #b97600, var(--shadow-soft);
+  color: var(--ink-800); font-family: var(--font-display);
+  font-weight: 800; font-size: 30px; text-shadow: 0 2px 0 rgba(255,255,255,.5);
+  animation: hint-breathe 3.4s ease-in-out infinite;
+}
+.circle-btn.hint-btn:active { box-shadow: 0 1px 0 #b97600; animation: none; }
+@keyframes hint-breathe {
+  0%, 68%, 100% { box-shadow: 0 5px 0 #b97600, var(--shadow-soft); }
+  84% { box-shadow: 0 5px 0 #b97600, 0 0 0 7px rgba(255,216,94,.34), var(--shadow-soft); }
+}
 .circle-btn:focus-visible, .tile:focus-visible, .btn-play:focus-visible, .bop-btn:focus-visible { outline: 4px solid var(--yellow); outline-offset: 2px; }
 .btn-play:focus:not(:focus-visible), .circle-btn:focus:not(:focus-visible) { outline: none; }
 
@@ -4344,4 +4360,28 @@ button.stars-pill:active { transform: translateY(3px); }
   .bop-btn { height: auto; min-height: 72px; font-size: 24px; padding: 0 14px;
     aspect-ratio: auto; flex-direction: row; gap: 12px; border-radius: var(--r-xl); }
   .bop-wrap { flex: 0 0 auto; }
+}
+
+/* ---- hint card ---- */
+/* Reads as a friendly aside, not as a verdict: cream on navy like the
+   goal card rather than the darker dialogs that announce a result. */
+.hint-card { max-width: min(520px, 88vw); gap: 14px; }
+.hint-card h2 { color: var(--yellow); }
+.hint-card p { color: var(--cream); font-size: clamp(15px, 1.9vw, 20px); line-height: 1.45; }
+.hint-card .intro-emoji { font-size: clamp(40px, 5vw, 62px); }
+/* "Show me more" is deliberately quieter than "Got it" — the way out
+   should be the easiest thing to press, so a child who only wanted a
+   glance is not nudged toward taking more help than they need. */
+.hint-card .hint-more {
+  background: linear-gradient(180deg, #6f7fd4 0%, #45539f 100%);
+  box-shadow: 0 4px 0 #2e3a76, var(--shadow-soft);
+  font-size: clamp(13px, 1.5vw, 16px); padding: 9px 18px;
+}
+.hint-card .hint-more:active { box-shadow: 0 1px 0 #2e3a76; }
+.hint-card .hint-more[hidden] { display: none; }
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .hint-card { gap: 9px; padding: 14px 20px 16px; }
+  .hint-card .intro-emoji { font-size: 32px; }
+  .hint-card p { font-size: 13px; }
 }

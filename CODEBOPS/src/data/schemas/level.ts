@@ -35,6 +35,13 @@ export interface LevelDef {
   readonly prefill?: readonly ProgramStep[];
   /** Intro briefing shown before the level starts. */
   readonly brief: { readonly title: string; readonly text: string; readonly emoji: string };
+  /**
+   * Optional hand-written nudge for the ? button, replacing the one worked
+   * out from the level. Only the NUDGE — the concrete next step stays
+   * derived, so an override can never point at a square that has moved.
+   * Phrase it as a question about where to look, never as the answer.
+   */
+  readonly hint?: string;
   /** Bonus star rule: use a tile of this family in the winning program. */
   readonly bonusStar?: 'loop' | 'condition' | 'swap' | 'rule';
   /** Agent Academy: helper-rule choices the kid can switch between. */

@@ -7,6 +7,7 @@ import type { SaveStore } from '../storage/saveStore';
 import { showCodePeek } from './codePeek';
 import type { CodePeekInfo } from './codePeek';
 import { TEST_SPEEDS, isTestSpeed, speechAvailable } from './a11y';
+import type { Hint } from '../gameplay/hints';
 
 function scrim(parent: HTMLElement): HTMLElement {
   return el('div', 'dialog-scrim', parent);
@@ -346,4 +347,56 @@ export function showToast(parent: HTMLElement, text: string): void {
   const t = el('div', 'toast', parent, text);
   clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => t.remove(), 2200);
+}
+
+/* ---------------- Hint card ---------------- */
+
+/**
+ * The card behind the ? button.
+ *
+ * Opens on the gentlest hint and offers one more only if the child asks
+ * for it, so the help arrives in the order they need it rather than all
+ * at once. There is never a tier that finishes the level — see hints.ts.
+ */
+export function showHintCard(parent: HTMLElement, sfx: Sfx, hints: readonly Hint[]): void {
+  if (hints.length === 0) return;
+  const previousFocus = document.activeElement;
+  const s = scrim(parent);
+  const d = el('div', 'dialog hint-card', s);
+  d.setAttribute('role', 'dialog');
+  d.setAttribute('aria-modal', 'true');
+  d.setAttribute('aria-label', 'Hint');
+
+  const emoji = el('div', 'intro-emoji', d);
+  const title = el('h2', undefined, d);
+  const body = el('p', undefined, d);
+  // A live region: tapping "Show me more" swaps the text in place rather
+  // than opening a second card, and a screen reader has to hear that.
+  body.setAttribute('aria-live', 'polite');
+  const more = el('button', 'mini-btn hint-more', d, '🔎 Show me more') as HTMLButtonElement;
+  const done = el('button', 'mini-btn', d, '👍 Got it!') as HTMLButtonElement;
+
+  let at = 0;
+  const paint = (): void => {
+    const h = hints[at];
+    emoji.textContent = h.emoji;
+    title.textContent = h.title;
+    body.textContent = h.text;
+    // Hidden rather than disabled on the last tier: a button a child can
+    // press that does nothing is worse than no button.
+    more.hidden = at >= hints.length - 1;
+  };
+  paint();
+
+  more.addEventListener('click', () => {
+    at = Math.min(at + 1, hints.length - 1);
+    sfx.play('tap');
+    paint();
+    (more.hidden ? done : more).focus();
+  });
+  done.addEventListener('click', () => {
+    sfx.play('bop');
+    closeDialog(s, previousFocus);
+  });
+  done.focus();
 }

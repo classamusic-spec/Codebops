@@ -18,6 +18,7 @@ import {
   AGENT_ACADEMY_1, AGENT_ACADEMY_2, AGENT_ACADEMY_3, AGENT_ACADEMY_DEBUG, AGENT_ACADEMY_CREATIVE,
 } from '../src/data/levels/agentAcademy';
 import { assertLevelValid } from '../src/data/schemas/level';
+import { levelHints, benchHints } from '../src/gameplay/hints';
 import { ALL_LEVELS } from '../src/data/levels/index';
 import { GEARWORKS_WORLD, GEARWORKS_PICKER, GW_TILES } from '../src/data/gearworks/world';
 import { CAMERA_PRESETS, presetIsNormalized } from '../src/rendering/gearworks/cameraPresets';
@@ -3626,6 +3627,107 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
       // Naming a layout wrapper instead of the panel that paints makes the
       // inset claim the whole width and over-reserve by ~60px.
       && /bottom: \['\.deck-panel'/.test(src) && !/'\.bottom-deck'/.test(src);
+  })());
+
+  // ---- hints ----
+  // The ? button must never be a dead end: a child taps it because they
+  // are stuck, and an empty card is worse than no button at all.
+  check('every level offers a hint on an empty deck', (() => {
+    const bad: string[] = [];
+    for (const lv of ALL_LEVELS) {
+      const hints = levelHints(lv, []);
+      if (hints.length === 0) bad.push(lv.id);
+      else if (hints.some((h) => !h.text.trim() || !h.title.trim())) bad.push(`${lv.id} (blank)`);
+    }
+    if (bad.length > 0) console.log('   no hint: ' + bad.slice(0, 6).join(', '));
+    return bad.length === 0;
+  })());
+
+  // Two tiers: a nudge to look somewhere, then one concrete tile. Never a
+  // third that finishes the level.
+  check('a hint never runs past two tiers', (() => {
+    const over = ALL_LEVELS.filter((lv) => levelHints(lv, []).length > 2);
+    if (over.length > 0) console.log('   over two tiers: ' + over.map((l) => l.id).slice(0, 5).join(', '));
+    return over.length === 0;
+  })());
+
+  // The step tier is walked over the real grid, so it can only ever name a
+  // move that is legal from where the child's plan actually leaves Zip. A
+  // hint that says "try MOVE RIGHT" into a tree teaches distrust.
+  check('the step a hint suggests is always a legal move', (() => {
+    const bad: string[] = [];
+    for (const lv of ALL_LEVELS) {
+      const step = levelHints(lv, []).find((h) => h.title === 'Try this next');
+      if (!step) continue;
+      const m = /the next tile is ([A-Z ]+)\./.exec(step.text);
+      if (!m) continue;
+      const dir = m[1].trim();
+      const delta: Record<string, { dc: number; dr: number }> = {
+        'MOVE RIGHT': { dc: 1, dr: 0 }, 'MOVE LEFT': { dc: -1, dr: 0 },
+        'MOVE UP': { dc: 0, dr: -1 }, 'MOVE DOWN': { dc: 0, dr: 1 },
+      };
+      const d = delta[dir];
+      if (!d) { bad.push(`${lv.id} (unknown tile ${dir})`); continue; }
+      const to = { col: lv.start.col + d.dc, row: lv.start.row + d.dr };
+      const wall = [...lv.blocked, ...(lv.zipBlocked ?? [])]
+        .some((c) => c.col === to.col && c.row === to.row);
+      const off = to.col < 0 || to.row < 0 || to.col >= lv.cols || to.row >= lv.rows;
+      if (wall || off) bad.push(`${lv.id} -> ${dir}`);
+    }
+    if (bad.length > 0) console.log('   illegal step: ' + bad.slice(0, 6).join(', '));
+    return bad.length === 0;
+  })());
+
+  // The hint has to describe the plan the child actually built, which is
+  // the whole reason it is worked out rather than written down.
+  check('a hint changes as the child builds their plan', (() => {
+    const lv = SPARKLE_MEADOW_1;
+    const empty = levelHints(lv, [])[0].text;
+    const oneStep = levelHints(lv, [{ cmd: 'moveRight' }] as ProgramStep[])[0].text;
+    const onIt = levelHints(lv, [{ cmd: 'moveRight' }, { cmd: 'moveRight' }] as ProgramStep[])[0].text;
+    const carrying = levelHints(lv,
+      [{ cmd: 'moveRight' }, { cmd: 'moveRight' }, { cmd: 'grab' }] as ProgramStep[])[0].text;
+    return new Set([empty, oneStep, onIt, carrying]).size === 4
+      && /GRAB/.test(onIt) && /star pad/.test(carrying);
+  })());
+
+  // Once Zip is holding the berry the thing to walk toward is the pad. The
+  // step tier used to name the berry he was already carrying.
+  check('a carried item is never named as the place to walk to', (() => {
+    const carrying = levelHints(SPARKLE_MEADOW_1,
+      [{ cmd: 'moveRight' }, { cmd: 'moveRight' }, { cmd: 'grab' }] as ProgramStep[]);
+    const step = carrying.find((h) => h.title === 'Try this next');
+    return step !== undefined && /star pad is/.test(step.text) && !/strawberry is/.test(step.text);
+  })());
+
+  // A hand-written nudge replaces only the QUESTION. The concrete step
+  // stays derived, so an override cannot point at a square that has moved.
+  check('an authored hint overrides the nudge but not the step', (() => {
+    const withHint = { ...SPARKLE_MEADOW_1, hint: 'Look at the trees!' };
+    const hints = levelHints(withHint, []);
+    return hints[0].text === 'Look at the trees!'
+      && hints.length === 2 && hints[1].title === 'Try this next';
+  })());
+
+  // Bench levels lead with the goal. Their coachHint was written for the
+  // Think Trail — which a child only sees after a run has gone wrong — and
+  // several name the tiles outright, so it belongs behind "Show me more".
+  check('a bench hint opens with the goal, not with the answer', (() => {
+    const h = benchHints({ goalText: 'Ring the bell!', coachHint: 'Try: START then STOP.' });
+    return h.length === 2 && h[0].text === 'Ring the bell!'
+      && h[1].title === 'Try this next' && h[1].text === 'Try: START then STOP.';
+  })());
+
+  // One button, one place, every play screen. Sixteen Gearworks screens
+  // plus the grid screen: a new screen that forgets it leaves a child on
+  // that level with no way to ask for help.
+  check('every play screen wires the ? button', (() => {
+    const screens = readdirSync('src/app').filter((f) => /Screen\.ts$/.test(f));
+    const play = screens.filter((f) => readFileSync(`src/app/${f}`, 'utf8').includes('new TopBar('));
+    const missing = play.filter((f) => !readFileSync(`src/app/${f}`, 'utf8').includes('onHint:'));
+    if (missing.length > 0) console.log('   no ? button: ' + missing.join(', '));
+    // The Trophy Room is a display case, not a level — nothing to hint at.
+    return play.length >= 17 && missing.every((f) => f === 'gearworksTrophyScreen.ts');
   })());
 
   // ---- background music ----

@@ -1,9 +1,14 @@
-/** Top bar: back · logo · star progress · settings. */
+/** Top bar: back · logo · hint · star progress · settings. */
 import { el } from './dom';
 
 export interface TopBarEvents {
   onBack: () => void;
   onSettings: () => void;
+  /**
+   * Open the hint card. Every play screen passes this; menus do not, and
+   * the button is simply absent there rather than present and dead.
+   */
+  onHint?: () => void;
 }
 
 export class TopBar {
@@ -29,6 +34,16 @@ export class TopBar {
     this.root.setAttribute('aria-label', title);
 
     el('div', 'top-bar-spacer', this.root);
+
+    // The one button a stuck child needs, in the same place on every
+    // level. It sits before the stars rather than out at the edge: a
+    // child looking for help looks at the middle of the bar, and the two
+    // corners are already spoken for by Back and Settings.
+    if (events.onHint) {
+      const hint = el('button', 'circle-btn hint-btn', this.root, '?');
+      hint.setAttribute('aria-label', 'Stuck? Get a hint');
+      hint.addEventListener('click', events.onHint);
+    }
 
     const stars = el('div', 'stars-pill', this.root);
     stars.setAttribute('aria-label', 'Stars earned');
