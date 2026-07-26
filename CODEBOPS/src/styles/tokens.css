@@ -64,6 +64,12 @@
 
   /* Touch targets */
   --tap-min: 56px;
+  /* How far a panel in the top-left corner must sit below the top bar to
+     clear the back button — its full height, plus room for the little
+     flags that hang above such a panel's own edge. Anything pinned under
+     the bar uses this instead of picking a number, because the numbers
+     that were picked (42, 44, 48, 50) were all smaller than the button. */
+  --under-bar: calc(var(--tap-min) + 22px);
 
   /* Safe areas */
   --sat: env(safe-area-inset-top, 0px);

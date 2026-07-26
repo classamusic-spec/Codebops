@@ -3514,6 +3514,41 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   // leaves the context attached to the canvas, so without an explicit
   // release the console starts announcing "Too many active WebGL
   // contexts" and a later level opens blank.
+  // ---- the play screen's chrome ----
+  // On a short screen the goal card becomes a chip under the top bar, and
+  // the GOAL flag hangs above the chip's own edge. Every compact rule used
+  // to pick its own offset by hand — 44, 48, 50px — all of them less than
+  // the 56px back button, so the flag sat on the button on every landscape
+  // phone. One variable, derived from the button, and no rule may go back
+  // to a hand-picked number.
+  check('nothing under the top bar clears it by a hand-picked number', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    // Derived from the button's own height...
+    const derived = /--under-bar:\s*calc\(var\(--tap-min\)\s*\+\s*\d+px\)/
+      .test(readFileSync('src/styles/tokens.css', 'utf8'));
+    // ...used by every compact rule...
+    const uses = (css.match(/var\(--under-bar\)/g) ?? []).length;
+    // ...and no .goal-card rule clears the bar with a number of its own.
+    // Other panels legitimately pick their own offsets; this is only about
+    // the card that shares the corner with the back button.
+    const handPicked: string[] = [];
+    for (const m of css.matchAll(/\.goal-card\s*\{([^}]*)\}/g)) {
+      const top = /top:\s*calc\(max\([^;]*?\)\s*\+\s*([^;)]+)\)/.exec(m[1]);
+      if (top && !top[1].includes('--under-bar')) handPicked.push(top[1].trim());
+    }
+    if (handPicked.length > 0) console.log('   hand-picked offsets: ' + handPicked.join(', '));
+    return derived && uses >= 3 && handPicked.length === 0;
+  })());
+
+  // The deck is the floor of the screen; an inset down each side made it
+  // look dropped on rather than built in. Safe-area insets stay.
+  check('the command deck reaches the sides of the screen', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.bottom-deck {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /left:\s*var\(--sal\)/.test(block) && /right:\s*var\(--sar\)/.test(block);
+  })());
+
   // ---- the splash ----
   // Play is the only button on it now. That is only safe while the two
   // it replaced still have a door somewhere else: the Garden opens from
