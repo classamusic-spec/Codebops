@@ -70,7 +70,11 @@ export class GearworksPaintScreen {
     this.stage.setSky('#171b46', 40, 100);
     this.scene = new GarageScene('motorLab');
     this.stage.scene.add(this.scene.group);
-    this.stage.frameArea(this.scene.frameCenter(), this.scene.frameCorners());
+    // 1.22 = fill 22% more of the frame. A workbench is a small
+    // object in a big room, so fitting it the way a whole board is
+    // fitted left it looking like something across the garage rather
+    // than something you are standing at.
+    this.stage.frameArea(this.scene.frameCenter(), this.scene.frameCorners(), 1.22);
 
     this.rig = new PaintRig(this.level.cols, this.level.rows);
     this.rig.group.scale.setScalar(0.62);

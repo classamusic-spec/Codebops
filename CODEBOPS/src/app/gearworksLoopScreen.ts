@@ -85,7 +85,11 @@ export class GearworksLoopScreen {
     const lift = this.level.machine === 'lift';
     this.scene = new GarageScene(lift ? 'liftBay' : 'motorLab');
     this.stage.scene.add(this.scene.group);
-    this.stage.frameArea(this.scene.frameCenter(), this.scene.frameCorners());
+    // 1.22 = fill 22% more of the frame. A workbench is a small
+    // object in a big room, so fitting it the way a whole board is
+    // fitted left it looking like something across the garage rather
+    // than something you are standing at.
+    this.stage.frameArea(this.scene.frameCenter(), this.scene.frameCorners(), 1.22);
 
     if (lift) {
       this.liftRig = new LiftRig(this.level.goal.topFloor ?? 3);

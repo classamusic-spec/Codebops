@@ -157,12 +157,26 @@ export class GameScreen {
       // the padding trimmed she fell off the canvas in three of five worlds
       // in portrait. Naming her actual spot makes the frame exactly
       // "the grid plus the friend", and nothing wider.
+      // Frame her BOX, not the spot she stands on. A single point at her
+      // feet only promises that her feet are on screen — which was enough
+      // while the frame had slack, and stopped being enough the moment it
+      // was tightened: measured, her silhouette hung 22px past the right
+      // edge in eight of fifteen world x viewport combinations. Half a
+      // body width either side, ground to head, and she is whole.
       const perch = this.world.mixyLookout().clone();
       perch.y = 0.2;
-      framePts.push(perch);
-      // Her sprite stands UP from that spot, so frame her head too — a
-      // ground point alone left the top of her cropped on a wide desktop.
-      framePts.push(perch.clone().setY(1.7));
+      const HALF_W = 0.9;
+      const HEAD_Y = 1.75;
+      for (const dx of [-HALF_W, HALF_W]) {
+        framePts.push(perch.clone().setX(perch.x + dx));
+        framePts.push(perch.clone().setX(perch.x + dx).setY(HEAD_Y));
+      }
+      // Head room for a bop standing on the back row is NOT declared here.
+      // A point two units above the furthest row projects near the top of
+      // the screen, so asking the fit to contain it dollies the camera
+      // right out — measured, the board came back a third smaller. The
+      // Stage reserves a thin band under the top bar instead, which costs a
+      // few percent of board rather than a third of it.
       this.stage.frameArea(center, framePts);
     }
 

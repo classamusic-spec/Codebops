@@ -89,18 +89,22 @@ function createPearl(): THREE.Group {
 /** Little wooden sailboat bobbing on the bay. */
 function createBoat(): THREE.Group {
   const g = new THREE.Group();
-  const hull = mesh(new RoundedBoxGeometry(2.2, 0.7, 1.0, 3, 0.2), toonMat('#b5773f'), 0, 0.35, 0);
-  hull.scale.set(1, 1, 1);
+  const hull = mesh(new RoundedBoxGeometry(2.9, 0.86, 1.3, 3, 0.24), toonMat('#b5773f'), 0, 0.42, 0);
   g.add(hull);
-  g.add(mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.9, 6), toonMat('#8d5a2b'), 0, 1.4, 0));
+  // A rim along the top, so a boat this size does not read as a plank.
+  g.add(mesh(new RoundedBoxGeometry(2.6, 0.16, 1.05, 3, 0.07), toonMat('#8d5a2b'), 0, 0.86, 0));
+  // The mast sits BACK from the middle. Mixy stands on the bow in front of
+  // it — she is a camera-facing billboard, so anything at her own depth can
+  // draw over her, and the mast used to cut her in half.
+  g.add(mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.3, 6), toonMat('#8d5a2b'), 0.25, 1.75, -0.32));
   const sailShape = new THREE.Shape();
   sailShape.moveTo(0, 0);
-  sailShape.lineTo(0.85, 0.55);
-  sailShape.lineTo(0, 1.3);
+  sailShape.lineTo(1.02, 0.66);
+  sailShape.lineTo(0, 1.56);
   sailShape.closePath();
-  const sail = mesh(new THREE.ShapeGeometry(sailShape), new THREE.MeshToonMaterial({ color: '#fff6e3', side: THREE.DoubleSide }), 0.06, 0.9, 0, false, false);
+  const sail = mesh(new THREE.ShapeGeometry(sailShape), new THREE.MeshToonMaterial({ color: '#fff6e3', side: THREE.DoubleSide }), 0.31, 1.12, -0.32, false, false);
   g.add(sail);
-  const flag = mesh(new THREE.BoxGeometry(0.28, 0.16, 0.02), toonMat('#ff5fa2'), 0.15, 2.3, 0, false, false);
+  const flag = mesh(new THREE.BoxGeometry(0.32, 0.18, 0.02), toonMat('#ff5fa2'), 0.42, 2.82, -0.32, false, false);
   g.add(flag);
   return g;
 }
@@ -113,6 +117,8 @@ export class BubbleBay {
   private bubbles: THREE.Points;
   private bubbleSpeeds: Float32Array;
   private boat: THREE.Group;
+  private readonly boatPos: THREE.Vector3;
+  private readonly fish2: THREE.Group;
   private readonly clouds: THREE.Group[] = [];
   private readonly gulls: THREE.Group[] = [];
   private readonly fish: THREE.Group[] = [];
@@ -132,7 +138,13 @@ export class BubbleBay {
     this.originZ = -((level.rows - 1) * STEP) / 2;
     const boardRight = this.originX + (level.cols - 1) * STEP;
     const boardMidZ = this.originZ + ((level.rows - 1) * STEP) / 2;
-    this.perch = new THREE.Vector3(boardRight + STEP * 0.98, 0.72, boardMidZ + STEP * 0.28);
+    // The boat used to sit a single tile off the board's edge, and being
+    // 2.9 long and rotated it swung its hull over the last column. Its
+    // CENTRE goes further out; Mixy stands on the bow, which keeps her the
+    // same distance from the board (so the camera frame does not grow) and
+    // puts her forward of the mast.
+    this.boatPos = new THREE.Vector3(boardRight + STEP * 1.72, -0.05, boardMidZ + STEP * 0.34);
+    this.perch = new THREE.Vector3(boardRight + STEP * 1.02, 0.9, boardMidZ + STEP * 0.66);
 
     // The bay itself — animated painted water
     this.waterTex = waterTexture();
@@ -203,9 +215,18 @@ export class BubbleBay {
 
     // Boat on the right — Mixy's deck, now beside the island
     this.boat = createBoat();
-    this.boat.position.set(this.perch.x, -0.05, this.perch.z);
-    this.boat.rotation.y = -0.5;
+    this.boat.position.copy(this.boatPos);
+    // Bow toward the board, so the deck Mixy stands on faces the puzzle.
+    this.boat.rotation.y = -0.62;
     this.group.add(this.boat);
+
+    // A fish that actually leaps. The bay had fish circling under the
+    // surface, which reads as pattern rather than as something happening;
+    // one of them breaks the water on a slow cycle so the level has an
+    // event in it, not only movement.
+    this.fish2 = createFish('#ffb03a', 1.25);
+    this.fish2.position.set(this.originX - STEP * 1.4, -0.1, boardMidZ + STEP * 1.5);
+    this.group.add(this.fish2);
 
     // ---- sandbar dressing: the anti-negative-space pass ----
     for (const [x, z, n, spread] of [
@@ -369,7 +390,7 @@ export class BubbleBay {
   update(dt: number, elapsed: number, windStrength = 1): void {
     this.waterTex.offset.x = (elapsed * 0.02) % 1;
     this.waterTex.offset.y = (elapsed * 0.03) % 1;
-    this.boat.position.y = -0.05 + Math.sin(elapsed * 1.1) * 0.07;
+    this.boat.position.y = this.boatPos.y + Math.sin(elapsed * 1.1) * 0.07;
     this.wind.update(elapsed, windStrength);
     if (windStrength > 0) {
       this.butterflies.forEach((b, i) => updateButterfly(b, elapsed, i * 2.6, 1.15, 0.62));
@@ -380,6 +401,18 @@ export class BubbleBay {
       buoy.rotation.z = Math.sin(elapsed * 1.1 + phase) * 0.14;
     }
     this.boat.rotation.z = Math.sin(elapsed * 0.9) * 0.03;
+    // Leap on a 5.2s cycle, in the air for the first 1.1s of it.
+    {
+      const cycle = 5.2;
+      const k = (elapsed % cycle) / 1.1;
+      const airborne = k < 1;
+      const arc = airborne ? Math.sin(k * Math.PI) : 0;
+      this.fish2.position.y = -0.1 + arc * 1.35;
+      this.fish2.rotation.z = airborne ? (k - 0.5) * 1.9 : 0;
+      this.fish2.rotation.y = 0.5 + arc * 0.5;
+      const tail = this.fish2.getObjectByName('tail');
+      if (tail) tail.rotation.y = Math.sin(elapsed * 11) * (airborne ? 0.7 : 0.35);
+    }
     for (let i = 0; i < this.clouds.length; i++) {
       const c = this.clouds[i];
       c.position.x += dt * (0.07 + i * 0.02);

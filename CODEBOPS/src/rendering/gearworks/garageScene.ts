@@ -308,8 +308,17 @@ export class GarageScene {
   }
 
   /** Floor spots where the mascots stand (DOM sprites project from here). */
-  zipSpot(): THREE.Vector3 { return new THREE.Vector3(-5.6, 0.05, 3.8); }
-  mixySpot(): THREE.Vector3 { return new THREE.Vector3(6.0, 0.05, 3.8); }
+  /**
+   * Where the two of them stand.
+   *
+   * They used to be at x = -5.6 and 6.0 — as wide as the garage. Once the
+   * bench view moved in close enough to be a bench you are standing AT,
+   * that put Zip behind the goal card and Mixy under the Think Trail. In
+   * from the walls and forward of the bench, so the closer framing keeps
+   * both of them clear of the panels.
+   */
+  zipSpot(): THREE.Vector3 { return new THREE.Vector3(-3.5, 0.05, 4.3); }
+  mixySpot(): THREE.Vector3 { return new THREE.Vector3(3.9, 0.05, 4.3); }
 
   update(dt: number, elapsed: number): void {
     for (const s of this.spinners) s.node.rotation.z += dt * s.speed;

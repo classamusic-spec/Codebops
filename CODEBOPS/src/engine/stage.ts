@@ -7,6 +7,11 @@ import { createRenderer, RendererInfo } from './renderer';
 
 export type TickHandler = (dt: number, elapsed: number) => void;
 
+// Reused every framing pass; framing runs on resize, not per frame, but
+// there is no reason to allocate here at all.
+const SHIFT_R = new THREE.Vector3();
+const SHIFT_U = new THREE.Vector3();
+
 /** Optional per-world camera/lighting override (Gearworks bench views). */
 export interface StageViewConfig {
   /** Normalized direction from look-target toward the camera. */
@@ -45,8 +50,31 @@ export class Stage {
   /** Free-area half-extents in NDC (1 = the whole canvas). */
   private fitX = 1;
   private fitY = 1;
+  /**
+   * Where the middle of the free area sits, in NDC.
+   *
+   * fitX/fitY shrink the target box symmetrically about the centre of the
+   * canvas, but the chrome is not symmetric: the command deck is three or
+   * four times the height of the top bar. Fitting to a centred box
+   * therefore left a band of unused sky above the puzzle and pressed the
+   * bottom of the grid into the deck. Shifting the target to the middle of
+   * the space that is actually free is what makes the grid sit between the
+   * bar and the deck — and what lets it be bigger, because the wasted band
+   * becomes board.
+   */
+  private centerX = 0;
+  private centerY = 0;
+  /** >1 fills more of the frame. Gearworks benches want a closer look. */
+  private zoom = 1;
   /** View direction (normalized) — the classic three-quarter storybook angle. */
-  private static readonly VIEW_DIR = new THREE.Vector3(0.02, 0.62, 0.782).normalize();
+  /**
+   * Straight on. This used to carry x = 0.02 — a two-degree yaw that made
+   * every grid in the game lean, so no row of tiles ever read as
+   * horizontal and the board looked like a photograph taken slightly
+   * crooked. The height still gives the three-quarter view; the yaw was
+   * doing nothing but the lean.
+   */
+  private static readonly VIEW_DIR = new THREE.Vector3(0, 0.62, 0.782).normalize();
   /** Active view direction (defaults to VIEW_DIR; presets may override). */
   private readonly viewDir: THREE.Vector3;
   private readonly fovFor: (aspect: number) => number;
@@ -153,9 +181,10 @@ export class Stage {
    * lookout spots). Re-applied automatically on every resize, so the whole
    * puzzle fits any screen — widescreen monitor to portrait phone.
    */
-  frameArea(center: THREE.Vector3, points: THREE.Vector3[]): void {
+  frameArea(center: THREE.Vector3, points: THREE.Vector3[], zoom = 1): void {
     this.frameCenter.copy(center);
     this.framePoints = points.map((p) => p.clone());
+    this.zoom = zoom;
     this.applyFrame();
   }
 
@@ -211,6 +240,12 @@ export class Stage {
     next.bottom = Math.round(next.bottom);
     next.left = Math.round(next.left);
     next.right = Math.round(next.right);
+    // A bop standing on the back row reaches about two world units up, and
+    // the back row is the part of the board that projects highest. Rather
+    // than framing that height — which dollies the camera way out — reserve
+    // a thin band under the top bar for heads to occupy. The board grows to
+    // the bottom of the band, so a character on any tile stays whole.
+    next.top += Math.min(box.height * 0.07, 52);
     // Never let chrome claim so much that nothing is left to play in.
     next.top = Math.min(next.top, box.height * 0.32);
     next.bottom = Math.min(next.bottom, box.height * 0.42);
@@ -227,23 +262,39 @@ export class Stage {
   private applyFrame(): void {
     // Chrome is reserved via insets now, so this is just breathing room
     // for idle bobs and shadows — keep it tight so the toy reads BIG.
-    const margin = 1.04;
+    const margin = 1.02;
     let dist = 11;
     const cam = this.camera;
-    for (let pass = 0; pass < 4; pass++) {
+    for (let pass = 0; pass < 5; pass++) {
       cam.position.copy(this.frameCenter).addScaledVector(this.viewDir, dist);
       // Vertical centering follows the caller's frame center (grid worlds
       // pass y=0.2 for ground focus; the Gearworks bench passes bench height).
       cam.lookAt(this.frameCenter.x, this.frameCenter.y, this.frameCenter.z);
+      // PAN, do not re-aim. Sliding the camera sideways and up keeps its
+      // orientation — and therefore the square-on read of the grid —
+      // while moving the whole picture into the free area. Re-aiming would
+      // move the picture too, but it would also tilt every row of tiles,
+      // which is the crooked look this is meant to remove.
+      cam.updateMatrixWorld(true);
+      const halfH = Math.tan((cam.fov / 2) * (Math.PI / 180)) * dist;
+      const halfW = halfH * cam.aspect;
+      SHIFT_R.setFromMatrixColumn(cam.matrixWorld, 0);
+      SHIFT_U.setFromMatrixColumn(cam.matrixWorld, 1);
+      // Moving the camera left slides the subject right, hence the minus.
+      cam.position
+        .addScaledVector(SHIFT_R, -this.centerX * halfW)
+        .addScaledVector(SHIFT_U, -this.centerY * halfH);
       cam.updateMatrixWorld(true);
       cam.updateProjectionMatrix();
       let worst = 0;
       for (const pt of this.framePoints) {
         const p = pt.clone().project(cam);
-        // Measure against the FREE area, not the whole canvas.
-        worst = Math.max(worst, Math.abs(p.x) / this.fitX, Math.abs(p.y) / this.fitY);
+        // Measure against the FREE area — its own middle, not the canvas's.
+        worst = Math.max(worst,
+          Math.abs(p.x - this.centerX) / this.fitX,
+          Math.abs(p.y - this.centerY) / this.fitY);
       }
-      const need = worst * margin;
+      const need = worst * margin / this.zoom;
       if (need <= 1 || this.framePoints.length === 0) break;
       dist *= need;
     }
@@ -274,6 +325,10 @@ export class Stage {
     const { top, right, bottom, left } = this.insets;
     this.fitX = Math.max(0.25, (w - left - right) / w);
     this.fitY = Math.max(0.25, (h - top - bottom) / h);
+    // NDC is +x right and +y UP, so a tall deck at the bottom pushes the
+    // free area's middle upward.
+    this.centerX = (left - right) / w;
+    this.centerY = (bottom - top) / h;
     const offX = Math.round((right - left) / 2);
     const offY = Math.round((bottom - top) / 2);
     if (offX !== 0 || offY !== 0) this.camera.setViewOffset(w, h, offX, offY, w, h);

@@ -3514,6 +3514,26 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   // leaves the context attached to the canvas, so without an explicit
   // release the console starts announcing "Too many active WebGL
   // contexts" and a later level opens blank.
+  // ---- the camera ----
+  // The board must read square-on. A yaw of any size turns every row of
+  // tiles a few degrees and the whole board looks like a photograph taken
+  // crooked; it was 0.02 for a long time and nobody could name why the
+  // grids leaned.
+  check('the world camera has no yaw — the board reads square-on', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    const m = /VIEW_DIR = new THREE\.Vector3\(([^,]+),/.exec(src);
+    return m !== null && Number(m[1].trim()) === 0;
+  })());
+
+  // The chrome is not symmetric — the deck is several times the height of
+  // the top bar — so fitting the puzzle to a box centred on the CANVAS
+  // wasted a band of sky and pressed the board into the deck.
+  check('the puzzle is framed into the free area, not the whole canvas', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /this\.centerY = \(bottom - top\) \/ h;/.test(src)
+      && /Math\.abs\(p\.y - this\.centerY\) \/ this\.fitY/.test(src);
+  })());
+
   // ---- the play screen's chrome ----
   // On a short screen the goal card becomes a chip under the top bar, and
   // the GOAL flag hangs above the chip's own edge. Every compact rule used
