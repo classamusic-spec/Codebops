@@ -68,6 +68,24 @@ for (const [k, v] of Object.entries(art)) {
   artData[k] = `data:image/svg+xml;base64,${Buffer.from(v).toString('base64')}`;
 }
 
+// The background music, same idea as the art: a file:// page cannot fetch
+// a sibling file, so the track rides inside the HTML as a data URI. It is
+// the single biggest thing in here by some margin, which is the price of a
+// one-file build that plays music with no server and no network.
+const audioData = {};
+const audioDir = join(dist, 'audio');
+if (existsSync(audioDir)) {
+  for (const name of readdirSync(audioDir)) {
+    if (!name.endsWith('.mp3')) continue;
+    const bytes = readFileSync(join(audioDir, name));
+    audioData[`./audio/${name}`] = `data:audio/mpeg;base64,${bytes.toString('base64')}`;
+    console.log(`[standalone] embedding audio: audio/${name} (${(bytes.length / 1024).toFixed(0)} KB)`);
+  }
+}
+if (Object.keys(audioData).length === 0) {
+  throw new Error('[standalone] no audio found to embed — the music would be silent.');
+}
+
 // Boot-loader markup lifted from index.html so the first paint matches.
 const bootLoader = readFileSync(join(dist, 'index.html'), 'utf8')
   .match(/<div\s+id="app">[\s\S]*?<\/div>\s*<\/body>/)[0]
@@ -77,12 +95,33 @@ const shim = `
 (function () {
   var ART = ${JSON.stringify(art)};
   var ARTDATA = ${JSON.stringify(artData)};
+  var AUDIO = ${JSON.stringify(audioData)};
   function key(u) {
     try { u = String(u); } catch (e) { return null; }
     var i = u.indexOf('art/');
     if (i < 0) return null;
     return './' + u.slice(i);
   }
+  function audioKey(u) {
+    try { u = String(u); } catch (e) { return null; }
+    var i = u.indexOf('audio/');
+    if (i < 0) return null;
+    return './' + u.slice(i);
+  }
+  // 0) audio src — the music player builds an Audio element and assigns a
+  // relative path, which over file:// resolves to a sibling the browser
+  // will not read. Swap in the embedded copy at set-time. This has to be
+  // HTMLMediaElement, not HTMLImageElement: they are separate prototypes
+  // and the img interception below never sees an audio element.
+  try {
+    var mProto = HTMLMediaElement.prototype;
+    var mDesc = Object.getOwnPropertyDescriptor(mProto, 'src');
+    Object.defineProperty(mProto, 'src', {
+      configurable: true,
+      get: function () { return mDesc.get.call(this); },
+      set: function (v) { var k = audioKey(v); mDesc.set.call(this, (k && AUDIO[k]) ? AUDIO[k] : v); },
+    });
+  } catch (e) { /* music simply stays silent rather than breaking the app */ }
   // 1) fetch shim — serve embedded SVGs to loadSvg()/inlineSvgInto().
   var realFetch = window.fetch ? window.fetch.bind(window) : null;
   window.fetch = function (input, init) {

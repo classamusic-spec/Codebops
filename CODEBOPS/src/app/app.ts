@@ -8,6 +8,7 @@ import { deleteCustomLevel } from '../storage/customLevels';
 import { loadSvg } from '../rendering/svgAsset';
 import { mountSkyScene } from '../ui/skyScene';
 import { sharedSfx } from '../audio/sfx';
+import { sharedMusic, attachFirstGesture } from '../audio/music';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
@@ -73,6 +74,11 @@ export class App {
   }
 
   start(): void {
+    // The track cannot begin at boot — every browser blocks audio until
+    // the page has been interacted with — so it waits for the first tap
+    // anywhere, which on the splash is the child reaching for Play.
+    sharedMusic.enabled = this.store.settings.music !== false;
+    attachFirstGesture();
     this.showTitle();
   }
 
@@ -95,6 +101,10 @@ export class App {
     // mode / high contrast / left-handed reach the App Lab and the menus
     // too rather than only the play screen that first set them (§14).
     applyAccessibility(this.store.settings);
+    // The music setting rides along with the rest, so turning it off in
+    // the Settings dialog reaches every screen and not only the one the
+    // dialog happened to be opened from.
+    sharedMusic.enabled = this.store.settings.music !== false;
     stopSpeaking();
     this.mascotStops.forEach((s) => s());
     this.mascotStops = [];

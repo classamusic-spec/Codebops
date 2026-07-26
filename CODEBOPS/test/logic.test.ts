@@ -3628,6 +3628,76 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
       && /bottom: \['\.deck-panel'/.test(src) && !/'\.bottom-deck'/.test(src);
   })());
 
+  // ---- background music ----
+  // A browser's own `loop` restarts an MP3 through its encoder padding,
+  // which is an audible hiccup every pass, forever. Two elements take
+  // turns and their volumes cross over the seam instead.
+  check('the music loops by crossfade, not by the element\'s own loop flag', (() => {
+    const src = readFileSync('src/audio/music.ts', 'utf8');
+    return /e\.loop = false/.test(src) && !/e\.loop = true/.test(src)
+      && /private handover\(fade: number\)/.test(src)
+      && /addEventListener\('ended'/.test(src);
+  })());
+
+  // Fades read the clock. Counting ticks makes the duration a hostage of
+  // timer health, and a timer sharing a thread with a Three.js loop was
+  // measured firing at ~600ms instead of 40 — a 0.7s fade became 11s and
+  // music kept playing well after it had been switched off.
+  check('a music fade is timed by the clock, not by counting ticks', (() => {
+    const src = readFileSync('src/audio/music.ts', 'utf8');
+    const at = src.indexOf('private fadeTo(');
+    const body = src.slice(at, src.indexOf('\n  }', at));
+    return /performance\.now\(\)/.test(body) && !/i \/ steps/.test(body);
+  })());
+
+  // The setting and the app's own request are different facts. Folding
+  // them together meant switching music off cleared the request too, so
+  // switching it back on left silence.
+  check('turning music off and on again brings it back', (() => {
+    const src = readFileSync('src/audio/music.ts', 'utf8');
+    const setter = src.slice(src.indexOf('set enabled('), src.indexOf('\n  }', src.indexOf('set enabled(')));
+    const silence = src.slice(src.indexOf('private silence()'), src.indexOf('\n  }', src.indexOf('private silence()')));
+    return /this\.silence\(\)/.test(setter) && /this\.wanted\) this\.start\(\)/.test(setter)
+      // silence() must not touch `wanted` — only stop() may.
+      && !/this\.wanted/.test(silence);
+  })());
+
+  // Nothing may play before the child touches the screen: every browser
+  // blocks it, and a rejected play() with nobody awaiting it is an
+  // unhandled rejection in the console on every load.
+  check('music waits for a gesture and never leaves a rejection behind', (() => {
+    const src = readFileSync('src/audio/music.ts', 'utf8');
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    return /export function attachFirstGesture/.test(src)
+      && /'pointerdown', 'keydown', 'touchstart'/.test(src)
+      && /try \{ await e\.play\(\); \} catch/.test(src)
+      && /attachFirstGesture\(\)/.test(app);
+  })());
+
+  // Music is a separate switch from the effects: a classroom often wants
+  // the sounds that explain what happened without a track underneath.
+  check('music has its own setting, defaulting to on for old saves', (() => {
+    const store = readFileSync('src/storage/saveStore.ts', 'utf8');
+    const dialogs = readFileSync('src/ui/dialogs.ts', 'utf8');
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    return /music\?: boolean/.test(store) && /music: true/.test(store)
+      && /key: 'music', label: '🎵 Background music'/.test(dialogs)
+      && /sharedMusic\.enabled = next/.test(dialogs)
+      // `!== false`, never `=== true`: a save written before this existed
+      // has no music key, and `=== true` would read that as "off".
+      && /settings\.music !== false/.test(app) && !/settings\.music === true/.test(app);
+  })());
+
+  // A file:// page cannot fetch a sibling, so the single-file build has to
+  // carry the track inside it — and <audio> lives on a different prototype
+  // from <img>, so the existing image interception never sees it.
+  check('the standalone build embeds the music and rewrites audio src', (() => {
+    const build = readFileSync('scripts/build-standalone.mjs', 'utf8');
+    return /audioData\[`\.\/audio\/\$\{name\}`\] = `data:audio\/mpeg;base64/.test(build)
+      && /HTMLMediaElement\.prototype/.test(build)
+      && /no audio found to embed/.test(build);
+  })());
+
   // ---- the characters ----
   // A bop that only floats reads as a picture of a bop. The idle hop is the
   // difference, and two things have to hold for it to look deliberate
