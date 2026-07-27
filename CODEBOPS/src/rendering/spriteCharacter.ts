@@ -27,6 +27,7 @@ import * as THREE from 'three';
 import { contactShadowTexture } from './materials/toon';
 import { Tweener } from './tween';
 import { makeRig } from './mascotRig';
+import { el } from '../ui/dom';
 import type { MascotName } from './mascotRig';
 import type { ThreeCharacterView } from '../vendor/codebops-rig/three-adapter.js';
 import type { CharacterRig } from '../vendor/codebops-rig/codebops-rig.js';
@@ -127,6 +128,9 @@ export class SpriteCharacter {
    * gaps between them.
    */
   private busy = 0;
+  /** The name chip under the feet, and the timer that hides it again. */
+  private nameChip: HTMLElement | null = null;
+  private nameTimer = 0;
   /** Art-box width / height, so the label anchor matches the silhouette. */
   private aspect = 1;
   private readonly ready: Promise<void>;
@@ -244,6 +248,43 @@ export class SpriteCharacter {
 
   whenReady(): Promise<void> {
     return this.ready;
+  }
+
+  /**
+   * Give this character a name chip under its feet.
+   *
+   * Sixteen screens built this themselves, six identical lines each, and
+   * every one of them left the chip on permanently — so both characters
+   * wore a label at all times, on every level, forever. A child who has
+   * met Zip does not need telling he is Zip.
+   *
+   * The chip is created hidden and shown on demand: when the character
+   * speaks, when it is tapped, and for a moment when the level opens so
+   * a first-time player still gets the introduction.
+   */
+  setName(name: string, introduce = true): void {
+    void this.ready.then(() => {
+      if (this.disposed) return;
+      this.nameChip?.remove();
+      const chip = el('span', 'char-name-chip', this.el, name);
+      chip.setAttribute('aria-hidden', 'true');
+      this.nameChip = chip;
+      // The anchor tracks the silhouette, so tapping it is tapping the
+      // character. Pointer events are off on the anchor by default —
+      // turn them on only for the tap, never for the chip itself.
+      this.el.style.pointerEvents = 'auto';
+      this.el.addEventListener('click', () => this.showName());
+      if (introduce) this.showName(2600);
+    });
+  }
+
+  /** Flash the name chip, then let it fade back out. */
+  showName(ms = 1800): void {
+    const chip = this.nameChip;
+    if (!chip) return;
+    chip.classList.add('on');
+    window.clearTimeout(this.nameTimer);
+    this.nameTimer = window.setTimeout(() => chip.classList.remove('on'), ms);
   }
 
   addToScene(scene: THREE.Scene): void {

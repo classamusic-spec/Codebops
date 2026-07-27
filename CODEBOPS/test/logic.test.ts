@@ -3730,6 +3730,116 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return play.length >= 17 && missing.every((f) => f === 'gearworksTrophyScreen.ts');
   })());
 
+  // ---- shared components (Phase 2) ----
+  // Nine screens built their own back arrow, five their own BOP, four
+  // their own Clear. A change to any of them had to be made nine, five or
+  // four times and in practice was made once.
+  check('the back arrow is built in one place', (() => {
+    const files = readdirSync('src/app').filter((f) => f.endsWith('.ts'))
+      .map((f) => `src/app/${f}`)
+      .concat(readdirSync('src/ui').filter((f) => f.endsWith('.ts')).map((f) => `src/ui/${f}`));
+    const rolled = files.filter((f) => /el\('button', 'circle-btn'[^)]*'←'/.test(readFileSync(f, 'utf8')));
+    if (rolled.length > 0) console.log('   hand-rolled back buttons: ' + rolled.join(', '));
+    return rolled.length === 0;
+  })());
+
+  // Every shared button sets type="button". A button with no type inside a
+  // form is a submit button, which is a bug waiting for the first form.
+  check('the shared button always declares its type', (() => {
+    const src = readFileSync('src/ui/components/button.ts', 'utf8');
+    return /b\.type = 'button'/.test(src);
+  })());
+
+  // Chrome icons must be drawn, not borrowed from the platform: emoji
+  // render differently on every OS, so the same bar looks like a
+  // different app on an iPad and an Android tablet.
+  check('the top bar draws its own icons', (() => {
+    const bar = readFileSync('src/ui/topBar.ts', 'utf8');
+    return !/[\u{1F300}-\u{1FAFF}\u{2699}\u{2605}]/u.test(bar)
+      && /ICON_STAR/.test(bar) && /backButton|settingsButton/.test(bar);
+  })());
+
+  // A permanent name label on both characters, on every level, forever.
+  // A child who has met Zip does not need telling he is Zip.
+  check('character names are shown on demand, not worn permanently', (() => {
+    const sprite = readFileSync('src/rendering/spriteCharacter.ts', 'utf8');
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const screens = readdirSync('src/app').filter((f) => /^gearworks.*Screen\.ts$/.test(f));
+    const stillLocal = screens.filter((f) => /private addNameChip/.test(readFileSync(`src/app/${f}`, 'utf8')));
+    if (stillLocal.length > 0) console.log('   local copies left: ' + stillLocal.length);
+    return stillLocal.length === 0
+      && /setName\(name: string/.test(sprite)
+      && /\.char-name-chip \{[^}]*opacity: 0/.test(css)
+      && /\.char-name-chip\.on \{[^}]*opacity: 1/.test(css);
+  })());
+
+  // The Think Trail must look like something you can open. It used to be
+  // an always-open panel holding prime corner space before it had
+  // anything to say, and its collapse decision was taken once from
+  // window.innerWidth and never revisited — wrong after any rotation.
+  check('the Think Trail is a button that opens a panel', (() => {
+    const src = readFileSync('src/ui/gearworks/statePanel.ts', 'utf8');
+    return /gw-trail-open/.test(src)
+      && /this\.panel\.hidden = !open/.test(src)
+      // ...on code, not on the comment that explains why it went.
+      && !/if \(window\.innerWidth/.test(src);
+  })());
+
+  // ---- responsive shell (Phase 3) ----
+  // `vh` resolves against the LARGEST viewport, so a panel sized in vh
+  // overflows while a mobile browser's toolbar is showing.
+  check('viewport heights track the visible viewport', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    // Keyframe transforms may use vh — they move things, they do not size them.
+    const layout = css.replace(/@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+    const bad = (layout.match(/(?<![\w-])\d+(?:\.\d+)?vh\b/g) ?? []);
+    if (bad.length > 0) console.log('   static vh left: ' + bad.slice(0, 6).join(', '));
+    return bad.length === 0 && /dvh/.test(css);
+  })());
+
+  // Portrait is a supported fallback, so the manifest must not lock the
+  // installed app to landscape — that makes the fallback unreachable.
+  // The in-app rotate hint does the encouraging instead.
+  check('the installed app allows both orientations', (() => {
+    const m = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'));
+    const maskable = m.icons.some((i: { purpose?: string }) => /maskable/.test(i.purpose ?? ''));
+    return m.orientation === 'any' && maskable && m.scope === './';
+  })());
+
+  // iOS reads none of the manifest. Without these the app opens inside
+  // Safari chrome and the toolbar sits over the command deck.
+  check('iOS is told the app is standalone', (() => {
+    const html = readFileSync('index.html', 'utf8');
+    return /apple-mobile-web-app-capable/.test(html)
+      && /apple-mobile-web-app-status-bar-style/.test(html);
+  })());
+
+  // ---- pickers (Phase 5) ----
+  // grayscale(.75) turned eight of fifteen worlds into identical grey
+  // discs: a child could not tell the Jam Room from the Paint Studio, so
+  // "not yet" read as "nothing here" rather than something to look
+  // forward to. Dim it; do not erase it.
+  check('a locked world keeps enough colour to stay itself', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.sel2-med.locked .sel2-med-disc');
+    const rule = css.slice(at, css.indexOf('}', at));
+    const gray = /grayscale\(\s*\.?(\d*\.?\d+)\s*\)/.exec(rule);
+    return !gray || Number(gray[1]) <= 0.4;
+  })());
+
+  // A row of same-size discs is a list, not a carousel. The spec asks for
+  // the selected world to be substantially larger with its neighbours
+  // partly visible, so the strip has a focus.
+  check('the world strip has a focused world and reliable snapping', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.sel2-med.on .sel2-med-disc');
+    const rule = css.slice(at, css.indexOf('}', at));
+    const scale = /scale\(([\d.]+)\)/.exec(rule);
+    return scale !== null && Number(scale[1]) >= 1.25
+      && /scroll-snap-type: x mandatory/.test(css)
+      && /\.sel2-strip \{[^}]*mask-image/.test(css);
+  })());
+
   // ---- design system ----
   // A token restated as a literal is the way a design system rots: both
   // render the same today, so nothing breaks until the brand colour moves

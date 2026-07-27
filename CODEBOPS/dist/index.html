@@ -8,6 +8,13 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <!-- iOS reads none of the manifest. Without these three, "Add to Home
+         Screen" opens the app inside Safari chrome, so the address bar
+         eats the top of the world and the toolbar sits over the deck. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CodeBops" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>CodeBops — Teach tiny helpers. Build big ideas.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,8 +22,8 @@
       href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-CiQVw07n.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DletAfPv.css">
+    <script type="module" crossorigin src="./assets/index-DdCkG_9f.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B98gIfU2.css">
   </head>
   <body>
     <div id="app">

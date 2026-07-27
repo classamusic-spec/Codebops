@@ -14,6 +14,7 @@ import { startersForTemplate } from '../../creator/miniAppProjectFactory';
 import type { StarterDefinition } from '../../creator/miniAppProjectFactory';
 import { APP_LAB_THEMES } from '../../data/app-lab/approvedAssets';
 import { creatorReward } from '../../data/app-lab/creatorRewards';
+import { backButton } from '../components/button';
 
 /** The child-facing sentence that says how a sky opens. */
 function themeInvitation(rewardId: string | undefined): string {
@@ -48,10 +49,7 @@ export class TemplatePicker {
     const wrap = el('div', 'tp-wrap', this.parent);
 
     const head = el('div', 'tp-head', wrap);
-    const back = el('button', 'circle-btn', head, '←') as HTMLButtonElement;
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to the App Lab');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onBack(); });
+    backButton(head, () => { sharedSfx.play('tap'); this.events.onBack(); }, 'Back to the App Lab');
     const titles = el('div', 'tp-titles', head);
     el('h2', undefined, titles, `${this.kit.glyph} ${this.kit.name}`);
     el('p', undefined, titles, 'Pick one to start with — you can change everything.');

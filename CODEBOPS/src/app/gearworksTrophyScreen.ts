@@ -11,6 +11,7 @@ import { sharedSfx } from '../audio/sfx';
 import { mountMascot } from '../rendering/mascotRig';
 import { spawnConfetti } from '../ui/dialogs';
 import { GEARWORKS_CONCEPTS, conceptProgress, garageTotals } from '../data/gearworks/progress';
+import { backButton } from '../ui/components/button';
 
 export class GearworksTrophyScreen {
   private stops: Array<() => void> = [];
@@ -31,10 +32,7 @@ export class GearworksTrophyScreen {
 
     // --- header ---
     const header = el('div', 'gw-tr-header', screen);
-    const back = el('button', 'circle-btn', header, '←');
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to levels');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onBack(); });
+    backButton(header, () => { sharedSfx.play('tap'); this.events.onBack(); }, 'Back to levels');
     const titles = el('div', 'gw-tr-titles', header);
     el('h1', undefined, titles, '🏆 Inventor\'s Trophies');
     el('p', undefined, titles, `You've learned ${totals.conceptsStarted} of ${totals.conceptsTotal} big ideas!`);

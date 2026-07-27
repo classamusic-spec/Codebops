@@ -34,6 +34,7 @@ import {
 import { garageTotals } from '../data/gearworks/progress';
 import { APP_LAB_WORLD } from '../data/app-lab/appLabDefinition';
 import { announce } from '../ui/a11y';
+import { backButton } from '../ui/components/button';
 
 export const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
   'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
@@ -163,10 +164,7 @@ export class LevelSelectScreen {
 
   private buildHeader(): void {
     const head = el('div', 'sel2-head', this.root);
-    const back = el('button', 'circle-btn', head, '←') as HTMLButtonElement;
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to title');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onBack(); });
+    backButton(head, () => { sharedSfx.play('tap'); this.events.onBack(); }, 'Back to title');
 
     el('h1', 'sel2-title', head, 'Where to?');
 

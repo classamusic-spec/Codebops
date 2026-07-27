@@ -44,6 +44,7 @@ import { isTestSpeed, speak, speechAvailable, announce } from '../ui/a11y';
 import { factsFor, evidenceForCreation } from '../creator/miniAppEvidence';
 import { makerRecord, newlyEarned, earnedRewards } from '../data/app-lab/creatorRewards';
 import { showCreatorCelebration } from '../ui/app-lab/creatorCelebration';
+import { backButton } from '../ui/components/button';
 
 export interface AppCreatorEvents {
   readonly onExitToLab: () => void;
@@ -102,10 +103,7 @@ export class AppCreatorScreen {
     this.creator = applyCreatorAction(initialCreatorState(), { kind: 'chooseKit' });
 
     const head = el('div', 'cr-head', this.root);
-    const back = el('button', 'circle-btn', head, '←') as HTMLButtonElement;
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to the App Lab');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.exit(); });
+    backButton(head, () => { sharedSfx.play('tap'); this.exit(); }, 'Back to the App Lab');
     const titles = el('div', 'cr-titles', head);
     const kitName = this.kit ? `${this.kit.glyph} ${this.kit.name}` : '🗂️ My App';
     el('h1', undefined, titles, kitName);

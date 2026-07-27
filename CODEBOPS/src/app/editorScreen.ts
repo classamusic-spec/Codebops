@@ -8,6 +8,7 @@ import { editorLevel, saveCustomLevel } from '../storage/customLevels';
 import type { LevelDef } from '../data/schemas/level';
 import { showToast } from '../ui/dialogs';
 import { sharedSfx } from '../audio/sfx';
+import { backButton } from '../ui/components/button';
 
 type CellKind = 'empty' | 'item' | 'goal' | 'blocked' | 'start';
 
@@ -71,10 +72,7 @@ export class EditorScreen {
     screen.classList.add('editor-screen');
 
     const header = el('div', 'select-header editor-header', screen);
-    const back = el('button', 'circle-btn', header, '←');
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to levels');
-    back.addEventListener('click', () => this.events.onBack());
+    backButton(header, () => { this.events.onBack(); }, 'Back to levels');
     el('h1', undefined, header, '🏝️ Imagination Island');
 
     el('div', 'editor-tip', screen, 'Tap a tile to change what lives there!');

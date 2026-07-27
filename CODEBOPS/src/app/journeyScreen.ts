@@ -13,6 +13,7 @@ import { sharedSfx } from '../audio/sfx';
 import { CURRICULUM_STAGES, worldsForStage } from '../data/curriculum/stages';
 import type { CurriculumStageId } from '../data/curriculum/stages';
 import { stageMastery, childTier } from '../data/curriculum/mastery';
+import { backButton } from '../ui/components/button';
 
 const WORLD_LABEL: Record<string, string> = {
   'sparkle-meadow': 'Sparkle Meadow',
@@ -37,10 +38,7 @@ export class JourneyScreen {
     const log = this.store.evidence;
 
     const header = el('div', 'jr-header', screen);
-    const back = el('button', 'circle-btn', header, '←');
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onBack(); });
+    backButton(header, () => { sharedSfx.play('tap'); this.events.onBack(); }, 'Back');
     const titles = el('div', 'jr-titles', header);
     el('h1', undefined, titles, '🌱 My Learning Garden');
     const grown = CURRICULUM_STAGES

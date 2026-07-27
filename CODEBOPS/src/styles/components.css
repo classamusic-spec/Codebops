@@ -1,0 +1,171 @@
+/* ============================================================
+   Shared components (Polish Phase 2)
+
+   One visual treatment per semantic family, built from tokens.
+   Everything here is additive: the older hand-rolled classes still
+   work, so screens can move across one at a time rather than in a
+   single risky sweep.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------
+   The house look is a moulded plastic key: a bright face, a hard
+   offset shadow in a darker shade of its own colour, and a white
+   inner highlight. Pressing it moves the face down onto the
+   shadow, which is what makes it feel like a real key rather
+   than a rectangle that changes colour.
+   ------------------------------------------------------------ */
+.cb-btn {
+  --cb-face-1: var(--blue-bright);
+  --cb-face-2: var(--blue-deep);
+  --cb-shade: var(--blue-shade);
+  --cb-lift: 4px;
+
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--sp-4);
+  min-height: var(--tap-floor);
+  padding: var(--sp-4) var(--sp-7);
+  border: 3px solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--r-pill);
+  background: linear-gradient(180deg, var(--cb-face-1), var(--cb-face-2));
+  color: var(--white);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-base);
+  letter-spacing: 0.3px;
+  text-shadow: 0 2px 0 rgba(13, 20, 55, 0.32);
+  box-shadow:
+    0 var(--cb-lift) 0 var(--cb-shade),
+    inset 0 2px 0 rgba(255, 255, 255, 0.46),
+    var(--shadow-soft);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-bounce),
+    box-shadow var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast);
+}
+
+.cb-btn:active {
+  transform: translateY(calc(var(--cb-lift) - 1px));
+  box-shadow: 0 1px 0 var(--cb-shade), inset 0 2px 0 rgba(255, 255, 255, 0.46);
+}
+
+/* A disabled control must stay READABLE. Fading it to near-invisible
+   tells a child the button is broken; keeping it legible but flat tells
+   them it is waiting for something. */
+.cb-btn:disabled {
+  cursor: default;
+  filter: saturate(0.42) brightness(0.86);
+  box-shadow: 0 2px 0 var(--cb-shade), inset 0 2px 0 rgba(255, 255, 255, 0.28);
+  transform: none;
+}
+
+.cb-btn:focus-visible {
+  outline: 4px solid var(--yellow);
+  outline-offset: 3px;
+}
+.cb-btn:focus:not(:focus-visible) { outline: none; }
+
+/* ---- semantic families ---- */
+.cb-btn.v-go     { --cb-face-1: var(--green-bright); --cb-face-2: var(--green-deep); --cb-shade: var(--green-shade); }
+.cb-btn.v-nav    { --cb-face-1: var(--blue-bright);  --cb-face-2: var(--blue-deep);  --cb-shade: var(--blue-shade); }
+.cb-btn.v-revise { --cb-face-1: var(--purple-light); --cb-face-2: var(--purple-deep);--cb-shade: var(--purple-shade); }
+.cb-btn.v-help   { --cb-face-1: var(--yellow);       --cb-face-2: var(--orange-deep);--cb-shade: var(--yellow-shade);
+                   color: var(--ink-800); text-shadow: 0 2px 0 rgba(255, 255, 255, 0.5); }
+.cb-btn.v-danger { --cb-face-1: #ff8080;             --cb-face-2: var(--red);        --cb-shade: #a32626; }
+
+/* ---- shapes ---- */
+.cb-btn.s-circle {
+  width: var(--tap-min); height: var(--tap-min);
+  min-width: var(--tap-min); padding: 0;
+  border-radius: var(--r-circle);
+}
+.cb-btn.s-square {
+  aspect-ratio: 1; padding: var(--sp-4);
+  border-radius: 28%;
+  flex-direction: column; gap: var(--sp-2);
+}
+
+/* ---- sizes ---- */
+.cb-btn.z-sm   { font-size: var(--fs-sm);  padding: var(--sp-3) var(--sp-5); --cb-lift: 3px; }
+.cb-btn.z-lg   { font-size: var(--fs-lg);  padding: var(--sp-5) var(--sp-8); --cb-lift: 5px; }
+.cb-btn.z-hero { font-size: var(--fs-fluid-xl); padding: var(--sp-6) var(--sp-10); --cb-lift: 8px; }
+
+.cb-btn.s-circle.z-sm   { width: var(--tap-floor); height: var(--tap-floor); min-width: var(--tap-floor); }
+.cb-btn.s-circle.z-lg   { width: 68px; height: 68px; min-width: 68px; }
+
+/* ---- icons ---- */
+.cb-btn-icon { display: grid; place-items: center; flex: 0 0 auto; }
+.cb-btn-icon svg { display: block; width: 1.5em; height: 1.5em; }
+.cb-btn.s-circle .cb-btn-icon svg { width: 55%; height: 55%; }
+.cb-btn.s-circle { font-size: var(--fs-xl); }
+.cb-btn-text { white-space: nowrap; }
+
+/* The hint button breathes so a stuck child scanning the screen finds it
+   without being told where to look. It stops the moment it is pressed. */
+.cb-btn.cb-hint { animation: cb-hint-breathe 3.4s var(--ease-in-out) infinite; }
+.cb-btn.cb-hint:active { animation: none; }
+@keyframes cb-hint-breathe {
+  0%, 68%, 100% { box-shadow: 0 var(--cb-lift) 0 var(--cb-shade), inset 0 2px 0 rgba(255,255,255,.46), var(--shadow-soft); }
+  84%           { box-shadow: 0 var(--cb-lift) 0 var(--cb-shade), inset 0 2px 0 rgba(255,255,255,.46), 0 0 0 7px rgba(255, 216, 94, .34), var(--shadow-soft); }
+}
+
+@media (hover: hover) {
+  .cb-btn:hover:not(:disabled) { filter: brightness(1.07); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-btn { transition: none; }
+  .cb-btn.cb-hint { animation: none; outline: 3px solid var(--yellow); outline-offset: 3px; }
+}
+
+/* ------------------------------------------------------------
+   Panels
+   ------------------------------------------------------------
+   One shell for every card: goal, tray, trail, settings, dialogue.
+   ------------------------------------------------------------ */
+.cb-panel {
+  border-radius: var(--r-xl);
+  border: 3px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, var(--ink-600) 0%, var(--ink-800) 70%);
+  box-shadow: var(--pop-6) var(--ink-line), var(--shadow-card);
+  padding: var(--sp-5);
+  color: var(--white);
+}
+/* The cream variant, for anything a child is meant to READ rather than
+   operate — goals, briefs, hints. */
+.cb-panel.p-paper {
+  background: linear-gradient(180deg, var(--white), var(--cream));
+  border-color: var(--cream-deep);
+  color: var(--ink-800);
+  box-shadow: var(--pop-5) var(--cream-deep), var(--shadow-card);
+}
+
+/* ------------------------------------------------------------
+   Badges
+   ------------------------------------------------------------ */
+.cb-badge {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-5);
+  border-radius: var(--r-pill);
+  font-family: var(--font-display); font-weight: 800;
+  font-size: var(--fs-sm);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+.cb-badge svg { width: 1.1em; height: 1.1em; display: block; }
+.cb-badge.b-lock    { background: var(--ink-700); color: var(--text-on-ink); }
+.cb-badge.b-concept { background: var(--purple-deep); color: var(--white); }
+.cb-badge.b-new     { background: var(--pink); color: var(--white); }
+
+/* ------------------------------------------------------------
+   Star display
+   ------------------------------------------------------------
+   Never colour alone: an unearned star is an outline, an earned one is
+   solid, so the difference survives a colour-blind eye and a greyscale
+   screenshot alike.
+   ------------------------------------------------------------ */
+.cb-stars { display: inline-flex; align-items: center; gap: var(--sp-3); }
+.cb-stars .cb-star { width: 1.4em; height: 1.4em; display: block; color: rgba(255, 255, 255, 0.26); }
+.cb-stars .cb-star.earned { color: var(--yellow); filter: drop-shadow(0 2px 0 var(--yellow-shade)); }

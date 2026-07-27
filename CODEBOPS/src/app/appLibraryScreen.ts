@@ -23,6 +23,7 @@ import { TITLE_TOKENS, tokensInGroup, titleToken } from '../data/app-lab/prepare
 import { duplicateProject } from '../creator/miniAppProjectFactory';
 import { SaveStore } from '../storage/saveStore';
 import { makerRecord, earnedRewards, frameForApp } from '../data/app-lab/creatorRewards';
+import { backButton } from '../ui/components/button';
 
 export interface AppLibraryEvents {
   readonly onBack: () => void;
@@ -51,10 +52,7 @@ export class AppLibraryScreen {
     this.root.classList.add('lib-screen');
 
     const header = el('div', 'lib-header', this.root);
-    const back = el('button', 'circle-btn', header, '←') as HTMLButtonElement;
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back to the App Lab');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onBack(); });
+    backButton(header, () => { sharedSfx.play('tap'); this.events.onBack(); }, 'Back to the App Lab');
     const titles = el('div', 'lib-titles', header);
     el('h1', undefined, titles, '🗂️ My Apps');
     el('p', undefined, titles, 'Everything you have built, kept on this device.');

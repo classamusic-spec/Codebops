@@ -25,6 +25,7 @@ import { applyAccessibility } from '../ui/a11y';
 import {
   CREATOR_REWARDS, makerRecord, earnedRewards,
 } from '../data/app-lab/creatorRewards';
+import { backButton } from '../ui/components/button';
 
 export interface AppLabEvents {
   readonly onBack: () => void;
@@ -53,10 +54,7 @@ export class AppLabScreen {
 
     // ---- header ----
     const header = el('div', 'al-header', screen);
-    const back = el('button', 'circle-btn', header, '←') as HTMLButtonElement;
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back');
-    back.addEventListener('click', () => { sharedSfx.play('tap'); this.events.onBack(); });
+    backButton(header, () => { sharedSfx.play('tap'); this.events.onBack(); }, 'Back');
 
     const titles = el('div', 'al-titles', header);
     el('h1', undefined, titles, `${APP_LAB_WORLD.glyph} ${APP_LAB_WORLD.name}`);

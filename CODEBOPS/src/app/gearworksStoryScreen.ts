@@ -97,7 +97,7 @@ export class GearworksStoryScreen {
     this.zip.addToScene(this.stage.scene);
     this.zip.placeAt(this.scene.zipSpot());
     this.zip.look('right');
-    this.addNameChip(this.zip, 'Zip');
+    this.zip.setName('Zip');
 
     this.mixy = new SpriteCharacter(
       { who: 'mixy', height: 2.1, name: 'mixy' },
@@ -106,7 +106,7 @@ export class GearworksStoryScreen {
     this.mixy.addToScene(this.stage.scene);
     this.mixy.placeAt(this.scene.mixySpot());
     this.mixy.look('left');
-    this.addNameChip(this.mixy, 'GlitchBop');
+    this.mixy.setName('GlitchBop');
 
     // --- UI chrome ---
     this.topBar = new TopBar(this.ui, `${this.level.title} · ${this.level.shortTitle}`, {
@@ -162,12 +162,6 @@ export class GearworksStoryScreen {
     document.body.classList.toggle('left-handed', this.events.store.settings.leftHanded);
   }
 
-  private addNameChip(sprite: SpriteCharacter, name: string): void {
-    void sprite.whenReady().then(() => {
-      const chip = el('span', 'gw-name-chip', sprite.el, name);
-      chip.setAttribute('aria-hidden', 'true');
-    });
-  }
 
   private statusLine(state: string): string {
     return `🎭 ${this.level.actorName} is ${storyStateLabel(this.level, state)} · Goal: ${storyStateLabel(this.level, this.level.target)}`;

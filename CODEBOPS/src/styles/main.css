@@ -1,5 +1,6 @@
 @import './tokens.css';
 @import './breakpoints.css';
+@import './components.css';
 
 /* Values in this file come from tokens.css. Two deliberate exceptions:
    #fff and #000 stay literal — pure white and pure black are not brand
@@ -70,11 +71,27 @@ button { font-family: inherit; border: 0; cursor: pointer; }
    ============================================================ */
 #screen-title {
   align-items: center; justify-content: flex-end;
-  padding-bottom: max(7vh, calc(48px + var(--sab)));
+  padding-bottom: max(7dvh, calc(48px + var(--sab)));
 }
 .title-card {
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-5);
   animation: rise-in .7s var(--ease-out) both .15s;
+}
+/* A soft pool of sky behind the wordmark.
+   The sun's rays are a conic gradient spanning 190vmax, so they run
+   straight across the logo and the tagline and set every white letter
+   against a moving stripe. This is the cheapest possible fix: no blur
+   filter (expensive on a large mobile panel), no extra node in the
+   scene — one radial that lifts the type off the rays without reading
+   as a panel behind it. */
+.title-card::before {
+  content: ''; position: absolute; z-index: -1;
+  left: 50%; top: 46%; transform: translate(-50%, -50%);
+  width: 128%; height: 150%;
+  background: radial-gradient(60% 52% at 50% 50%,
+    rgba(22, 34, 92, .30) 0%, rgba(22, 34, 92, .17) 46%, transparent 72%);
+  pointer-events: none;
 }
 @keyframes rise-in { from { opacity: 0; transform: translateY(34px) scale(.96) } to { opacity: 1; transform: none } }
 .btn-play {
@@ -542,7 +559,7 @@ body.high-contrast .rh-card p { color: #fff; }
 .confetti { position: absolute; top: -20px; z-index: var(--z-modal); pointer-events: none; border-radius: 3px; animation: confetti-fall linear both; }
 @keyframes confetti-fall {
   from { transform: translateY(-4vh) rotate(0deg); opacity: 1 }
-  to { transform: translateY(110vh) rotate(720deg); opacity: .9 }
+  to { transform: translateY(110dvh) rotate(720deg); opacity: .9 }
 }
 
 /* Toast hint */
@@ -682,7 +699,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 .sel2-screen > *:not(.sky-scene) { position: relative; z-index: var(--z-content); }
 /* A menu keeps the land to a strip and leaves the sky to the content. */
 .sky-scene.compact .title-ground { height: 34%; }
-.sky-scene.compact .title-sun { left: 88%; top: 34%; width: min(30vh, 230px); height: min(30vh, 230px); }
+.sky-scene.compact .title-sun { left: 88%; top: 34%; width: min(30dvh, 230px); height: min(30dvh, 230px); }
 .sky-scene.compact .title-rays { opacity: .55; }
 .sky-scene.compact .title-hill.h1 { left: -18%; bottom: -30%; width: 84%; height: 132%; }
 .sky-scene.compact .title-hill.h2 { right: -22%; bottom: -36%; width: 92%; height: 146%; }
@@ -707,7 +724,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 /* ---- header ---- */
 .sel2-head {
   flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
-  margin-bottom: clamp(12px, 2.2vh, 22px);
+  margin-bottom: clamp(12px, 2.2dvh, 22px);
 }
 .sel2-title {
   font-family: var(--font-display); font-weight: 800; color: #fff; margin: 0;
@@ -722,7 +739,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
   cursor: pointer; font: inherit; text-align: left; min-height: 44px;
   background: linear-gradient(180deg, #fff6e2, #ffe9b8);
   border: 3px solid #fff; border-radius: var(--r-xl);
-  padding: 11px 16px; margin-bottom: clamp(12px, 2.2vh, 22px);
+  padding: 11px 16px; margin-bottom: clamp(12px, 2.2dvh, 22px);
   box-shadow: 0 5px 0 rgba(20,32,80,.28);
 }
 .sel2-daily:active { transform: translateY(2px); box-shadow: 0 3px 0 rgba(20,32,80,.28); }
@@ -766,10 +783,19 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
   mask-image: linear-gradient(90deg, transparent 0, #000 38px, #000 calc(100% - 38px), transparent 100%);
 }
 .sel2-strip {
-  display: flex; gap: 16px; overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
-  padding: 4px 2px clamp(14px, 2.4vh, 24px); margin: 0 -2px;
+  display: flex; gap: var(--sp-7); overflow-x: auto; overflow-y: hidden;
+  /* mandatory, not proximity: a child's swipe is imprecise, and
+     proximity leaves the strip resting between two worlds. */
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  /* Top padding makes room for the selected disc to grow without being
+     clipped by the strip's own box. */
+  padding: var(--sp-6) var(--sp-2) clamp(14px, 2.4dvh, 24px);
+  margin: 0 -2px;
   scrollbar-width: none;
+  /* Fade the ends so a partly-visible neighbour reads as "there is more
+     this way" instead of looking like a rendering mistake. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
 }
 .sel2-strip::-webkit-scrollbar { display: none; }
 .sel2-med {
@@ -791,10 +817,21 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 }
 .sel2-med-glyph { font-size: 29px; line-height: 1; position: relative; }
 .sel2-med.on .sel2-med-disc {
-  transform: translateY(-4px) scale(1.08); border-color: #fff;
-  box-shadow: 0 8px 0 rgba(20,32,80,.34), 0 0 22px rgba(255,255,255,.5);
+  transform: translateY(-6px) scale(1.34); border-color: #fff;
+  box-shadow: 0 8px 0 rgba(20,32,80,.34), 0 0 26px rgba(255,255,255,.55);
 }
-.sel2-med.locked .sel2-med-disc { filter: grayscale(.75) brightness(.8); }
+/* The unselected ones step back, so the difference is a hierarchy and
+   not just a size. Neighbours stay legible — they are the invitation. */
+.sel2-med:not(.on) .sel2-med-disc { transform: scale(.92); opacity: .88; }
+.sel2-med.on .sel2-med-name { font-weight: 800; }
+/* A locked world must stay RECOGNISABLE. grayscale(.75) turned eight of
+   the fifteen worlds into identical grey discs — a child could not tell
+   the Jam Room from the Paint Studio, so "not yet" read as "nothing
+   here" rather than as something to look forward to. Dim it and drain
+   some saturation; keep enough hue that the place is still itself. The
+   lock badge, not the colour, is what says it is closed. */
+.sel2-med.locked .sel2-med-disc { filter: saturate(.55) brightness(.72); }
+.sel2-med.locked .sel2-med-name { opacity: .72; }
 .sel2-med-lock {
   position: absolute; right: -3px; bottom: -3px; font-size: 15px;
   background: var(--cream); border-radius: var(--r-circle); width: 24px; height: 24px;
@@ -846,7 +883,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
    actual hills under them. */
 .sel2-island::before {
   content: ''; position: absolute; left: 50%; top: 46%; translate: -50% -50%;
-  width: min(92vw, 540px); height: min(44vh, 430px);
+  width: min(92vw, 540px); height: min(44dvh, 430px);
   background: radial-gradient(closest-side, var(--isle, rgba(255,255,255,.3)) 0%, transparent 68%);
   pointer-events: none; opacity: .55;
   transition: background var(--dur-med);
@@ -864,7 +901,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
    screen, rather than a head at the top and a button near the bottom with
    a field of nothing between them. */
 .sel2-island { justify-content: center; gap: 2px; }
-.sel2-island-head { margin-bottom: clamp(6px, 1.4vh, 16px); }
+.sel2-island-head { margin-bottom: clamp(6px, 1.4dvh, 16px); }
 
 .sel2-island-head {
   position: relative; z-index: var(--z-content); flex: 0 0 auto;
@@ -914,7 +951,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
    holds a floating orb and the words under it. */
 .sel2-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: clamp(10px, 1.6vh, 18px);
+  gap: clamp(10px, 1.6dvh, 18px);
   width: 100%; height: 100%; cursor: pointer; font: inherit; text-align: center;
   background: none; border: 0; padding: 0;
   --d: 0; --ad: 0;
@@ -959,9 +996,18 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 }
 .sel2-disc-glyph {
   position: relative;
-  font-size: clamp(58px, min(27vw, 19vh), 104px); line-height: 1;
+  display: grid; place-items: center;
+  width: 1.2em; height: 1.2em;
+  font-size: clamp(58px, min(27vw, 19dvh), 104px); line-height: 1;
   filter: drop-shadow(0 8px 10px rgba(20,32,80,.34));
   transform: translateZ(28px);
+  /* Glyphs arrive from level data as a mix of emoji and plain text
+     characters, so their optical weights differ wildly — a hairline
+     arrow beside a full-colour emoji. A fixed box and a shared shadow
+     is the most that can be done without an authored icon per level;
+     the icon set itself is a content job, noted for a later phase. */
+  color: var(--ink-800);
+  text-shadow: 0 3px 0 rgba(255, 255, 255, .55);
 }
 /* The ellipse on the ground. Without it an orb is a circle, not an object. */
 .sel2-orb-shadow {
@@ -1077,7 +1123,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
   box-shadow: inset 0 -18px 38px rgba(20,32,80,.24), 0 0 0 4px rgba(255,255,255,.3), 0 18px 34px rgba(10,20,50,.3);
 }
 .sel2-card.st-locked .sel2-disc-glyph,
-.sel2-card.st-soon .sel2-disc-glyph { filter: grayscale(.85) drop-shadow(0 6px 8px rgba(20,32,80,.3)); opacity: .62; }
+.sel2-card.st-soon .sel2-disc-glyph { filter: saturate(.5) drop-shadow(0 6px 8px rgba(20,32,80,.3)); opacity: .78; }
 .sel2-card.st-locked .sel2-badge, .sel2-card.st-soon .sel2-badge {
   background: linear-gradient(180deg, #b9c2d8, #8b95b4); color: #f4f7ff;
 }
@@ -1120,7 +1166,7 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 }
 .sel2-pip.on { width: 22px; background: #fff; }
 
-.sel2-toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: var(--z-toast); }
+.sel2-toast { position: absolute; left: 50%; bottom: max(18px, calc(var(--sab) + var(--sp-4))); transform: translateX(-50%); z-index: var(--z-toast); }
 
 /* Wider screens: bigger cards, a couple of neighbours peeking in. */
 @media (min-width: 760px) {
@@ -1435,7 +1481,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .bop-btn { height: 96px; font-size: 21px; }
   .deck-tray, .deck-sequence { overflow-x: auto; scrollbar-width: none; }
   .deck-tray::-webkit-scrollbar, .deck-sequence::-webkit-scrollbar { display: none; }
-  .dialog { padding: 14px 20px 16px; gap: 10px; max-height: 92vh; overflow-y: auto; }
+  .dialog { padding: 14px 20px 16px; gap: 10px; max-height: 92dvh; overflow-y: auto; }
   .dialog h2 { font-size: 18px; }
   .dialog p { font-size: 12.5px; }
   .dialog .intro-emoji { font-size: 34px; }
@@ -1499,8 +1545,8 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   box-shadow: 0 4px 0 var(--wood-warm);
 }
 .garden-mascot { position: absolute; bottom: 6%; z-index: 4; pointer-events: none; aspect-ratio: 1; }
-.garden-mascot.zip { left: 4%; height: min(34vh, 300px); }
-.garden-mascot.mixy { right: 4%; height: min(27vh, 240px); }
+.garden-mascot.zip { left: 4%; height: min(34dvh, 300px); }
+.garden-mascot.mixy { right: 4%; height: min(27dvh, 240px); }
 .garden-mascot canvas { height: 100%; width: 100%; filter: drop-shadow(0 12px 16px rgba(13,20,55,.3)); }
 .garden-field {
   position: absolute; left: 12%; right: 12%; top: 20%; bottom: 8%; z-index: 3;
@@ -1550,7 +1596,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
 }
 @keyframes gate-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-.campfire-dialog { max-width: 560px; text-align: left; max-height: 88vh; overflow-y: auto; }
+.campfire-dialog { max-width: 560px; text-align: left; max-height: 88dvh; overflow-y: auto; }
 .campfire-dialog .intro-emoji, .campfire-dialog h2 { text-align: center; }
 .camp-sub { text-align: center; margin-top: -6px; }
 .camp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -1632,8 +1678,8 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .dc-title { font-size: 15px; }
   .dc-sub { font-size: 11.5px; }
   .dc-streak { font-size: 13px; padding: 4px 9px; }
-  .garden-mascot.zip { height: 22vh; left: 1%; }
-  .garden-mascot.mixy { height: 17vh; right: 1%; }
+  .garden-mascot.zip { height: 22dvh; left: 1%; }
+  .garden-mascot.mixy { height: 17dvh; right: 1%; }
   .garden-field { left: 6%; right: 6%; top: 17%; }
   .garden-header h1 { font-size: 24px; }
   .garden-count { font-size: 14px; padding: 6px 12px; }
@@ -1763,7 +1809,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   background: linear-gradient(180deg, #7ad8ff 0%, #4fb6f8 32%, #2f8ef0 64%, #2b78e4 100%);
   overflow: hidden;
   align-items: center; justify-content: flex-end;
-  padding-bottom: max(6vh, calc(40px + var(--sab)));
+  padding-bottom: max(6dvh, calc(40px + var(--sab)));
 }
 .sky-scene { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: var(--z-base); }
 .title-sky { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -1772,7 +1818,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
 /* ---- the sun rises from behind the hills ---- */
 .title-sun {
   position: absolute; left: 50%; top: 21%;
-  width: min(46vh, 340px); height: min(46vh, 340px);
+  width: min(46dvh, 340px); height: min(46dvh, 340px);
   transform: translate(-50%, -50%);
   animation: sun-rise 1.5s var(--ease-out) both;
 }
@@ -1804,7 +1850,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   animation: rays-spin 90s linear infinite, rays-in 1.8s ease-out .35s both;
 }
 @keyframes sun-rise {
-  0%   { transform: translate(-50%, 46vh) scale(.72); opacity: 0; }
+  0%   { transform: translate(-50%, 46dvh) scale(.72); opacity: 0; }
   70%  { opacity: 1; }
   100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
@@ -1943,13 +1989,13 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
 .title-screen .title-card {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: max(4vh, calc(24px + var(--sat))) 16px max(5vh, calc(34px + var(--sab)));
-  gap: clamp(10px, 2.6vh, 26px); pointer-events: none;
+  padding: max(4dvh, calc(24px + var(--sat))) 16px max(5dvh, calc(34px + var(--sab)));
+  gap: clamp(10px, 2.6dvh, 26px); pointer-events: none;
 }
 .title-screen .title-card > * { pointer-events: auto; }
 .title-actions {
   display: flex; flex-direction: column; align-items: center;
-  gap: clamp(8px, 1.8vh, 18px);
+  gap: clamp(8px, 1.8dvh, 18px);
 }
 
 /* The logo is the hero: as wide as the screen sensibly allows, landing
@@ -1958,7 +2004,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
    is tall, so on a short screen a width-only cap would push the buttons
    straight off the bottom. */
 .title-logo-art {
-  position: relative; width: min(88vw, 720px, calc(56vh * 1.418));
+  position: relative; width: min(88vw, 720px, calc(56dvh * 1.418));
   filter: drop-shadow(0 16px 30px rgba(13,20,55,.42));
   animation: logo-land 1s var(--ease-bounce) 1.35s both;
   cursor: pointer;
@@ -2044,7 +2090,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .title-actions { gap: 8px; }
   .title-tag { font-size: 14px; }
   .title-screen .btn-play { padding: 12px 44px; font-size: 27px; }
-  .title-sun { left: 71%; top: 34%; width: min(74vh, 250px); height: min(74vh, 250px); }
+  .title-sun { left: 71%; top: 34%; width: min(74dvh, 250px); height: min(74dvh, 250px); }
   .title-tree.t5, .title-cloud.c3, .title-cloud.c4 { display: none; }
 }
 
@@ -2405,27 +2451,55 @@ button.stars-pill:active { transform: translateY(3px); }
 .level-item.locked .gw-num { filter: saturate(.4) brightness(.85); }
 
 /* Character name chips (reference art: navy pill under each Bop) */
-.gw-name-chip {
+.char-name-chip {
   position: absolute; left: 50%; top: 100%; transform: translate(-50%, 4px);
-  font-family: var(--font-display); font-weight: 600; font-size: clamp(12px, 1.4vw, 17px);
+  font-family: var(--font-display); font-weight: 600; font-size: var(--fs-fluid-sm);
   color: #fff; letter-spacing: .5px; white-space: nowrap;
   background: linear-gradient(180deg, #33418f, #1d2864);
   border: 2px solid rgba(255,255,255,.5); border-radius: var(--r-pill);
   padding: 4px 16px;
-  box-shadow: 0 4px 0 var(--ink-line), 0 8px 16px rgba(0,0,0,.35);
+  /* Hidden until the character is tapped, speaks, or is first introduced.
+     Both bops used to wear a label permanently, on every level, forever —
+     a child who has met Zip does not need telling he is Zip. */
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
 }
+.char-name-chip.on { opacity: 1; transform: translate(-50%, 0); }
 
 /* Think Trail panel — right-docked cream card (reference image) */
+/* The Think Trail entry sits in the corner; the panel drops from it, so
+   nothing occupies the world until a child asks to see it. */
+.gw-trail-wrap {
+  position: absolute; right: max(var(--sp-6), var(--sar));
+  top: calc(max(var(--sp-5), var(--sat)) + var(--under-bar));
+  z-index: var(--z-sticky);
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-4);
+}
+.gw-trail-open { position: relative; }
+/* The "something new" dot. Not a count — a child is not managing a queue. */
+.gw-trail-dot {
+  position: absolute; top: -3px; right: -3px;
+  width: 14px; height: 14px; border-radius: var(--r-circle);
+  background: var(--pink); border: 2px solid var(--white);
+  box-shadow: 0 0 0 3px rgba(241, 99, 201, .35);
+  animation: gw-dot-pulse 1.8s var(--ease-in-out) infinite;
+}
+@keyframes gw-dot-pulse { 50% { box-shadow: 0 0 0 7px rgba(241, 99, 201, 0); } }
+@media (prefers-reduced-motion: reduce) { .gw-trail-dot { animation: none; } }
+.gw-trail-close { --cb-lift: 2px; }
+
 .gw-trail {
-  position: absolute; right: max(16px, var(--sar)); top: calc(max(10px, var(--sat)) + 74px);
-  width: clamp(190px, 20vw, 264px); z-index: 8;
+  width: clamp(200px, 22vw, 280px); max-width: calc(100vw - var(--sp-8));
   background: var(--cream); color: var(--ink-800);
   border: 4px solid #fff; border-radius: var(--r-lg);
-  box-shadow: 0 6px 0 var(--cream-deep), var(--shadow-card);
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 18px 12px 12px;
+  box-shadow: var(--pop-6) var(--cream-deep), var(--shadow-card);
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-5) var(--sp-5);
+  animation: gw-trail-in var(--dur-med) var(--ease-bounce) both;
 }
-.gw-trail-head { display: flex; align-items: center; justify-content: center; }
+@keyframes gw-trail-in { from { opacity: 0; transform: translateY(-10px) scale(.96); } }
+@media (prefers-reduced-motion: reduce) { .gw-trail { animation: none; } }
+.gw-trail-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
 .gw-trail-title {
   position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
   background: linear-gradient(180deg, var(--purple-light), var(--purple-deep)); color: #fff;
@@ -2436,25 +2510,15 @@ button.stars-pill:active { transform: translateY(3px); }
 /* The visible pip stays small so it does not shout over the trail, but
    the thing a finger has to hit is the full 44px (§14). Measured at 30x30
    on every Gearworks screen before this. */
-.gw-trail-toggle {
-  position: absolute; top: 0; right: 0; width: 44px; height: 44px;
-  min-width: 44px; min-height: 44px; cursor: pointer; font: inherit;
-  background: none; border: none; padding: 0;
-  display: grid; place-items: center; color: #4a3b6e;
-  font-size: 15px; font-weight: 900;
-}
-.gw-trail-toggle::before {
-  content: ''; position: absolute; width: 30px; height: 30px;
-  border-radius: var(--r-circle); background: rgba(42,24,69,.12);
-}
-.gw-trail.collapsed .gw-trail-list, .gw-trail.collapsed .gw-trail-hint { display: none; }
-.gw-trail-list { display: flex; flex-direction: column; gap: 8px; max-height: 44vh; overflow-y: auto; }
+
+
+.gw-trail-list { display: flex; flex-direction: column; gap: 8px; max-height: 44dvh; overflow-y: auto; }
 .gw-trail-empty {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   text-align: center; font-weight: 800; font-size: 13.5px; color: #6b628a;
   padding: 10px 6px;
 }
-.gw-trail-empty span:first-child { font-size: 30px; }
+.gw-trail-empty-icon svg { width: 30px; height: 30px; display: block; color: var(--purple-deep); }
 .gw-trail-step {
   display: flex; align-items: center; gap: 8px;
   background: #fff; border-radius: 12px; padding: 7px 9px;
@@ -2646,7 +2710,7 @@ button.stars-pill:active { transform: translateY(3px); }
 /* Responsive: Think Trail collapses out of the way on small screens */
 @media (max-width: 900px) {
   .gw-trail { width: clamp(170px, 30vw, 220px); padding: 16px 10px 10px; }
-  .gw-trail-list { max-height: 30vh; }
+  .gw-trail-list { max-height: 30dvh; }
 }
 @media (max-width: 700px) {
   /* dock under the top bar as a compact expandable chip (clear of the deck) */
@@ -2654,10 +2718,10 @@ button.stars-pill:active { transform: translateY(3px); }
     top: calc(max(8px, var(--sat)) + 118px); bottom: auto;
     right: max(8px, var(--sar)); width: 158px; padding: 14px 8px 8px;
   }
-  .gw-trail-list { max-height: 24vh; }
+  .gw-trail-list { max-height: 24dvh; }
   .gw-trail-empty { font-size: 11.5px; }
   .gw-trail-title { font-size: 11px; padding: 3px 12px; top: -12px; }
-  .gw-name-chip { font-size: 11px; padding: 3px 10px; }
+  .char-name-chip { font-size: 11px; padding: 3px 10px; }
 }
 
 /* Gearworks live machine-state readout (top of the Think Trail) */
@@ -2667,7 +2731,6 @@ button.stars-pill:active { transform: translateY(3px); }
   font-family: var(--font-display); font-weight: 600; font-size: 13.5px;
   letter-spacing: .4px; box-shadow: inset 0 2px 0 rgba(255,255,255,.2), 0 2px 0 rgba(42,24,69,.2);
 }
-.gw-trail.collapsed .gw-machine-line { display: none; }
 
 /* Gearworks parts shelf (Phase 3 builder levels — no program slots) */
 .gw-shelf {
@@ -3175,7 +3238,7 @@ button.stars-pill:active { transform: translateY(3px); }
      document, so it stretches and reads left-aligned. */
   align-items: stretch; text-align: left; gap: 0;
   width: min(560px, 92vw); max-width: min(560px, 92vw);
-  max-height: 86vh; overflow-y: auto;
+  max-height: 86dvh; overflow-y: auto;
   padding: 18px 20px 20px;
 }
 .code-peek > .mini-btn { align-self: center; margin-top: 4px; }
@@ -3228,7 +3291,7 @@ button.stars-pill:active { transform: translateY(3px); }
 
 /* Landscape phones: the peek must fit without hiding its own heading. */
 @media (max-height: 560px) and (orientation: landscape) {
-  .code-peek { padding: 12px 14px 14px; max-height: 92vh; }
+  .code-peek { padding: 12px 14px 14px; max-height: 92dvh; }
   .cp-badge-icon { width: 38px; height: 38px; font-size: 21px; }
   .cp-concept { font-size: 15px; }
   .cp-childlang { font-size: 11px; }
@@ -4030,7 +4093,7 @@ button.stars-pill:active { transform: translateY(3px); }
 @keyframes pmHint { 0%, 100% { opacity: .28; } 50% { opacity: .75; } }
 .pm-piece.gone { opacity: 0; transform: scale(.6); pointer-events: none; }
 .pm-piece-glyph {
-  font-size: clamp(28px, 11vh, 74px); line-height: 1;
+  font-size: clamp(28px, 11dvh, 74px); line-height: 1;
   filter: drop-shadow(0 4px 6px rgba(13,20,55,.35));
 }
 .pm-piece.lit .pm-piece-glyph { filter: drop-shadow(0 0 16px rgba(255,214,102,.95)); }
@@ -4174,14 +4237,14 @@ button.stars-pill:active { transform: translateY(3px); }
 
 @media (max-height: 560px) and (orientation: landscape) {
   .pm-stage { min-height: 150px; }
-  .pm-piece-glyph { font-size: clamp(24px, 12vh, 48px); }
+  .pm-piece-glyph { font-size: clamp(24px, 12dvh, 48px); }
   .pm-exit, .pm-restart { width: 34px; height: 34px; font-size: 15px; }
 }
 
 /* ---- App Lab Code Peek panel ---- */
 .acp {
   align-items: stretch; text-align: left; gap: 0;
-  width: min(620px, 92vw); max-height: 86vh; overflow-y: auto; padding: 18px 20px 20px;
+  width: min(620px, 92vw); max-height: 86dvh; overflow-y: auto; padding: 18px 20px 20px;
 }
 .acp-head { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
 .acp-glyph { font-size: 30px; }
@@ -4296,15 +4359,15 @@ button.stars-pill:active { transform: translateY(3px); }
   /* --- think trail: compact rail, never covers the cast --- */
   .gw-trail {
     width: 132px; padding: 11px 7px 7px;
-    top: calc(max(6px, var(--sat)) + 44px); bottom: auto; max-height: 58vh;
+    top: calc(max(6px, var(--sat)) + 44px); bottom: auto; max-height: 58dvh;
   }
   .gw-trail-title { font-size: 9.5px; padding: 2px 10px; top: -10px; }
-  .gw-trail-list { max-height: 34vh; gap: 4px; }
+  .gw-trail-list { max-height: 34dvh; gap: 4px; }
   .gw-trail-step { font-size: 9.5px; padding: 4px 5px; gap: 4px; }
   .gw-trail-step .n { width: 15px; height: 15px; font-size: 9px; }
   .gw-trail-empty { font-size: 9.5px; }
   .gw-machine-line { font-size: 10px; padding: 5px 6px; border-radius: 9px; }
-  .gw-name-chip { font-size: 9.5px; padding: 2px 8px; }
+  .char-name-chip { font-size: 9.5px; padding: 2px 8px; }
 
   /* --- concept boards sit tight under the bar --- */
   .gw-sky-board, .gw-queue-strip, .gw-state-map, .gw-paint-board {
@@ -4349,7 +4412,7 @@ button.stars-pill:active { transform: translateY(3px); }
     top: calc(max(8px, var(--sat)) + 48px); bottom: auto;
     right: max(8px, var(--sar)); width: 34vw; max-width: 168px; padding: 12px 8px 8px;
   }
-  body.playing .gw-trail-list { max-height: 22vh; }
+  body.playing .gw-trail-list { max-height: 22dvh; }
   body.playing .gw-trail-step { font-size: 10.5px; padding: 5px 6px; }
   body.playing .gw-machine-line { font-size: 11px; padding: 6px 7px; }
 

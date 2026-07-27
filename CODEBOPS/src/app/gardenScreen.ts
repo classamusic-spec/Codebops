@@ -6,6 +6,7 @@ import { el } from '../ui/dom';
 import { SaveStore } from '../storage/saveStore';
 import { mountMascot } from '../rendering/mascotRig';
 import { sharedSfx } from '../audio/sfx';
+import { backButton } from '../ui/components/button';
 
 const FLOWERS = ['🌸', '🌼', '🌷', '🌻', '🌹', '💐', '🪻', '🌺'];
 
@@ -40,10 +41,7 @@ export class GardenScreen {
 
     // Header
     const header = el('div', 'garden-header', screen);
-    const back = el('button', 'circle-btn', header, '←');
-    back.type = 'button';
-    back.setAttribute('aria-label', 'Back');
-    back.addEventListener('click', () => this.events.onBack());
+    backButton(header, () => { this.events.onBack(); }, 'Back');
     el('h1', undefined, header, 'Bop Garden');
     const totalStars = Object.values(this.store.stars).reduce((a, b) => a + b, 0);
     const golden = this.store.daily.totalCompleted;

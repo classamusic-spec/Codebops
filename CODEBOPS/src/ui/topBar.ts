@@ -1,5 +1,6 @@
 /** Top bar: back · logo · hint · star progress · settings. */
 import { el } from './dom';
+import { backButton, settingsButton, hintButton, ICON_STAR } from './components/button';
 
 export interface TopBarEvents {
   onBack: () => void;
@@ -18,9 +19,7 @@ export class TopBar {
   constructor(parent: HTMLElement, title: string, events: TopBarEvents) {
     this.root = el('header', 'top-bar', parent);
 
-    const back = el('button', 'circle-btn', this.root, '←');
-    back.setAttribute('aria-label', 'Back to title');
-    back.addEventListener('click', events.onBack);
+    backButton(this.root, events.onBack, 'Back to the map');
 
     const mark = el('img', 'logo-chip-img', this.root) as HTMLImageElement;
     mark.src = './art/logo.svg';
@@ -39,25 +38,27 @@ export class TopBar {
     // level. It sits before the stars rather than out at the edge: a
     // child looking for help looks at the middle of the bar, and the two
     // corners are already spoken for by Back and Settings.
-    if (events.onHint) {
-      const hint = el('button', 'circle-btn hint-btn', this.root, '?');
-      hint.setAttribute('aria-label', 'Stuck? Get a hint');
-      hint.addEventListener('click', events.onHint);
-    }
+    if (events.onHint) hintButton(this.root, events.onHint);
 
-    const stars = el('div', 'stars-pill', this.root);
-    stars.setAttribute('aria-label', 'Stars earned');
+    // Stars carry their state in SHAPE as well as colour — an unearned
+    // star is a hollow outline, an earned one is solid — so the progress
+    // survives a colour-blind eye and a greyscale screenshot alike.
+    const stars = el('div', 'stars-pill cb-stars', this.root);
+    stars.setAttribute('role', 'img');
     for (let i = 0; i < 3; i++) {
-      const s = el('span', 'star', stars, '★');
+      const s = el('span', 'cb-star', stars);
+      s.innerHTML = ICON_STAR;
       this.starNodes.push(s);
     }
+    this.setStars(0);
 
-    const gear = el('button', 'circle-btn blue', this.root, '⚙️');
-    gear.setAttribute('aria-label', 'Settings');
-    gear.addEventListener('click', events.onSettings);
+    settingsButton(this.root, events.onSettings);
   }
 
   setStars(count: number): void {
     this.starNodes.forEach((s, i) => s.classList.toggle('earned', i < count));
+    this.starNodes[0]?.parentElement?.setAttribute(
+      'aria-label', `${count} of 3 stars earned`,
+    );
   }
 }
