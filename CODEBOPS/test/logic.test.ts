@@ -3730,6 +3730,103 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return play.length >= 17 && missing.every((f) => f === 'gearworksTrophyScreen.ts');
   })());
 
+  // ---- design system ----
+  // A token restated as a literal is the way a design system rots: both
+  // render the same today, so nothing breaks until the brand colour moves
+  // and only half the uses follow. 34 of these existed before Phase 1.
+  check('no colour token is restated as a literal', (() => {
+    const tokens = readFileSync('src/styles/tokens.css', 'utf8');
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const bad: string[] = [];
+    for (const m of tokens.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
+      const [, name, hex] = m;
+      // #fff / #000 are deliberately literal — see docs/design-system.md.
+      if (/^#(ffffff|000000)$/i.test(hex)) continue;
+      const uses = css.match(new RegExp(hex + '(?![0-9a-fA-F])', 'gi'));
+      if (uses) bad.push(`${hex} (${name}) x${uses.length}`);
+    }
+    if (bad.length > 0) console.log('   restated: ' + bad.slice(0, 8).join(', '));
+    return bad.length === 0;
+  })());
+
+  // The scale exists so that layers can be reasoned about. It also fixed a
+  // real bug: the rotate hint sat above the modal scrim and its button
+  // stole taps meant for the dialog underneath, so a level-intro dialog
+  // could not be dismissed on a portrait phone.
+  check('overlays are ordered by the z-index scale, not magic numbers', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const tokens = readFileSync('src/styles/tokens.css', 'utf8');
+    const scale = new Map<string, number>();
+    for (const m of tokens.matchAll(/(--z-[\w-]+):\s*(\d+)/g)) scale.set(m[1], Number(m[2]));
+    // Values 2..12 order children inside one component and stay literal.
+    const rogue = [...css.matchAll(/z-index:\s*(\d+)/g)]
+      .map((m) => Number(m[1])).filter((v) => v > 12);
+    if (rogue.length > 0) console.log('   un-tokenized z-index: ' + rogue.join(', '));
+    const zOf = (name: string): number => {
+      const at = css.indexOf(name);
+      const m = /z-index:\s*var\((--z-[\w-]+)\)/.exec(css.slice(at, at + 400));
+      return m ? scale.get(m[1]) ?? -1 : -1;
+    };
+    // The rotate hint must sit BELOW the modal scrim so dialogs win taps.
+    return rogue.length === 0
+      && zOf('.rotate-hint') < zOf('.dialog-scrim')
+      && zOf('.rotate-hint') > 0;
+  })());
+
+  // ...and z-index alone is NOT enough, which is why the guard below has
+  // to exist. `.screen` carries a transform and is therefore a stacking
+  // context, so a dialog's z-index only competes inside the screen, while
+  // the rotate card is a sibling of `.screen` at the root. Measured: with
+  // the ordering "fixed" and this rule removed, elementFromPoint at the
+  // centre of the dialog's own button still returned the rotate card's
+  // button, and the level-intro dialog could not be dismissed.
+  check('the rotate invitation stands down while a dialog is open', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return /body:has\(\.dialog-scrim\) \.rotate-hint \{ display: none/.test(css);
+  })());
+
+  // A splash a three-year-old cannot press is a broken splash. Measured at
+  // 2957ms before this: the Play button sat at opacity 0 while six tagline
+  // words revealed one at a time, and only then rose in.
+  check('the splash offers its Play button in well under a second', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const play = /\.title-screen \.btn-play \{ animation: rise-in ([\d.]+)s [^}]*?([\d.]+)s both/.exec(css);
+    if (!play) return false;
+    const readyAt = Number(play[2]);
+    const words = /animation-delay: calc\(([\d.]+)s \+ var\(--i\) \* (\d+)ms\)/.exec(css);
+    if (!words) return false;
+    // Six words in the tagline; the last one starts last.
+    const tagDone = Number(words[1]) + 5 * (Number(words[2]) / 1000) + 0.5;
+    if (readyAt > 1) console.log(`   play appears at ${readyAt}s`);
+    return readyAt <= 1 && tagDone <= 1.8;
+  })());
+
+  // Anything pinned to the bottom of the screen has to clear the home
+  // indicator. `.app-toast` used a bare percentage and landed on it.
+  check('bottom-pinned chrome respects the safe area', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.app-toast');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /--sab/.test(block);
+  })());
+
+  // Two floors answering two questions, both named. Before Phase 1 the
+  // 56px token was used on exactly one selector while a hardcoded 44px
+  // floor was repeated twelve times referencing no token at all.
+  check('the touch-target floors are tokens', (() => {
+    const tokens = readFileSync('src/styles/tokens.css', 'utf8');
+    return /--tap-min:\s*56px/.test(tokens) && /--tap-floor:\s*44px/.test(tokens);
+  })());
+
+  // The 540/560 split meant a device 550px tall matched one rule set and
+  // not the other. One value, and it must be the larger.
+  check('short-landscape uses one breakpoint, not two', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at540 = (css.match(/max-height:\s*540px/g) ?? []).length;
+    if (at540 > 0) console.log(`   ${at540} rules still on 540px`);
+    return at540 === 0 && /max-height:\s*560px/.test(css);
+  })());
+
   // ---- background music ----
   // A browser's own `loop` restarts an MP3 through its encoder padding,
   // which is an audible hiccup every pass, forever. Two elements take

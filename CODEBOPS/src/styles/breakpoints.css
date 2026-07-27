@@ -1,0 +1,67 @@
+/* ============================================================
+   CodeBops breakpoints — the layout modes, named.
+
+   CSS cannot put a media query behind a custom property, so these
+   cannot be tokens. They are written down here instead so that
+   every `@media` in the stylesheet can be checked against a list
+   of four, rather than invented at the point of need.
+
+   The stylesheet had grown EIGHT width breakpoints (380, 560,
+   620, 700, 720, 760, 820, 900) and TWO heights for the same
+   idea. Two of those were live bugs:
+
+     - `max-height: 540px` was used eight times and
+       `max-height: 560px` three times, both meaning "short
+       landscape phone". A device 550px tall matched one set of
+       rules and not the other.
+     - `max-width: 1500px` and `min-width: 1600px` left the range
+       1500–1600px matched by neither.
+
+   The same condition was also written in two operand orders
+   (`(max-height: 560px) and (orientation: landscape)` in one
+   place, the reverse in another), so any search or codemod over
+   the stylesheet silently missed half the occurrences.
+
+   ------------------------------------------------------------
+   THE FOUR LAYOUT MODES
+   ------------------------------------------------------------
+
+   Landscape tablet is the PRIMARY target. It is the default —
+   it has no media query, because designing for it is what the
+   base stylesheet does. The queries below are all departures
+   from it.
+
+     COMPACT      @media (max-width: 620px)
+                  Narrow portrait phones. Panels go full width,
+                  decoration thins out.
+
+     PORTRAIT     @media (max-width: 820px) and (orientation: portrait)
+                  Portrait phones and small portrait tablets. The
+                  deck becomes a column, BOP becomes a bar.
+
+     SHORT        @media (max-height: 560px) and (orientation: landscape)
+                  Landscape phones. Vertical space is the scarce
+                  resource: every panel gets shorter, never
+                  narrower. 560px, not 540px — the larger value
+                  so nothing falls in the gap.
+
+     WIDE         @media (min-width: 1500px)
+                  Large tablets and desktop. Content gains a
+                  maximum width so a line of text never runs the
+                  full span of a monitor.
+
+   Two capability queries, which are about the input device
+   rather than the size:
+
+     @media (hover: hover)                  pointer enhancements only
+     @media (prefers-reduced-motion: reduce) motion alternatives
+
+   ------------------------------------------------------------
+   WRITING A NEW QUERY
+   ------------------------------------------------------------
+
+   Copy one of the four verbatim, including the operand order.
+   If a component seems to need a fifth breakpoint, that is
+   usually the component asking to be laid out with a grid or a
+   flex-wrap instead — reach for that first.
+   ============================================================ */

@@ -1,69 +1,197 @@
 /* ============================================================
-   CodeBops design tokens — locked from reference UI art
+   CodeBops design tokens — the single source of visual truth.
+
+   Rules for using this file:
+
+   1. A value used more than once belongs here, named.
+   2. A component may hold a value used exactly once by that
+      component. The moment a second component wants it, it moves
+      here.
+   3. Never restate a token as a literal. `#ffd23e` and
+      `var(--yellow)` are the same colour, and when the brand
+      yellow shifts, only one of them follows.
+
+   The scales below were derived by measuring what the stylesheet
+   ALREADY does, not invented: every colour promoted to a token
+   appeared at least four times as a literal, and the type scale
+   covers all 26 fixed font sizes that were in use.
    ============================================================ */
 :root {
-  /* UI ink + surfaces */
+  /* ---------- ink + surfaces ---------- */
   --ink-900: #101a45;
   --ink-800: #16225c;
   --ink-700: #1e2f7a;
   --ink-600: #27398f;
   --ink-500: #34479f;
   --ink-line: #0d1437;
+  /* Deepest shade, for insets and the darkest panel wells. */
+  --ink-950: #2a2350;
   --cream: #fff6e3;
   --cream-deep: #f7e9c8;
+  /* Warm paper tints that recur across cards and callouts. */
+  --cream-soft: #fff7e2;
+  --cream-warm: #fff7d6;
   --white: #ffffff;
+  --black: #000000;
 
-  /* Brand colors (from reference UI) */
+  /* ---------- brand ---------- */
   --blue: #38b6ff;
   --blue-deep: #2e7ce6;
+  --blue-bright: #5fc9ff;
+  /* The pressed/underside shade every blue control casts. */
+  --blue-shade: #1c55ab;
+  --blue-shade-deep: #1257a8;
   --sky: #7dd7ff;
+  --sky-pale: #8fe3ff;
+  --sky-soft: #9fe0ff;
+  --sky-mist: #d8f4ff;
   --purple: #a06bff;
   --purple-deep: #8b4ddb;
+  --purple-light: #b47dff;
+  --purple-shade: #5e2fa8;
+  --purple-pale: #c7b3ff;
   --pink: #ff5fa2;
   --orange: #ff9f2e;
   --orange-deep: #f0810f;
+  --orange-mid: #f0a81e;
   --yellow: #ffd23e;
+  --yellow-warm: #ffcf3e;
+  --yellow-pale: #ffe9a8;
+  --yellow-shade: #6b4a12;
   --green: #3ed35f;
   --green-deep: #1fae4a;
+  --green-light: #7ee79b;
+  --green-bright: #7dee8e;
+  --green-shade: #157a33;
+  --green-pale: #eafff1;
   --mint: #5ee8c7;
   --red: #ff5d5d;
+  /* Cool text tints used on navy panels. */
+  --text-on-ink: #c3d4ff;
+  --text-on-ink-soft: #cfe4ff;
 
-  /* World palette */
+  /* ---------- world palette ---------- */
   --grass-1: #8ee06a;
   --grass-2: #7ed95e;
   --grass-deep: #4fae4a;
   --water: #37b6f6;
   --wood: #b5773f;
   --wood-deep: #8d5a2b;
+  --wood-warm: #d9a94e;
 
-  /* Type */
+  /* ---------- type ---------- */
   /* The webfonts come first when they load. Everything after them is the
      fallback chain for an offline build: `ui-rounded` is SF Pro Rounded on
      Apple platforms, then the rounded faces Windows and Android ship, so
      the friendly look survives with no network at all. */
   --font-display: 'Fredoka', 'Nunito', ui-rounded, 'Arial Rounded MT Bold', 'Segoe UI', Roboto, system-ui, sans-serif;
   --font-body: 'Nunito', 'Fredoka', ui-rounded, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Shape */
+  /* Fixed type scale.
+     Nine steps covering the 26 fixed sizes the stylesheet was using. The
+     old set included a half-pixel tier (9.5, 10.5, 11.5, 12.5, 13.5,
+     14.5) which is the signature of values nudged by eye rather than
+     chosen; each of those now rounds to its nearest step. */
+  --fs-3xs: 9px;
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-base: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 26px;
+  --fs-3xl: 32px;
+
+  /* Fluid type scale.
+     Six ramps replacing 42 one-off clamp() expressions, several of which
+     differed only in the middle term (1.5vw vs 1.6vw vs 1.7vw) — a
+     difference nobody can see and everybody has to maintain. */
+  --fs-fluid-xs: clamp(10px, 1.1vw, 13px);
+  --fs-fluid-sm: clamp(12px, 1.4vw, 16px);
+  --fs-fluid-md: clamp(14px, 1.6vw, 18px);
+  --fs-fluid-lg: clamp(16px, 2vw, 22px);
+  --fs-fluid-xl: clamp(20px, 2.6vw, 30px);
+  --fs-fluid-2xl: clamp(22px, 3vw, 34px);
+
+  /* ---------- spacing ---------- */
+  /* A 4px-based ramp. The stylesheet held 192 distinct padding/gap/margin
+     values; almost all of them land on or beside one of these. */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 26px;
+  --sp-9: 34px;
+  --sp-10: 44px;
+
+  /* ---------- shape ---------- */
   --r-sm: 10px;
   --r-md: 16px;
   --r-lg: 22px;
   --r-xl: 30px;
   --r-pill: 999px;
+  --r-circle: 50%;
 
-  /* Elevation */
+  /* ---------- elevation ---------- */
+  /* The "pop" family: a hard offset shadow in a darker shade of the
+     control's own colour, which is what gives every CodeBops button its
+     moulded-plastic look. It appeared 98 different ways; it is one shape
+     with two variables. Use like:
+       box-shadow: var(--pop-3) var(--purple-shade), var(--shadow-soft); */
+  --pop-1: 0 1px 0;
+  --pop-2: 0 2px 0;
+  --pop-3: 0 3px 0;
+  --pop-4: 0 4px 0;
+  --pop-5: 0 5px 0;
+  --pop-6: 0 6px 0;
+  --pop-10: 0 10px 0;
+
   --shadow-pop: 0 6px 0 rgba(13, 20, 55, 0.9);
   --shadow-soft: 0 10px 24px rgba(13, 20, 55, 0.35);
   --shadow-card: 0 14px 34px rgba(13, 20, 55, 0.42);
+  --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.5);
 
-  /* Motion */
+  /* ---------- motion ---------- */
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Four families, matching the four jobs motion does here. The old set
+     clustered .15/.16/.18/.2s — four values doing one job. */
+  --dur-instant: 80ms;
   --dur-fast: 140ms;
   --dur-med: 260ms;
+  --dur-slow: 420ms;
+  --dur-scene: 700ms;
 
-  /* Touch targets */
+  /* ---------- layering ---------- */
+  /* Seven steps, in the order things sit in front of each other. Before
+     this there were 17 magic numbers, and three of them were wrong: the
+     drag ghost, the rotate hint and the confetti all sat ABOVE the modal
+     scrim, so a dialog could be covered by, and its taps stolen by, the
+     thing it was supposed to block. */
+  --z-base: 0;
+  --z-content: 1;
+  --z-raised: 5;
+  --z-sticky: 20;
+  --z-overlay: 40;      /* scrims and the modal backdrop */
+  --z-modal: 50;        /* the dialog itself, above its own scrim */
+  --z-drag: 70;         /* a dragged tile follows the finger over anything */
+  --z-toast: 90;        /* transient messages sit on top of everything */
+
+  /* ---------- touch targets ---------- */
+  /* The comfortable size for a primary control. */
   --tap-min: 56px;
+  /* The absolute floor for anything tappable — the WCAG 2.5.5 minimum.
+     Kept separate from --tap-min because they answer different
+     questions: "how big should this be" and "how small may this ever
+     get". Previously the 56px token was used on one selector while a
+     hardcoded 44px floor was repeated twelve times. */
+  --tap-floor: 44px;
   /* How far a panel in the top-left corner must sit below the top bar to
      clear the back button — its full height, plus room for the little
      flags that hang above such a panel's own edge. Anything pinned under
@@ -71,7 +199,7 @@
      that were picked (42, 44, 48, 50) were all smaller than the button. */
   --under-bar: calc(var(--tap-min) + 22px);
 
-  /* Safe areas */
+  /* ---------- safe areas ---------- */
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
