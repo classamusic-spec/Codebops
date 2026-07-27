@@ -28,6 +28,8 @@ export interface SaveData {
      * without a track playing under them.
      */
     music?: boolean;
+    /** Small taps on snap and success. Absent on devices that cannot. */
+    haptics?: boolean;
     calmMode: boolean;
     highContrast: boolean;
     leftHanded: boolean;
@@ -60,7 +62,7 @@ const DEFAULT_SAVE: SaveData = {
   evidence: [],
   unlockedWorlds: [],
   stars: {},
-  settings: { sound: true, music: true, calmMode: false, highContrast: false, leftHanded: false },
+  settings: { sound: true, music: true, haptics: true, calmMode: false, highContrast: false, leftHanded: false },
   daily: { lastCompleted: null, streak: 0, totalCompleted: 0 },
   playSeconds: 0,
 };

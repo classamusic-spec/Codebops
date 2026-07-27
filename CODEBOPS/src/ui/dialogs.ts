@@ -3,6 +3,7 @@ import { el } from './dom';
 import type { ExecEvent } from '../gameplay/commands/interpreter';
 import type { Sfx } from '../audio/sfx';
 import { sharedMusic } from '../audio/music';
+import { sharedHaptics, hapticsAvailable } from '../audio/haptics';
 import type { SaveStore } from '../storage/saveStore';
 import { showCodePeek } from './codePeek';
 import type { CodePeekInfo } from './codePeek';
@@ -156,6 +157,8 @@ export function showCelebration(
   next.addEventListener('click', () => { sfx.play('tap'); closeDialog(s, previousFocus); actions.onContinue(); });
   next.focus();
 
+  sharedHaptics.play('success');
+
   // Pop stars one by one with sounds + names (only the EARNED ones —
   // callers may pass the full 3-name roster alongside a smaller count)
   info.starNames.slice(0, info.stars).forEach((starName, i) => {
@@ -270,13 +273,16 @@ export function showSettings(
   el('h2', undefined, d, '⚙️ Settings');
 
   const list = el('div', 'settings-list', d);
-  type ToggleKey = 'sound' | 'music' | 'calmMode' | 'highContrast' | 'leftHanded'
+  type ToggleKey = 'sound' | 'music' | 'haptics' | 'calmMode' | 'highContrast' | 'leftHanded'
     | 'captions' | 'spokenInstructions';
   const rows: Array<{ key: ToggleKey; label: string; only?: boolean }> = [
     { key: 'sound', label: '🔊 Sound effects' },
     // Separate from the effects above: a classroom often wants the sounds
     // that tell a child what just happened, without a track under them.
     { key: 'music', label: '🎵 Background music' },
+    // Haptics are hidden where the device cannot do them, rather than
+    // offered as a switch that does nothing.
+    { key: 'haptics', label: '📳 Little buzzes', only: hapticsAvailable() },
     { key: 'calmMode', label: '🍃 Calm mode (softer motion)' },
     { key: 'highContrast', label: '🌗 High contrast' },
     { key: 'leftHanded', label: '🤚 Left-handed layout' },
@@ -299,6 +305,7 @@ export function showSettings(
       // Music answers immediately — it fades rather than waiting for the
       // next screen change, which is the only feedback the toggle has.
       if (row.key === 'music') sharedMusic.enabled = next;
+      if (row.key === 'haptics') sharedHaptics.enabled = next;
       sfx.play('tap');
       onChange();
     });

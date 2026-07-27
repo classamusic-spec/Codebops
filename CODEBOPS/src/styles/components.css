@@ -169,3 +169,46 @@
 .cb-stars { display: inline-flex; align-items: center; gap: var(--sp-3); }
 .cb-stars .cb-star { width: 1.4em; height: 1.4em; display: block; color: rgba(255, 255, 255, 0.26); }
 .cb-stars .cb-star.earned { color: var(--yellow); filter: drop-shadow(0 2px 0 var(--yellow-shade)); }
+
+/* ------------------------------------------------------------
+   Accessibility modes (Phase 12)
+   ------------------------------------------------------------ */
+
+/* High contrast: flatten the moulded look, keep the semantics. The
+   gradient face and soft shadow are exactly what makes a low-vision
+   reader work harder, so both go — but the family colour stays, because
+   colour is one of the channels and removing it would cost information
+   rather than add it. */
+body.high-contrast .cb-btn {
+  background: var(--cb-face-2);
+  border: 3px solid var(--white);
+  box-shadow: 0 3px 0 var(--black);
+  text-shadow: none;
+}
+body.high-contrast .cb-btn:disabled {
+  filter: none; opacity: 1;
+  background: var(--ink-900); border-style: dashed;
+}
+body.high-contrast .cb-panel {
+  background: var(--ink-900); border-color: var(--white);
+  box-shadow: 0 4px 0 var(--black);
+}
+body.high-contrast .cb-panel.p-paper {
+  background: var(--white); color: var(--black); border-color: var(--black);
+}
+/* An unearned star is already an outline; high contrast makes the
+   outline explicit rather than relying on a 26% white fill. */
+body.high-contrast .cb-stars .cb-star { color: transparent; stroke: var(--white); stroke-width: 2px; }
+body.high-contrast .cb-stars .cb-star.earned { color: var(--yellow); stroke: var(--black); filter: none; }
+body.high-contrast .cb-badge { border-color: var(--white); }
+
+/* Calm mode stills the decorative loops but keeps every state change,
+   because a state change is information and a wobble is not. */
+body.calm-mode .cb-btn.cb-hint { animation: none; }
+body.calm-mode .gw-trail-dot { animation: none; }
+
+/* Left-handed: the Think Trail moves to the reach of the other thumb. */
+body.left-handed .gw-trail-wrap {
+  right: auto; left: max(var(--sp-6), var(--sal));
+  align-items: flex-start;
+}

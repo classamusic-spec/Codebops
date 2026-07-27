@@ -209,6 +209,7 @@ export class GameScreen {
       },
       onBop: () => void this.onBop(ui),
       onRewind: () => this.rewind(),
+      onNeedProgram: () => showToast(ui, 'Add some tiles first, then press BOP!'),
     }, this.sfx);
 
     // --- Agent Academy: helper-rule bar + BopLens ---

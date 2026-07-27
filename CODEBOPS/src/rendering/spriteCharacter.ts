@@ -331,7 +331,19 @@ export class SpriteCharacter {
   }
 
   private syncShadow(): void {
-    this.shadow.position.set(this.root.position.x, 0.44, this.root.position.z);
+    // Sit on whatever the character is standing on, not on a fixed height.
+    //
+    // 0.44 was the top of a Sparkle Meadow tile, hard-coded, so in the
+    // Gearworks garage — where the floor is at 0.05 — the shadow hovered
+    // 39cm in the air behind the bench and never landed anywhere. Both
+    // bops read as stickers pasted onto the room. Following the root's own
+    // y puts the shadow under the feet in every world, and the small lift
+    // keeps it off the floor plane so the two never z-fight.
+    this.shadow.position.set(
+      this.root.position.x,
+      this.root.position.y + 0.02,
+      this.root.position.z,
+    );
   }
 
   // ---------- moods & expressions ----------

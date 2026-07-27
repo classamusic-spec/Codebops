@@ -3730,6 +3730,112 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return play.length >= 17 && missing.every((f) => f === 'gearworksTrophyScreen.ts');
   })());
 
+  // ---- command system (Phase 6) ----
+  // A disabled button that swallows a tap teaches a child that the button
+  // is broken. BOP must say what it is waiting for, and point at the
+  // empty slots, which is where the answer is.
+  check('BOP explains itself instead of doing nothing', (() => {
+    const deck = readFileSync('src/ui/programDeck.ts', 'utf8');
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return /onNeedProgram\?\.\(\)/.test(deck)
+      && /needs-plan/.test(deck)
+      && /\.deck-panel\.needs-plan .slot:not\(\.filled\)/.test(css);
+  })());
+
+  // One tile is nothing to lose. Four is a plan a child built, and losing
+  // it to a mis-tap beside BOP is the sort of thing that ends a session.
+  check('Clear asks before taking a real plan away', (() => {
+    const deck = readFileSync('src/ui/programDeck.ts', 'utf8');
+    return /this\.program\.length > 2/.test(deck) && /confirming/.test(deck);
+  })());
+
+  // Dark navy dashes at 35% on a dark navy panel: the row read as texture
+  // rather than as places waiting for a tile.
+  check('an empty slot is visible enough to invite a tile', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.slot {');
+    const rule = css.slice(at, css.indexOf('}', at));
+    const alpha = /border: 3px dashed rgba\(255, 255, 255, \.(\d+)\)/.exec(rule);
+    return alpha !== null && Number(`0.${alpha[1]}`) >= 0.5;
+  })());
+
+  // The controls a child touches most had no declared floor at all — they
+  // relied on padding arithmetic, which is what broke when a media query
+  // resized them.
+  check('the controls a child touches most declare a tap floor', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const missing: string[] = [];
+    for (const sel of ['.tile {', '.slot {', '.btn-play {', '.bop-btn {']) {
+      const at = css.indexOf(sel);
+      const rule = css.slice(at, css.indexOf('}', at));
+      if (!/min-height: var\(--tap-(min|floor)\)/.test(rule)) missing.push(sel);
+    }
+    if (missing.length > 0) console.log('   no floor: ' + missing.join(', '));
+    return missing.length === 0;
+  })());
+
+  // ---- Gearworks (Phase 8) ----
+  // The gauge used to sit on the bench near the gear with nothing between
+  // them, so a child watching the needle move had no reason to believe
+  // the gear moved it. The chain has to be visible end to end.
+  check('the machine chain reaches the gauge', (() => {
+    const rig = readFileSync('src/rendering/gearworks/motorRig.ts', 'utf8');
+    return /takeoff/.test(rig)
+      // ...and the link has to MOVE. A link that does not is scenery.
+      && /this\.takeoff\.rotation\.z \+= dt \* rate/.test(rig);
+  })());
+
+  // 0.44 was the top of a Sparkle Meadow tile, hard-coded — so in the
+  // garage, where the floor is at 0.05, both bops' shadows hovered 39cm
+  // in the air and they read as stickers pasted onto the room.
+  check('a character shadow lands on whatever it is standing on', (() => {
+    const src = readFileSync('src/rendering/spriteCharacter.ts', 'utf8');
+    const at = src.indexOf('private syncShadow');
+    // Strip comments first: the one explaining why 0.44 went would
+    // otherwise fail the check that 0.44 is gone.
+    const body = src.slice(at, src.indexOf('\n  }', at)).replace(/\/\/[^\n]*/g, '');
+    return /this\.root\.position\.y \+ 0\.02/.test(body) && !/0\.44/.test(body);
+  })());
+
+  // ---- feedback (Phase 11) ----
+  // Never as punishment: a wrong drop gets no buzz. A child who feels the
+  // device flinch at a mistake learns to stop trying things.
+  check('haptics reward, never punish', (() => {
+    const h = readFileSync('src/audio/haptics.ts', 'utf8');
+    const kinds = /export type Haptic = ([^;]+);/.exec(h);
+    return kinds !== null
+      && !/error|wrong|fail|invalid|bump/i.test(kinds[1])
+      && /success/.test(kinds[1]);
+  })());
+
+  // A switch that does nothing is worse than no switch: a grown-up flips
+  // it, nothing changes, and now they distrust the other settings too.
+  // iOS has no Vibration API, so this is hidden on every iPad.
+  check('the haptics setting hides itself where it cannot work', (() => {
+    const d = readFileSync('src/ui/dialogs.ts', 'utf8');
+    const h = readFileSync('src/audio/haptics.ts', 'utf8');
+    return /only: hapticsAvailable\(\)/.test(d)
+      && /export function hapticsAvailable/.test(h);
+  })());
+
+  // Silencing the game in a waiting room means all of it.
+  check('haptics follow the sound switch', (() => {
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    return /sharedHaptics\.enabled = this\.store\.settings\.sound/.test(app);
+  })());
+
+  // ---- accessibility (Phase 12) ----
+  // High contrast flattens the moulded look but keeps the family colour,
+  // because colour is one of the channels and removing it costs
+  // information rather than adding it.
+  check('the shared components answer every accessibility mode', (() => {
+    const css = readFileSync('src/styles/components.css', 'utf8');
+    return /body\.high-contrast \.cb-btn/.test(css)
+      && /body\.calm-mode \.cb-btn\.cb-hint/.test(css)
+      && /body\.left-handed \.gw-trail-wrap/.test(css)
+      && /prefers-reduced-motion/.test(css);
+  })());
+
   // ---- shared components (Phase 2) ----
   // Nine screens built their own back arrow, five their own BOP, four
   // their own Clear. A change to any of them had to be made nine, five or

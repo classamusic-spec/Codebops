@@ -6,6 +6,7 @@
  * drag & drop with pointer capture, reorder, remove, clear, rewind.
  */
 import { el } from './dom';
+import { sharedHaptics } from '../audio/haptics';
 import { COMMAND_DEFS } from '../data/commands/commandDefs';
 import { renderCommandIcon, iconMarkup } from '../data/commands/commandIcons';
 import type { CommandId, ProgramStep } from '../gameplay/commands/interpreter';
@@ -16,6 +17,8 @@ export interface ProgramDeckEvents {
   onProgramChange: (program: ProgramStep[]) => void;
   onBop: () => void;
   onRewind: () => void;
+  /** BOP was pressed with nothing to run — the screen explains why. */
+  onNeedProgram?: () => void;
 }
 
 interface DragState {
@@ -79,8 +82,21 @@ export class ProgramDeck {
     this.bopBtn.append('BOP!');
     el('span', 'tri', this.bopBtn);
     this.bopBtn.addEventListener('click', () => {
-      if (this.program.length === 0 || this.running) return;
+      if (this.running) return;
+      // A disabled button that does nothing when pressed teaches a child
+      // that the button is broken. Say what it is waiting for instead —
+      // and point at the tiles, which is where the answer is.
+      if (this.program.length === 0) {
+        this.sfx.play('bump');
+        this.events.onNeedProgram?.();
+        const panelEl = this.root.querySelector('.deck-panel');
+        panelEl?.classList.remove('needs-plan');
+        void (panelEl as HTMLElement | null)?.offsetWidth;
+        panelEl?.classList.add('needs-plan');
+        return;
+      }
       this.sfx.play('bop');
+      sharedHaptics.play('snap');
       this.events.onBop();
     });
     this.refreshBopState();
@@ -99,6 +115,29 @@ export class ProgramDeck {
     clear.setAttribute('aria-label', 'Clear the plan');
     clear.addEventListener('click', () => {
       if (this.running || this.program.length === 0) return;
+      // One tile is nothing to lose, so taking it away instantly is
+      // kinder than asking. Four tiles is a plan a child built, and
+      // losing it to a mis-tap beside the BOP button is the sort of
+      // thing that ends a session.
+      if (this.program.length > 2 && !clear.classList.contains('confirming')) {
+        clear.classList.add('confirming');
+        const text = clear.querySelector('.cb-btn-text') ?? clear;
+        const was = text.textContent;
+        text.textContent = 'Clear it?';
+        this.sfx.play('tap');
+        window.setTimeout(() => {
+          clear.classList.remove('confirming');
+          text.textContent = was;
+          // Four seconds, not two. A three-year-old has to notice the
+          // label changed, work out what it now says, and decide — and
+          // measured in a browser, two and a half seconds expired before
+          // a second deliberate tap could land.
+        }, 4200);
+        return;
+      }
+      clear.classList.remove('confirming');
+      const text = clear.querySelector('.cb-btn-text') ?? clear;
+      if (text.textContent === 'Clear it?') text.textContent = 'Clear';
       this.sfx.play('remove');
       this.program = [];
       this.renderSlots();

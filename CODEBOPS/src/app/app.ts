@@ -9,6 +9,7 @@ import { loadSvg } from '../rendering/svgAsset';
 import { mountSkyScene } from '../ui/skyScene';
 import { sharedSfx } from '../audio/sfx';
 import { sharedMusic, attachFirstGesture } from '../audio/music';
+import { sharedHaptics } from '../audio/haptics';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
@@ -105,6 +106,9 @@ export class App {
     // the Settings dialog reaches every screen and not only the one the
     // dialog happened to be opened from.
     sharedMusic.enabled = this.store.settings.music !== false;
+    // Haptics ride the sound switch. Silencing the game in a waiting room
+    // means all of it, not just the speaker.
+    sharedHaptics.enabled = this.store.settings.sound;
     stopSpeaking();
     this.mascotStops.forEach((s) => s());
     this.mascotStops = [];

@@ -28,6 +28,8 @@ export class MotorRig {
   private readonly lamp: THREE.Mesh;
   private readonly needle: THREE.Group;
   private readonly arrow: THREE.Group;
+  /** Pulley on the gauge end of the drive, so power visibly reaches it. */
+  private takeoff!: THREE.Group;
   private on = false;
   private dir: MotorDir = 'cw';
   private speed: MotorSpeed = 2;
@@ -85,7 +87,7 @@ export class MotorRig {
     tip.position.set(Math.cos(Math.PI * 1.2) * 0.52, Math.sin(Math.PI * 1.2) * 0.52, 0);
     tip.rotation.z = Math.PI * 1.2 - Math.PI / 2;
     this.arrow.add(tip);
-    this.arrow.position.set(0.9, 3.6, 0.1);
+    this.arrow.position.set(0.9, 3.16, 0.1);
     this.arrow.scale.x = -1; // cw reading for a viewer
     this.group.add(this.arrow);
 
@@ -114,6 +116,31 @@ export class MotorRig {
     gaugeMount.position.set(3.15, 1.15, 0.2);
     gaugeMount.add(mesh(new RoundedBoxGeometry(1.5, 0.9, 0.3, 2, 0.08), toonMat('#2c3f8f'), 0, -0.32, -0.12));
     this.group.add(gaugeMount);
+
+    // ---- the drive link from the gear to the gauge ----
+    //
+    // Without this the gauge is a dial sitting on the bench near a gear,
+    // and a child watching the needle move has no reason to believe the
+    // gear moved it. The chain has to be visible end to end:
+    //
+    //     motor -> snout -> GEAR -> takeoff pulley -> shaft -> gauge
+    //
+    // The pulley turns with the gear, so the eye can follow motion along
+    // the whole run rather than seeing two things happen separately.
+    this.takeoff = new THREE.Group();
+    this.takeoff.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.26, 16), toonMat('#c8d2e8'), 0, 0, 0, true, false));
+    this.takeoff.add(mesh(new THREE.TorusGeometry(0.34, 0.05, 8, 18), toonMat('#8a94ad'), 0, 0, 0.15, false, false));
+    (this.takeoff.children[0] as THREE.Mesh).rotation.x = Math.PI / 2;
+    this.takeoff.position.set(2.12, 1.5, 0.12);
+    this.group.add(this.takeoff);
+
+    const shaft = mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.0, 12), toonMat('#aab3c8'), 2.62, 1.5, 0.12);
+    shaft.rotation.z = Math.PI / 2;
+    this.group.add(shaft);
+    // A collar where the shaft meets the dial housing, so the join reads
+    // as a fitting rather than as two shapes that happen to touch.
+    this.group.add(mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.18, 12), toonMat('#39406e'), 3.1, 1.5, 0.12, false, false));
+    (this.group.children[this.group.children.length - 1] as THREE.Mesh).rotation.z = Math.PI / 2;
 
     this.applySpeedNeedle();
     this.applyLamp();
@@ -174,6 +201,11 @@ export class MotorRig {
     const idle = this.on ? 1 : 0;
     const rate = (idle * this.speed * 1.4 + this.workBoost * this.speed * 3.2) * (this.dir === 'cw' ? -1 : 1);
     this.gear.rotation.z += dt * rate;
+    // The takeoff pulley turns WITH the gear — faster, because it is
+    // smaller, which is also the first gearing lesson in this world. A
+    // link that does not move is scenery; a link that moves is the reason
+    // the needle moves.
+    this.takeoff.rotation.z += dt * rate * (1.15 / 0.34);
     this.workBoost = Math.max(0, this.workBoost - dt * 1.4);
     // lamp breathing while on
     if (this.on) {
