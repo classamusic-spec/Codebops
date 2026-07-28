@@ -178,10 +178,27 @@ export class GameScreen {
       // band the Stage reserves under the top bar, which is what that band
       // is for.
       const SHOULDER_Y = 0.55;
-      for (const dx of [-HALF_W, HALF_W]) {
-        framePts.push(perch.clone().setX(perch.x + dx));
-        framePts.push(perch.clone().setX(perch.x + dx).setY(SHOULDER_Y));
-      }
+      // Her INNER half only — the side facing the board.
+      //
+      // Framing her whole silhouette made her the binding constraint on
+      // every screen: the fit had to hold a point well beyond the board's
+      // edge, so the board came back small and far away with a lap of
+      // empty meadow around it. That is the single biggest reason the
+      // puzzle did not read as the subject of the screen.
+      //
+      // She is context and a goal marker, not a piece a child moves. Her
+      // outer shoulder may sit at the very edge or a few pixels past it;
+      // what has to be true is that she is visibly THERE, next to the
+      // board, and the goal card carries her picture regardless.
+      // Her CENTRE and her inner shoulder. Framing both outer edges made
+      // her the binding constraint and shrank the board; framing only the
+      // inner edge went too far the other way and pushed her off the
+      // canvas entirely. Her middle is the honest promise: she is on
+      // screen and recognisable, and at most an outer shoulder is clipped.
+      const inner = perch.x > center.x ? -HALF_W : HALF_W;
+      framePts.push(perch.clone());
+      framePts.push(perch.clone().setY(SHOULDER_Y));
+      framePts.push(perch.clone().setX(perch.x + inner).setY(SHOULDER_Y));
       // Head room for a bop standing on the back row is NOT declared here.
       // A point two units above the furthest row projects near the top of
       // the screen, so asking the fit to contain it dollies the camera

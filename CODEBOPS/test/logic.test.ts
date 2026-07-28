@@ -5959,5 +5959,103 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   })());
 }
 
+
+// ============================================================
+// Device-report fixes — chrome icons, board framing, deck, drag
+// ============================================================
+{
+  check('a round icon button sizes its glyph off the button, not off text', (() => {
+    // Measured on a real phone: the icon box came out 90x50 inside a 56px
+    // circular button, and an SVG with a square viewBox letterboxes rather
+    // than stretches, so the glyph drew at 27px. That is what made the
+    // cog read as a small white starburst.
+    const css = readFileSync('src/styles/components.css', 'utf8');
+    const at = css.indexOf('.cb-btn.s-circle .cb-btn-icon {');
+    if (at < 0) return false;
+    const block = css.slice(at, css.indexOf('}', at));
+    return /width:\s*calc\(var\(--tap-min\)/.test(block)
+      && /height:\s*calc\(var\(--tap-min\)/.test(block);
+  })());
+  check('the icon box is square', (() => {
+    const css = readFileSync('src/styles/components.css', 'utf8');
+    const at = css.indexOf('.cb-btn-icon {');
+    const block = css.slice(at, css.indexOf('}', at));
+    const w = /width:\s*([0-9.]+)em/.exec(block);
+    const h = /height:\s*([0-9.]+)em/.exec(block);
+    return !!w && !!h && w[1] === h[1];
+  })());
+  check('the two icon-size rules no longer multiply each other', (() => {
+    // A 2em box and then 55% of it left a 24px glyph in a 56px button.
+    const css = readFileSync('src/styles/components.css', 'utf8');
+    return !/\.cb-btn\.s-circle \.cb-btn-icon svg \{[^}]*55%/.test(css);
+  })());
+  check('the settings cog is drawn as a gear, not a filled star', (() => {
+    const src = readFileSync('src/ui/components/button.ts', 'utf8');
+    const at = src.indexOf('export const ICON_SETTINGS');
+    const block = src.slice(at, at + 600);
+    return /stroke="currentColor"/.test(block) && /<circle/.test(block);
+  })());
+
+  check('the board frame does not have to contain the whole off-board perch', (() => {
+    // Framing both of her outer edges made her the binding constraint, so
+    // the board came back small with a lap of empty meadow around it.
+    const src = readFileSync('src/app/gameScreen.ts', 'utf8');
+    return /const inner = perch\.x > center\.x/.test(src)
+      && !/for \(const dx of \[-HALF_W, HALF_W\]\)/.test(src);
+  })());
+  check('the camera tilts to suit the shape of the screen', (() => {
+    // A grid is wider than it is deep, so on a tall phone the fit is
+    // always width-limited and half the screen went unused.
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /tiltForAspect/.test(src) && /camera\.aspect/.test(src);
+  })());
+  check('a pinned preset view is never re-aimed by the aspect ratio', (() => {
+    // The Gearworks benches face a back wall; tilting them would look at
+    // the ceiling.
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /viewPinned/.test(src) && /if \(this\.viewPinned\) return;/.test(src);
+  })());
+  check('head room scales with the board, not with the viewport', (() => {
+    // 7% of screen height was enough while the board was small; once it
+    // grew, a character's head drew over the logo.
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /freeH \* 0\.2/.test(src);
+  })());
+
+  check('the slot row fits on screen instead of scrolling out of it', (() => {
+    // Eight 54px slots came to 481px on a 390px phone, so the last one
+    // sat off the right edge behind a gesture a four-year-old will not try.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.deck-sequence .slot {');
+    if (at < 0) return false;
+    const block = css.slice(at, css.indexOf('}', at));
+    return /flex:\s*1 1 0/.test(block) && /aspect-ratio:\s*1/.test(block);
+  })());
+  check('a toast wraps rather than growing past both edges', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.toast {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /max-width:/.test(block) && !/white-space:\s*nowrap/.test(block);
+  })());
+
+  check('drag listeners live on the window, not on the dragged tile', (() => {
+    // The tile is replaced by renderSlots() mid-drag, which destroyed the
+    // pointerup handler with its element — so endDrag() never ran and the
+    // ghost stayed on the page. That is the floating command tile.
+    const src = readFileSync('src/ui/programDeck.ts', 'utf8');
+    return /window\.addEventListener\('pointerup', this\.onPointerUp\)/.test(src)
+      && !/tile\.addEventListener\('pointerup'/.test(src);
+  })());
+  check('starting a drag sweeps away any ghost that outlived its drag', (() => {
+    const src = readFileSync('src/ui/programDeck.ts', 'utf8');
+    return /querySelectorAll\('\.drag-ghost'\)/.test(src);
+  })());
+  check('losing pointer capture cannot strand a drag', (() => {
+    const src = readFileSync('src/ui/programDeck.ts', 'utf8');
+    return /releaseDragListeners/.test(src)
+      && /try \{ tile\.setPointerCapture/.test(src);
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

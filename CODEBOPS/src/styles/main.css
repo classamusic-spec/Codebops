@@ -588,13 +588,18 @@ body.high-contrast .rh-card p { color: #fff; }
 }
 
 /* Toast hint */
+/* `white-space: nowrap` on a centred absolute element does not stay on
+   screen — it just grows past both edges. On a 390px phone "Build a plan,
+   then press BOP!" ran off the right and the child read half a sentence.
+   Wrap, and cap the width to the viewport. */
 .toast {
   position: absolute; left: 50%; bottom: calc(150px + var(--sab)); transform: translateX(-50%);
+  max-width: min(88vw, 460px); box-sizing: border-box; text-align: center;
   background: var(--cream); color: var(--ink-800); font-weight: 900;
   padding: 10px 22px; border-radius: var(--r-pill); font-size: clamp(14px, 1.6vw, 18px);
   box-shadow: 0 5px 0 var(--cream-deep), var(--shadow-soft);
   animation: dialog-pop .3s var(--ease-bounce) both; z-index: var(--z-toast);
-  pointer-events: none; white-space: nowrap;
+  pointer-events: none;
 }
 
 /* ============================================================
@@ -1418,14 +1423,22 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
     padding: 0; overflow: visible;
   }
   .deck-divider { display: none; }
+  /* The slot row FITS. It used to scroll sideways, and on a 390px phone
+     eight 54px slots came to 481px — so the last slot sat off the right
+     edge, looking cut in half, behind a gesture a four-year-old has no
+     reason to try. Slots now share the row and shrink to fit, with wrap
+     as the safety valve if a level ever asks for more than can shrink. */
   .deck-sequence {
-    order: 1; flex: 0 0 auto; justify-content: flex-start;
-    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
-    padding: 10px 8px 0; gap: 7px;
-    -webkit-overflow-scrolling: touch; touch-action: pan-x;
+    order: 1; flex: 0 0 auto; justify-content: center; flex-wrap: wrap;
+    overflow: visible;
+    padding: 10px 6px 0; gap: 6px;
   }
-  .deck-sequence::-webkit-scrollbar { display: none; }
-  .tile, .slot, .drag-ghost { width: 54px; height: 54px; flex: 0 0 auto; border-radius: 14px; }
+  .deck-sequence .slot {
+    flex: 1 1 0; width: auto; height: auto; aspect-ratio: 1;
+    min-width: 38px; max-width: 54px; min-height: 0;
+  }
+  .tile, .drag-ghost { width: 54px; height: 54px; flex: 0 0 auto; border-radius: 14px; }
+  .slot { border-radius: 14px; }
   .tile .ico { font-size: 21px; }
   .tile .cmd-ico { width: 26px; height: 26px; }
   .tile .lbl { font-size: 8px; }
@@ -1497,10 +1510,28 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
      panel whose height decides how big the toy can be. Two rows of 42px
      tiles still clear the 44px tap floor with their padding, and buy the
      board back about 15% of its height. */
-  .deck-panel { min-height: 0; padding: 3px 8px 4px; gap: 1px; }
-  .deck-sequence { padding: 6px 6px 0; }
-  .deck-tray { padding: 0; }
-  .tile, .slot, .drag-ghost { width: 42px; height: 42px; }
+  /* Slots BESIDE the tiles, not above them.
+     Stacked, the deck was 142px of a 390px-tall screen — 36% of the
+     phone, sitting exactly where the board wants to be, and the board is
+     height-limited here so every one of those pixels came straight out of
+     the toy. Side by side it is one row, and the board grows into the
+     difference. Both groups shrink to share the width, so this holds down
+     to a 667px-wide phone. */
+  .deck-panel {
+    min-height: 0; padding: 3px 8px 4px; gap: 8px;
+    flex-direction: row; align-items: center;
+  }
+  .deck-sequence {
+    order: 1; padding: 8px 0 0; flex: 1 1 auto; flex-wrap: nowrap; gap: 5px;
+    justify-content: flex-end; overflow: visible;
+  }
+  .deck-tray { order: 2; padding: 0; flex: 0 1 auto; flex-wrap: nowrap; gap: 5px; }
+  .deck-sequence .slot {
+    flex: 1 1 0; width: auto; height: auto; aspect-ratio: 1;
+    min-width: 30px; max-width: 44px; min-height: 0;
+  }
+  .tile, .drag-ghost { width: 42px; height: 42px; }
+  .slot { border-radius: 12px; }
   .tile .ico { font-size: 18px; }
   .tile .lbl { font-size: 7px; }
   .bop-btn { height: 96px; font-size: 21px; }

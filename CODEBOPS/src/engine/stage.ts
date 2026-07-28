@@ -77,7 +77,9 @@ export class Stage {
    */
   private static readonly VIEW_DIR = new THREE.Vector3(0, 0.62, 0.782).normalize();
   /** Active view direction (defaults to VIEW_DIR; presets may override). */
-  private readonly viewDir: THREE.Vector3;
+  private viewDir: THREE.Vector3;
+  /** True when a preset pinned the view — then aspect must not move it. */
+  private readonly viewPinned: boolean;
   private readonly fovFor: (aspect: number) => number;
   private onVisibility = (): void => {
     if (document.hidden) this.stopLoop();
@@ -94,6 +96,7 @@ export class Stage {
     this.renderer = renderer;
     this.info = info;
 
+    this.viewPinned = view.viewDir !== undefined;
     this.viewDir = view.viewDir
       ? new THREE.Vector3(view.viewDir.x, view.viewDir.y, view.viewDir.z).normalize()
       : Stage.VIEW_DIR.clone();
@@ -282,7 +285,18 @@ export class Stage {
     // than framing that height — which dollies the camera way out — reserve
     // a thin band under the top bar for heads to occupy. The board grows to
     // the bottom of the band, so a character on any tile stays whole.
-    next.top += Math.min(box.height * 0.07, 52);
+    // Head room scales with the board, not with the viewport.
+    //
+    // 7% of the screen was enough while the board was small. Once the
+    // frame stopped being dominated by the off-board perch the board grew
+    // by roughly half, and a bop standing on the back row reaches that
+    // much higher in screen space too — measured, Zip's head drew over
+    // the logo on a 1024x700 landscape screen. Reserving a band that
+    // tracks the FREE height keeps a whole character under the bar, and
+    // costs a few percent of board rather than the third that framing an
+    // actual head point costs.
+    const freeH = Math.max(1, box.height - next.top - next.bottom);
+    next.top += Math.min(freeH * 0.2, 108);
     // Never let chrome claim so much that nothing is left to play in.
     next.top = Math.min(next.top, box.height * 0.32);
     next.bottom = Math.min(next.bottom, box.height * 0.42);
@@ -304,7 +318,46 @@ export class Stage {
    * there was room for 45%. It converges both ways now, so the frame always
    * fills the space it is given whatever the viewport.
    */
+  /**
+   * Tilt the camera to suit the shape of the screen.
+   *
+   * A puzzle grid is wider than it is deep, so on a tall phone the fit is
+   * always width-limited: the board fills the width and then leaves half
+   * the screen as empty meadow underneath. Measured on a 390x844 phone,
+   * the board used 130px of a 530px free area.
+   *
+   * Looking down more steeply foreshortens the depth less, so the same
+   * grid projects TALLER and grows into that room. It also reads better
+   * on a phone — from above, a grid is a map. In landscape the free area
+   * is already wide and short, so the three-quarter view stays as it was.
+   *
+   * Skipped entirely when a preset pinned the direction: the Gearworks
+   * benches are framed against a back wall and re-aiming them would look
+   * at the ceiling.
+   */
+  private tiltForAspect(): void {
+    if (this.viewPinned) return;
+    const a = this.camera.aspect;
+    // Three anchors, because both extremes waste room in opposite ways.
+    //
+    //  0.55 (tall phone)    58 deg — steep. A grid is wider than it is
+    //                       deep, so a shallow view fills the width and
+    //                       leaves half the screen as empty meadow.
+    //  1.40 (tablet)        38 deg — the storybook three-quarter view.
+    //  2.10 (phone on its   31 deg — shallow. A 390px-tall landscape
+    //       side)           screen is height-limited, so flattening the
+    //                       depth is what lets the board grow sideways
+    //                       into the slack instead of sitting small in
+    //                       the middle.
+    const deg = a <= 1.4
+      ? 38 + Math.min(1, (1.4 - a) / (1.4 - 0.55)) * 20
+      : 38 - Math.min(1, (a - 1.4) / (2.1 - 1.4)) * 7;
+    const rad = (deg * Math.PI) / 180;
+    this.viewDir.set(0, Math.sin(rad), Math.cos(rad)).normalize();
+  }
+
   private applyFrame(): void {
+    this.tiltForAspect();
     // Chrome is reserved via insets now, so this is just breathing room
     // for idle bobs and shadows — keep it tight so the toy reads BIG.
     const margin = 1.02;

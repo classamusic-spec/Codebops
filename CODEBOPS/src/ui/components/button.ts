@@ -76,25 +76,32 @@ export function button(parent: HTMLElement, spec: ButtonSpec): HTMLButtonElement
 
 /** Chevron pointing left. Replaces the `←` character in nine places. */
 export const ICON_BACK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M15 5 L8 12 L15 19"/></svg>`;
+  stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14.5 5.5 L8 12 L14.5 18.5"/></svg>`;
 
 /**
  * Cog. Replaces the ⚙️ emoji, which renders differently on every OS.
+ *
+ * Drawn as a ring with eight spokes rather than as a filled twelve-point
+ * star with a hole punched in it. The star version read as a small white
+ * sunburst on a real phone — the silhouette of a gear is its teeth, and
+ * filled points at icon size just look spiky.
  *
  * Drawn as a solid toothed disc rather than a circle with spokes: at the
  * 30-odd pixels this actually renders at, spokes read as a sun. Silhouette
  * beats detail at icon sizes.
  */
-export const ICON_SETTINGS = `<svg viewBox="0 0 24 24" fill="currentColor">
-  <path d="M12 1.9l1.9 1.6 2.4-.6.9 2.3 2.3.9-.6 2.4L20.1 12l-1.6 1.9.6 2.4-2.3.9-.9 2.3-2.4-.6L12 22.1l-1.9-1.6-2.4.6-.9-2.3-2.3-.9.6-2.4L3.9 12l1.6-1.9-.6-2.4 2.3-.9.9-2.3 2.4.6z"/>
-  <circle cx="12" cy="12" r="3.5" fill="var(--ink-800, #16225c)"/></svg>`;
+export const ICON_SETTINGS = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="3.4"/>
+  <path d="M12 2.6v2.6M12 18.8v2.6M21.4 12h-2.6M5.2 12H2.6M18.6 5.4l-1.8 1.8M7.2 16.8l-1.8 1.8M18.6 18.6l-1.8-1.8M7.2 7.2 5.4 5.4"/>
+  </svg>`;
 
 /** Question mark for the hint button. */
 export const ICON_HELP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M8.6 8.6a3.6 3.6 0 1 1 4.7 3.4c-.9.3-1.3 1-1.3 1.9v.6"/>
-  <circle cx="12" cy="18.6" r="1.5" fill="currentColor" stroke="none"/></svg>`;
+  stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.4 8.8a3.7 3.7 0 1 1 4.8 3.5c-1 .35-1.4 1.05-1.4 2v.5"/>
+  <circle cx="11.8" cy="19" r="1.7" fill="currentColor" stroke="none"/></svg>`;
 
 /** Solid triangle. The run/play mark on BOP and Play. */
 export const ICON_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor">

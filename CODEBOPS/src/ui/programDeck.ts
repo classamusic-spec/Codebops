@@ -338,6 +338,12 @@ export class ProgramDeck {
   private onPointerDown(e: PointerEvent, cmd: CommandId, kind: 'tray' | 'slot', slotIndex: number, tile: HTMLElement): void {
     if (this.running) return;
     e.preventDefault();
+    // Sweep first. A ghost that outlived its drag is a tile floating over
+    // the deck with nothing to dismiss it, and it survives every re-render
+    // because it lives on <body>. Belt and braces with the window
+    // listeners below: whichever way one escapes, the next touch clears it.
+    for (const stray of document.querySelectorAll('.drag-ghost')) stray.remove();
+
     const ghost = tile.cloneNode(true) as HTMLElement;
     ghost.className = 'tile drag-ghost';
     ghost.dataset.cmd = cmd;
@@ -347,10 +353,26 @@ export class ProgramDeck {
       pointerId: e.pointerId, kind, command: cmd, fromIndex: slotIndex,
       ghost, moved: false, startX: e.clientX, startY: e.clientY,
     };
-    tile.setPointerCapture(e.pointerId);
-    tile.addEventListener('pointermove', this.onPointerMove);
-    tile.addEventListener('pointerup', this.onPointerUp, { once: true });
-    tile.addEventListener('pointercancel', this.onPointerCancel, { once: true });
+    // On WINDOW, not on the tile.
+    //
+    // This is the bug behind the floating command tile: the listeners used
+    // to live on the tile being dragged, and `renderSlots()` replaces those
+    // tiles. Re-render mid-drag — which happens the moment a tile lands in
+    // a slot — and the pointerup handler was destroyed with its element, so
+    // endDrag() never ran and the ghost stayed on the page forever. iOS
+    // dropping pointer capture does the same thing. The window always
+    // outlives the drag.
+    try { tile.setPointerCapture(e.pointerId); } catch { /* capture is a nicety */ }
+    window.addEventListener('pointermove', this.onPointerMove);
+    window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerCancel);
+  }
+
+  /** Drop every drag listener. Safe to call twice. */
+  private releaseDragListeners(): void {
+    window.removeEventListener('pointermove', this.onPointerMove);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerCancel);
   }
 
   private positionGhost(ghost: HTMLElement, x: number, y: number): void {
@@ -371,8 +393,7 @@ export class ProgramDeck {
   private onPointerUp = (e: PointerEvent): void => {
     const drag = this.drag;
     if (!drag || e.pointerId !== drag.pointerId) return;
-    const target = e.target as HTMLElement;
-    target.removeEventListener('pointermove', this.onPointerMove);
+    this.releaseDragListeners();
     this.endDrag();
 
     if (!drag.moved) {
@@ -398,12 +419,13 @@ export class ProgramDeck {
 
   private onPointerCancel = (e: PointerEvent): void => {
     if (this.drag && e.pointerId === this.drag.pointerId) {
-      (e.target as HTMLElement).removeEventListener('pointermove', this.onPointerMove);
+      this.releaseDragListeners();
       this.endDrag();
     }
   };
 
   private endDrag(): void {
+    this.releaseDragListeners();
     if (!this.drag) return;
     this.drag.ghost.remove();
     this.drag = null;
