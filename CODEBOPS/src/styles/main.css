@@ -4492,3 +4492,52 @@ button.stars-pill:active { transform: translateY(3px); }
   .hint-card .intro-emoji { font-size: 32px; }
   .hint-card p { font-size: 13px; }
 }
+
+
+/* ============================================================
+   Goal card — folded state (Polish Phase 7)
+   ============================================================
+   Folded, the card keeps its visual token — item, arrow,
+   destination — and drops the sentence. That token is what a
+   child glances back at; the sentence is what a grown-up reads
+   once. The card is the widest fixed thing on the play screen,
+   and the board is framed into whatever the chrome leaves, so
+   the width it gives up goes straight back to the toy.
+   ============================================================ */
+.goal-card {
+  cursor: pointer;
+  transition: width var(--dur-med) var(--ease-out),
+              max-width var(--dur-med) var(--ease-out),
+              padding var(--dur-med) var(--ease-out);
+}
+/* The folded card is the only way back to the goal, so it has to stay a
+   real target. It measures 76px today, but only because the flag inside
+   it happens to be that tall — shrink the flag and the hit area shrinks
+   with it. The floor makes the promise explicit instead of incidental. */
+.goal-card.folded {
+  padding: var(--sp-4) var(--sp-5);
+  max-width: max-content;
+  min-height: var(--tap-floor);
+  display: flex;
+  align-items: center;
+}
+.goal-card.folded .goal-text { display: none; }
+.goal-card.folded .goal-flag { font-size: var(--fs-3xs); padding: 2px 8px; }
+.goal-card:focus-visible { outline: 4px solid var(--yellow); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .goal-card { transition: none; } }
+
+/* The step where a run first surprised the child. Ring, pulse AND the
+   word "look here first" in the accessible name — never colour alone. */
+.replay-chip.suspect {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 4px rgba(255, 210, 62, .34), var(--pop-3) var(--yellow-shade);
+  animation: replay-suspect 1.6s var(--ease-in-out) infinite;
+}
+@keyframes replay-suspect {
+  50% { box-shadow: 0 0 0 8px rgba(255, 210, 62, .16), var(--pop-3) var(--yellow-shade); }
+}
+.replay-lead {
+  margin: 0; font-weight: 800; color: var(--yellow);
+  font-size: var(--fs-fluid-sm);
+}
+@media (prefers-reduced-motion: reduce) { .replay-chip.suspect { animation: none; } }

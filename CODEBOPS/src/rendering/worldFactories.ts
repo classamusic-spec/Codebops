@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { toonMat, waterTexture } from './materials/toon';
+import { jitter } from '../engine/testMode';
 
 function mesh(
   geo: THREE.BufferGeometry,
@@ -111,11 +112,11 @@ export function createStream(points: THREE.Vector3[], width = 1.9): { group: THR
 export function createRockCluster(count = 3, spread = 0.7): THREE.Group {
   const g = new THREE.Group();
   for (let i = 0; i < count; i++) {
-    const r = 0.22 + Math.random() * 0.2;
+    const r = 0.22 + jitter() * 0.2;
     const rock = mesh(new THREE.IcosahedronGeometry(r, 1), toonMat(i % 2 ? '#9aa7bd' : '#b3bfd2'));
-    rock.position.set((Math.random() - 0.5) * spread, r * 0.55, (Math.random() - 0.5) * spread);
+    rock.position.set((jitter() - 0.5) * spread, r * 0.55, (jitter() - 0.5) * spread);
     rock.scale.y = 0.72;
-    rock.rotation.set(Math.random(), Math.random() * Math.PI, Math.random() * 0.4);
+    rock.rotation.set(jitter(), jitter() * Math.PI, jitter() * 0.4);
     g.add(rock);
   }
   return g;
@@ -136,7 +137,7 @@ export function createBush(scale = 1): THREE.Group {
     g.add(mesh(
       new THREE.SphereGeometry(0.06 * scale, 8, 6),
       toonMat(['#ff8fc0', '#ffd23e', '#ffffff'][i]),
-      (Math.random() - 0.5) * 0.5 * scale, (0.4 + Math.random() * 0.25) * scale, (Math.random() - 0.5) * 0.5 * scale,
+      (jitter() - 0.5) * 0.5 * scale, (0.4 + jitter() * 0.25) * scale, (jitter() - 0.5) * 0.5 * scale,
       false, false,
     ));
   }
@@ -149,11 +150,11 @@ export function createFlowerPatch(count = 5, spread = 1.1): THREE.Group {
   const petals = ['#ff8fc0', '#ffd23e', '#7dd7ff', '#c79bff', '#ffffff', '#ff9f7a'];
   for (let i = 0; i < count; i++) {
     const f = new THREE.Group();
-    const px = (Math.random() - 0.5) * spread;
-    const pz = (Math.random() - 0.5) * spread;
-    const h = 0.26 + Math.random() * 0.16;
+    const px = (jitter() - 0.5) * spread;
+    const pz = (jitter() - 0.5) * spread;
+    const h = 0.26 + jitter() * 0.16;
     f.add(mesh(new THREE.CylinderGeometry(0.02, 0.03, h, 5), toonMat('#2f9247'), 0, h / 2, 0, false, false));
-    const color = petals[Math.floor(Math.random() * petals.length)];
+    const color = petals[Math.floor(jitter() * petals.length)];
     for (let p = 0; p < 5; p++) {
       const a = (p / 5) * Math.PI * 2;
       f.add(mesh(new THREE.SphereGeometry(0.055, 8, 6), toonMat(color), Math.cos(a) * 0.09, h, Math.sin(a) * 0.09, false, false));
@@ -256,9 +257,9 @@ export function createDistantHills(): THREE.Group {
 export function createSparkles(count = 26, area = 12): THREE.Points {
   const pos = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    pos[i * 3] = (Math.random() - 0.5) * area;
-    pos[i * 3 + 1] = 0.6 + Math.random() * 2.6;
-    pos[i * 3 + 2] = (Math.random() - 0.5) * area;
+    pos[i * 3] = (jitter() - 0.5) * area;
+    pos[i * 3 + 1] = 0.6 + jitter() * 2.6;
+    pos[i * 3 + 2] = (jitter() - 0.5) * area;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -303,14 +304,14 @@ export function createPetalDrift(count = 14, area = 12): THREE.Group {
   const colors = ['#ffd6ec', '#fff0f7', '#ffe9a8'];
   for (let i = 0; i < count; i++) {
     const petal = mesh(
-      new THREE.CircleGeometry(0.055 + Math.random() * 0.03, 6),
+      new THREE.CircleGeometry(0.055 + jitter() * 0.03, 6),
       new THREE.MeshToonMaterial({ color: colors[i % colors.length], side: THREE.DoubleSide, transparent: true, opacity: 0.95 }),
-      (Math.random() - 0.5) * area, 0.5 + Math.random() * 3.4, (Math.random() - 0.5) * area,
+      (jitter() - 0.5) * area, 0.5 + jitter() * 3.4, (jitter() - 0.5) * area,
       false, false,
     );
     petal.scale.y = 0.6;
-    petal.userData.phase = Math.random() * Math.PI * 2;
-    petal.userData.fall = 0.25 + Math.random() * 0.3;
+    petal.userData.phase = jitter() * Math.PI * 2;
+    petal.userData.fall = 0.25 + jitter() * 0.3;
     g.add(petal);
   }
   g.name = 'petals';
@@ -363,9 +364,9 @@ export function createDrone(scale = 1): THREE.Group {
 export function createSpores(count = 24, area = 13, color = '#c9a0ff'): THREE.Points {
   const pos = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    pos[i * 3] = (Math.random() - 0.5) * area;
-    pos[i * 3 + 1] = 0.3 + Math.random() * 3;
-    pos[i * 3 + 2] = (Math.random() - 0.5) * area;
+    pos[i * 3] = (jitter() - 0.5) * area;
+    pos[i * 3 + 1] = 0.3 + jitter() * 3;
+    pos[i * 3 + 2] = (jitter() - 0.5) * area;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -389,16 +390,16 @@ export function createSpores(count = 24, area = 13, color = '#c9a0ff'): THREE.Po
 /** A fan of grass blades. Register it with a WindField to make it move. */
 export function createGrassTuft(scale = 1, color = '#4dbb5c'): THREE.Group {
   const g = new THREE.Group();
-  const blades = 5 + Math.floor(Math.random() * 3);
+  const blades = 5 + Math.floor(jitter() * 3);
   for (let i = 0; i < blades; i++) {
-    const h = (0.3 + Math.random() * 0.26) * scale;
+    const h = (0.3 + jitter() * 0.26) * scale;
     const blade = mesh(
       new THREE.CylinderGeometry(0.012 * scale, 0.032 * scale, h, 4),
       toonMat(color), 0, h / 2, 0, false, false,
     );
-    blade.rotation.z = (Math.random() - 0.5) * 0.5;
-    blade.position.x = (Math.random() - 0.5) * 0.3 * scale;
-    blade.position.z = (Math.random() - 0.5) * 0.3 * scale;
+    blade.rotation.z = (jitter() - 0.5) * 0.5;
+    blade.position.x = (jitter() - 0.5) * 0.3 * scale;
+    blade.position.z = (jitter() - 0.5) * 0.3 * scale;
     g.add(blade);
   }
   return g;
@@ -415,10 +416,10 @@ export function createGrassTuft(scale = 1, color = '#4dbb5c'): THREE.Group {
 export function createGroundDetail(count = 10, spread = 3, colors = ['#54c05f', '#68cf6c', '#9aa7bd']): THREE.Group {
   const g = new THREE.Group();
   for (let i = 0; i < count; i++) {
-    const r = (0.09 + Math.random() * 0.16);
+    const r = (0.09 + jitter() * 0.16);
     const disc = mesh(
       new THREE.CircleGeometry(r, 7), toonMat(colors[i % colors.length]),
-      (Math.random() - 0.5) * spread, 0.012, (Math.random() - 0.5) * spread, false, false,
+      (jitter() - 0.5) * spread, 0.012, (jitter() - 0.5) * spread, false, false,
     );
     disc.rotation.x = -Math.PI / 2;
     g.add(disc);
@@ -482,7 +483,7 @@ export class WindField {
   /** `amount` is radians of lean at full gust — 0.02 for a tree, 0.09 for grass. */
   add(obj: THREE.Object3D, amount: number): void {
     this.items.push({
-      obj, amount, phase: Math.random() * Math.PI * 2,
+      obj, amount, phase: jitter() * Math.PI * 2,
       baseZ: obj.rotation.z, baseX: obj.rotation.x,
     });
   }

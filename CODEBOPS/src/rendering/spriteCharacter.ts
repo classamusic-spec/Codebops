@@ -28,6 +28,7 @@ import { contactShadowTexture } from './materials/toon';
 import { Tweener } from './tween';
 import { makeRig } from './mascotRig';
 import { el } from '../ui/dom';
+import { jitter } from '../engine/testMode';
 import type { MascotName } from './mascotRig';
 import type { ThreeCharacterView } from '../vendor/codebops-rig/three-adapter.js';
 import type { CharacterRig } from '../vendor/codebops-rig/codebops-rig.js';
@@ -105,7 +106,7 @@ export class SpriteCharacter {
   private view: ThreeCharacterView | null = null;
   private disposed = false;
   private calm = false;
-  private bobPhase = Math.random() * Math.PI * 2;
+  private bobPhase = jitter() * Math.PI * 2;
   /**
    * Seconds of animation still owed. In calm mode the rig is only stepped
    * while this is positive, which is what turns "damped" into "still":
@@ -114,14 +115,14 @@ export class SpriteCharacter {
    * it is ignored and the rig runs every frame.
    */
   private settle = 0;
-  private lookClock = 5 + Math.random() * 4;
+  private lookClock = 5 + jitter() * 4;
   /**
    * Seconds until the next idle hop, and how long the current one has
    * left. A bop that only floats reads as a picture of a bop; one that
    * hops on the spot while it waits reads as something waiting FOR you.
    * Staggered per character so the two of them never bounce in lockstep.
    */
-  private hopClock = 1.6 + Math.random() * 2.6;
+  private hopClock = 1.6 + jitter() * 2.6;
   /**
    * Counts down while a clip the game asked for is playing. The idle hop
    * never interrupts a walk, a celebration or a glitch — it only fills the
@@ -472,7 +473,7 @@ export class SpriteCharacter {
       // restack on itself nor cut off the tail of a clip the game asked for
       // in the frame where `busy` happened to run out.
       if (this.hopClock <= 0 && this.currentClip() === 'idle') {
-        this.hopClock = 2.6 + Math.random() * 3.4;
+        this.hopClock = 2.6 + jitter() * 3.4;
         this.rig?.play('bounce', { restart: true });
         this.touch(2.0);
       }
@@ -480,8 +481,8 @@ export class SpriteCharacter {
     if (!this.calm) this.lookClock -= dt;
     if (this.lookClock <= 0 && !this.calm) {
       const dirs: LookDir[] = ['left', 'right', null, 'up'];
-      this.look(dirs[Math.floor(Math.random() * dirs.length)]);
-      this.lookClock = 4 + Math.random() * 5;
+      this.look(dirs[Math.floor(jitter() * dirs.length)]);
+      this.lookClock = 4 + jitter() * 5;
     }
 
     if (this.rig && this.view) {

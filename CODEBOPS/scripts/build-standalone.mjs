@@ -40,6 +40,31 @@ if (extra.length > 0) {
 const js = readFileSync(join(dist, 'assets', jsName), 'utf8');
 const css = readFileSync(join(dist, 'assets', cssName), 'utf8');
 
+// Fold the self-hosted webfonts in as data URIs.
+//
+// A single file has no siblings, so `url(./fonts/x.woff2)` resolves to
+// nothing over file:// and the whole point of self-hosting is lost at the
+// last step. Base64 costs about a third more bytes than the raw woff2 —
+// roughly 170 KB against a file already past two megabytes — which is a
+// fair price for the build actually looking like the game.
+const fontDir = join(dist, 'fonts');
+let fontCss = '';
+if (existsSync(join(fontDir, 'fonts.css'))) {
+  fontCss = readFileSync(join(fontDir, 'fonts.css'), 'utf8').replace(
+    /url\(\.\/([^)]+\.woff2)\)/g,
+    (whole, file) => {
+      const p = join(fontDir, file);
+      if (!existsSync(p)) return whole;
+      return `url(data:font/woff2;base64,${readFileSync(p).toString('base64')})`;
+    },
+  );
+  const n = (fontCss.match(/data:font\/woff2/g) || []).length;
+  console.log(`[standalone] embedding ${n} font face(s)`);
+} else {
+  // Not fatal: the stacks in tokens.css still name a rounded system face.
+  console.warn('[standalone] no self-hosted fonts found — run scripts/fetch-fonts.mjs');
+}
+
 // Embed every art SVG the game can load at runtime.
 //
 // This used to be a hand-written list, and adding a new piece of art
@@ -212,11 +237,12 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#16225c" />
 <title>CodeBops — Playable Test Build</title>
-<!-- No webfont link here, deliberately. This file is meant to be opened
-     from a USB stick with no network, and a remote font request would both
-     break that and send a child's IP to a third party for nothing. The
-     font stacks in tokens.css fall back to the platform's rounded UI
-     face, which is what the design wanted anyway. -->
+<!-- The fonts are embedded, not linked. This file is meant to be opened
+     from a USB stick with no network, so a remote request would both fail
+     and send a child's IP to a third party for nothing. Until the faces
+     were self-hosted this build had no choice but to fall back to the
+     platform's rounded UI face; now it looks like the real game. -->
+<style>${fontCss}</style>
 <style>${css}</style>
 <script>${shim}</script>
 </head>

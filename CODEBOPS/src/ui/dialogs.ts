@@ -9,6 +9,7 @@ import { showCodePeek } from './codePeek';
 import type { CodePeekInfo } from './codePeek';
 import { TEST_SPEEDS, isTestSpeed, speechAvailable } from './a11y';
 import type { Hint } from '../gameplay/hints';
+import { jitter } from '../engine/testMode';
 
 function scrim(parent: HTMLElement): HTMLElement {
   return el('div', 'dialog-scrim', parent);
@@ -177,13 +178,13 @@ export function spawnConfetti(parent: HTMLElement): void {
   const colors = ['#ff5fa2', '#ffd23e', '#3ed35f', '#38b6ff', '#a06bff', '#ff9f2e', '#5ee8c7'];
   for (let i = 0; i < 70; i++) {
     const c = el('div', 'confetti', parent);
-    const size = 8 + Math.random() * 10;
+    const size = 8 + jitter() * 10;
     c.style.width = `${size}px`;
-    c.style.height = `${size * (0.5 + Math.random())}px`;
-    c.style.left = `${Math.random() * 100}%`;
+    c.style.height = `${size * (0.5 + jitter())}px`;
+    c.style.left = `${jitter() * 100}%`;
     c.style.background = colors[i % colors.length];
-    c.style.animationDuration = `${1.8 + Math.random() * 1.8}s`;
-    c.style.animationDelay = `${Math.random() * 0.6}s`;
+    c.style.animationDuration = `${1.8 + jitter() * 1.8}s`;
+    c.style.animationDelay = `${jitter() * 0.6}s`;
     setTimeout(() => c.remove(), 4500);
   }
 }
@@ -216,13 +217,29 @@ export function showGlitchReplay(
   el('h2', undefined, d, "Oops — Mixy found a glitch!");
 
   el('p', undefined, d, 'No worries! Tap the steps to see what happened, fix your plan, and BOP again!');
+  // Filled in below once the timeline is built.
+  const lead = el('p', 'replay-lead', d);
 
   const strip = el('div', 'replay-strip', d);
   const steps = timelineOf(events);
+  // Where it FIRST went wrong. A row of identical chips asks a child to
+  // audit their own plan, which is the hard part and the part they came
+  // here for help with; marking the first surprise gives their eye
+  // somewhere to land without telling them the answer.
+  const suspectAt = steps.findIndex((st) => /bump|nothing to grab|nothing to drop/i.test(st.label));
   const chips: HTMLElement[] = [];
   steps.forEach((step, i) => {
     const chip = el('button', 'replay-chip', strip);
-    chip.setAttribute('aria-label', `Step ${i + 1}: ${step.label}`);
+    (chip as HTMLButtonElement).type = 'button';
+    const suspect = i === suspectAt;
+    if (suspect) {
+      chip.classList.add('suspect');
+      // Said out loud, not just drawn — the ring is invisible to a
+      // screen reader and to anyone who cannot pick it out by colour.
+      chip.setAttribute('aria-label', `Step ${i + 1}: ${step.label} — look here first`);
+    } else {
+      chip.setAttribute('aria-label', `Step ${i + 1}: ${step.label}`);
+    }
     el('span', 'ico', chip, step.icon);
     chip.addEventListener('click', () => {
       sfx.play('tap');
@@ -232,6 +249,11 @@ export function showGlitchReplay(
     });
     chips.push(chip);
   });
+
+  lead.textContent = suspectAt >= 0
+    ? "Let's check the glowing step."
+    : '';
+  lead.hidden = suspectAt < 0;
 
   const btns = el('div', 'dialog-actions', d);
   const fix = el('button', 'mini-btn', btns, '🛠 Fix My Plan');

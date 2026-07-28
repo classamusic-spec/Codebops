@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import { createRenderer, RendererInfo } from './renderer';
+import { deterministic, FIXED_DT, frameCount, frameLimit, tickFrame } from './testMode';
 
 export type TickHandler = (dt: number, elapsed: number) => void;
 
@@ -150,9 +151,17 @@ export class Stage {
       this.lastTickAt = performance.now();
       // Clamp keeps tweens stable on hitches while still progressing in
       // degraded (software-rendered / throttled) frame environments.
-      const dt = Math.min(this.clock.getDelta(), 0.25);
-      this.handlers.forEach((h) => h(dt, this.clock.elapsedTime));
+      const wall = Math.min(this.clock.getDelta(), 0.25);
+      // In deterministic mode the clock is counted rather than read, so a
+      // screenshot taken at frame N shows the same instant every run.
+      const det = deterministic();
+      const dt = det ? FIXED_DT : wall;
+      this.handlers.forEach((h) => h(dt, det ? tickFrame() : this.clock.elapsedTime));
       this.renderer.render(this.scene, this.camera);
+      // A test asked for exactly N frames of this screen. Stopping from
+      // in here is the only way to land on N and not on N-plus-whatever
+      // arrived while the request to stop was in flight.
+      if (det && frameLimit() > 0 && frameCount() >= frameLimit()) this.stopLoop();
     };
     const loop = (): void => {
       if (!this.running) return;

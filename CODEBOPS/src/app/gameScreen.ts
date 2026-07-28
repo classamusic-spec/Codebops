@@ -31,6 +31,7 @@ import type { ProgramStep } from '../gameplay/commands/interpreter';
 import { el } from '../ui/dom';
 import { wait } from '../rendering/tween';
 import { peekForLevel } from '../ui/codePeek';
+import { jitter } from '../engine/testMode';
 
 type WorldEnv = SparkleMeadow | BubbleBay | PatternForest | RobotTown | AgentAcademy;
 
@@ -55,6 +56,7 @@ export class GameScreen {
   private preview!: PathPreview;
   private deck!: ProgramDeck;
   private topBar!: TopBar;
+  private goalCard!: GoalCard;
   private charLayer!: HTMLElement;
   private readonly sfx = sharedSfx;
   private readonly store: SaveStore;
@@ -200,7 +202,10 @@ export class GameScreen {
       onHint: () => showHintCard(ui, this.sfx, levelHints(this.level, this.program, this.selectedRule)),
     });
     this.topBar.setStars(this.store.stars[this.level.id] ?? 0);
-    new GoalCard(ui, this.level.goalText, ITEM_EMOJI[this.level.items[0]?.kind ?? 'strawberry']);
+    this.goalCard = new GoalCard(
+      ui, this.level.goalText, ITEM_EMOJI[this.level.items[0]?.kind ?? 'strawberry'],
+      () => this.stage.resize(),
+    );
 
     this.deck = new ProgramDeck(ui, this.level.availableCommands, this.level.maxSlots, {
       onProgramChange: (program) => {
@@ -534,9 +539,9 @@ export class GameScreen {
             node.removeFromParent();
             const p = this.world.cellToWorld(e.at.col, e.at.row);
             node.position.set(
-              p.x + (e.onGoal ? 0 : (Math.random() - 0.5) * 0.3),
+              p.x + (e.onGoal ? 0 : (jitter() - 0.5) * 0.3),
               TILE_TOP + (e.onGoal ? 0.62 : 0),
-              p.z + (e.onGoal ? 0.1 : (Math.random() - 0.5) * 0.3),
+              p.z + (e.onGoal ? 0.1 : (jitter() - 0.5) * 0.3),
             );
             node.scale.setScalar(e.onGoal ? 0.85 : 1);
             this.world.group.add(node);
@@ -686,6 +691,7 @@ export class GameScreen {
   }
 
   dispose(): void {
+    this.goalCard?.dispose();
     if (this.playAccum > 0) this.store.addPlaySeconds(this.playAccum);
     this.playAccum = 0;
     this.disposers.forEach((d) => d());

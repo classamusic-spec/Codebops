@@ -6,12 +6,14 @@
   "description": "CodeBops \u2014 Teach tiny helpers. Build big ideas. A playful coding adventure for ages 3\u20137.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/build-sw.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:logic": "esbuild test/logic.test.ts --bundle --platform=node --outfile=/tmp/logic-test.cjs && node /tmp/logic-test.cjs",
     "build:standalone": "vite build --config vite.standalone.config.js && node scripts/build-standalone.mjs",
-    "lint": "eslint src test"
+    "lint": "eslint src test",
+    "visual": "node scripts/visual-shoot.mjs",
+    "visual:diff": "node scripts/visual-diff.mjs"
   },
   "dependencies": {
     "three": "^0.171.0"

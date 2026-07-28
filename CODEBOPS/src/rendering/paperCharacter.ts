@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { contactShadowTexture } from './materials/toon';
 import { Tweener } from './tween';
+import { jitter } from '../engine/testMode';
 
 export interface PaperCharacterOptions {
   textureUrl: string;
@@ -23,7 +24,7 @@ export class PaperCharacter {
   private plane: THREE.Mesh | null = null;
   private baseY: number;
   private height: number;
-  private idlePhase = Math.random() * Math.PI * 2;
+  private idlePhase = jitter() * Math.PI * 2;
   private calm = false;
   private ready: Promise<void>;
 
@@ -142,12 +143,12 @@ export class PaperCharacter {
     const plane = this.plane;
     const x0 = this.group.position.x;
     await this.tweener.tween(duration, () => {
-      const jitter = this.calm ? 0.015 : 0.05;
-      this.group.position.x = x0 + (Math.random() - 0.5) * jitter * 2;
+      const amount = this.calm ? 0.015 : 0.05;
+      this.group.position.x = x0 + (jitter() - 0.5) * amount * 2;
       if (plane) {
-        plane.rotation.z = (Math.random() - 0.5) * 0.12;
+        plane.rotation.z = (jitter() - 0.5) * 0.12;
         const mat = plane.material as THREE.MeshBasicMaterial;
-        mat.opacity = 0.75 + Math.random() * 0.25;
+        mat.opacity = 0.75 + jitter() * 0.25;
       }
     }, 'linear');
     this.group.position.x = x0;

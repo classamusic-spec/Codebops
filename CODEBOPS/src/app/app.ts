@@ -10,6 +10,7 @@ import { mountSkyScene } from '../ui/skyScene';
 import { sharedSfx } from '../audio/sfx';
 import { sharedMusic, attachFirstGesture } from '../audio/music';
 import { sharedHaptics } from '../audio/haptics';
+import { resetFrames, resetJitter } from '../engine/testMode';
 import { GardenScreen } from './gardenScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
@@ -97,6 +98,10 @@ export class App {
   }
 
   private clearHost(): void {
+    // Same screen, same character phases, same frame count, run after
+    // run — see testMode.
+    resetJitter();
+    resetFrames();
     this.setNeedsLandscape(false);
     // Every screen change re-applies the accessibility settings, so calm
     // mode / high contrast / left-handed reach the App Lab and the menus

@@ -12,6 +12,7 @@ import {
   createBird, updateBird, createFish,
   createGrassTuft, createGroundDetail, createButterfly, updateButterfly, WindField,
 } from './worldFactories';
+import { jitter } from '../engine/testMode';
 
 export const TILE = 1.68;
 export const STEP = 1.78;
@@ -272,7 +273,7 @@ export class BubbleBay {
       buoy.add(mesh(new THREE.SphereGeometry(0.3, 12, 10), toonMat(color), 0, 0.16, 0));
       buoy.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.34, 6), toonMat('#3d4b63'), 0, 0.5, 0, false, false));
       buoy.position.set(x, 0, z);
-      buoy.userData.bob = Math.random() * Math.PI * 2;
+      buoy.userData.bob = jitter() * Math.PI * 2;
       this.buoys.push(buoy);
       this.group.add(buoy);
     }
@@ -328,10 +329,10 @@ export class BubbleBay {
     const pos = new Float32Array(count * 3);
     this.bubbleSpeeds = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 22;
-      pos[i * 3 + 1] = Math.random() * 0.4;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 16;
-      this.bubbleSpeeds[i] = 0.25 + Math.random() * 0.5;
+      pos[i * 3] = (jitter() - 0.5) * 22;
+      pos[i * 3 + 1] = jitter() * 0.4;
+      pos[i * 3 + 2] = (jitter() - 0.5) * 16;
+      this.bubbleSpeeds[i] = 0.25 + jitter() * 0.5;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));

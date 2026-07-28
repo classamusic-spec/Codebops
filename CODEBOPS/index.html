@@ -16,12 +16,12 @@
     <meta name="apple-mobile-web-app-title" content="CodeBops" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>CodeBops — Teach tiny helpers. Build big ideas.</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Self-hosted, on purpose: a cross-origin stylesheet cannot be
+         precached, so the offline shell used to open in system fonts, and
+         the standalone single-file build had no type at all. It also
+         means a child's device makes no third-party request to read a
+         headline. Regenerate with `node scripts/fetch-fonts.mjs`. -->
+    <link rel="stylesheet" href="./fonts/fonts.css" />
   </head>
   <body>
     <div id="app">

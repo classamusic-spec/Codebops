@@ -4356,5 +4356,202 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   })());
 }
 
+
+// ============================================================
+// Polish addendum — the phases that shipped without tests
+// ============================================================
+{
+  // --- Phase 7: the goal card gets out of the way -------------------
+  // A goal card that sits open forever eats the top-left corner of a
+  // small landscape screen for the whole level, which is exactly where
+  // the play area wants to be.
+  check('the goal card folds itself after a readable pause', (() => {
+    const src = readFileSync('src/ui/goalCard.ts', 'utf8');
+    const m = /const READ_MS = (\d+)/.exec(src);
+    if (!m) return false;
+    const ms = Number(m[1]);
+    // Long enough for a grown-up to read it aloud, short enough that the
+    // corner comes back before the child has finished their first plan.
+    return ms >= 5000 && ms <= 10000;
+  })());
+  check('the folded goal card can always be opened again', (() => {
+    const src = readFileSync('src/ui/goalCard.ts', 'utf8');
+    return /classList\.toggle\('folded'/.test(src) && /addEventListener\('click'/.test(src);
+  })());
+  check('the goal card says which of its two states it is in', (() => {
+    const src = readFileSync('src/ui/goalCard.ts', 'utf8');
+    // Both labels must exist: a control that keeps the same name in both
+    // states tells a screen-reader user nothing about what tapping does.
+    return /Show the goal again/.test(src) && /openLabel/.test(src);
+  })());
+  check('folding tells the camera to re-fit, or the world stays cropped', (() => {
+    const src = readFileSync('src/ui/goalCard.ts', 'utf8');
+    return /onResize\?\.\(\)/.test(src);
+  })());
+  check('the folded card is still big enough to hit', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.goal-card.folded');
+    if (at < 0) return false;
+    const block = css.slice(at, css.indexOf('}', at));
+    return /min-height|height/.test(block);
+  })());
+
+  // --- Phase 9: Glitch Replay points at the likely step -------------
+  check('the replay marks the first step that surprised the child', (() => {
+    const src = readFileSync('src/ui/dialogs.ts', 'utf8');
+    return /suspectAt/.test(src) && /classList\.add\('suspect'\)/.test(src);
+  })());
+  check('exactly one step is ever marked suspect', (() => {
+    const src = readFileSync('src/ui/dialogs.ts', 'utf8');
+    // findIndex, not filter: a row with four rings is a row with none.
+    return /findIndex\(\(st\) =>/.test(src.slice(src.indexOf('const suspectAt')));
+  })());
+  check('the suspect step is announced, not only drawn', (() => {
+    const src = readFileSync('src/ui/dialogs.ts', 'utf8');
+    return /look here first/.test(src);
+  })());
+  check('nothing suspect means no glowing-step prompt', (() => {
+    const src = readFileSync('src/ui/dialogs.ts', 'utf8');
+    return /lead\.hidden = suspectAt < 0/.test(src);
+  })());
+  check('the suspect ring is drawn, not just named', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return css.includes('.replay-chip.suspect');
+  })());
+
+  // --- Phase 13: the offline shell ----------------------------------
+  check('the service worker exists and claims a version', (() => {
+    const sw = readFileSync('public/sw.js', 'utf8');
+    return /CACHE|VERSION/.test(sw);
+  })());
+  check('the worker never caches another origin', (() => {
+    const sw = readFileSync('public/sw.js', 'utf8');
+    return /origin/.test(sw);
+  })());
+  check('navigations go to the network first, so a new build is picked up', (() => {
+    const sw = readFileSync('public/sw.js', 'utf8');
+    return /navigate/.test(sw);
+  })());
+  check('registration is silent — a child never sees an update prompt', (() => {
+    const src = readFileSync('src/pwa.ts', 'utf8');
+    return /catch\(\(\) => \{/.test(src) && !/confirm\(|alert\(/.test(src);
+  })());
+  check('file:// skips registration — the standalone build IS the offline copy', (() => {
+    const src = readFileSync('src/pwa.ts', 'utf8');
+    return /location\.protocol/.test(src);
+  })());
+  check('the precache list is generated from the build, never hand-kept', (() => {
+    const src = readFileSync('scripts/build-sw.mjs', 'utf8');
+    return /__CB_PRECACHE__/.test(src);
+  })());
+  check('the precache follows what index.html references, not what dist holds', (() => {
+    // emptyOutDir is false, so dist/assets keeps every hashed bundle ever
+    // emitted. Precaching the directory shipped 11.7 MB of dead copies.
+    const src = readFileSync('scripts/build-sw.mjs', 'utf8');
+    return /reachable/.test(src) && /queue/.test(src);
+  })());
+
+  // --- Phase 14: the screenshot suite means something ---------------
+  check('deterministic mode is opt-in through the URL only', (() => {
+    const src = readFileSync('src/engine/testMode.ts', 'utf8');
+    return /cbtest/.test(src) && /location\.search/.test(src);
+  })());
+  check('nothing random is left in the scenery once a test is watching', (() => {
+    // Every visual Math.random() has to go through jitter(), or two runs
+    // of the same build scatter different rocks and the diff is noise.
+    const files = [
+      'src/rendering/worldFactories.ts', 'src/rendering/bubbleBay.ts',
+      'src/rendering/patternForest.ts', 'src/rendering/robotTown.ts',
+      'src/rendering/paperCharacter.ts', 'src/rendering/spriteCharacter.ts',
+    ];
+    return files.every((f) => {
+      const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+      return !src.includes('Math.random()');
+    });
+  })());
+  check('the seeded sequence is a generator, not a fixed step', (() => {
+    // A constant increment puts consecutive draws on a diagonal, so every
+    // scattered thing lands on a lattice and the baseline stops proving
+    // that scattering works at all.
+    const src = readFileSync('src/engine/testMode.ts', 'utf8');
+    return /Math\.imul/.test(src);
+  })());
+  check('the render loop counts frames instead of reading a clock in test mode', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /FIXED_DT/.test(src) && /tickFrame\(\)/.test(src);
+  })());
+  check('the loop stops itself on the exact frame a test asked for', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /frameLimit\(\)/.test(src) && /frameCount\(\) >= frameLimit\(\)/.test(src);
+  })());
+  check('the frame count restarts with each screen, not with the session', (() => {
+    const app = readFileSync('src/app/app.ts', 'utf8');
+    return /resetFrames\(\)/.test(app) && /resetJitter\(\)/.test(app);
+  })());
+  check('deterministic mode costs a child nothing', (() => {
+    // jitter() must fall straight through to Math.random() when no test
+    // is watching, or the shipped game gets the test's scenery.
+    const src = readFileSync('src/engine/testMode.ts', 'utf8');
+    return /if \(!deterministic\(\)\) return Math\.random\(\);/.test(src);
+  })());
+  check('the screenshot harness lives in the repo, not in someone tmp dir', (() => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    return typeof pkg.scripts.visual === 'string'
+      && typeof pkg.scripts['visual:diff'] === 'string';
+  })());
+  check('the harness opens pages in deterministic mode', (() => {
+    const src = readFileSync('scripts/visual-shoot.mjs', 'utf8');
+    return /cbtest=1/.test(src) && /cbframes=/.test(src);
+  })());
+}
+
+
+// ============================================================
+// Type — the app owns its own fonts
+// ============================================================
+{
+  check('no page asks a third party for a font', (() => {
+    const html = readFileSync('index.html', 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+    return !/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html);
+  })());
+  check('the fonts are in the repo, so a build never needs the network', (() => {
+    const css = readFileSync('public/fonts/fonts.css', 'utf8');
+    return /@font-face/.test(css) && !/https?:/.test(css);
+  })());
+  check('font urls are relative to their own stylesheet', (() => {
+    // `./fonts/x.woff2` inside public/fonts/fonts.css resolves to
+    // fonts/fonts/x.woff2, which a dev server answers with index.html and
+    // a 200 — no console error, and every heading silently wrong.
+    const css = readFileSync('public/fonts/fonts.css', 'utf8');
+    return /url\(\.\/[^/)]+\.woff2\)/.test(css) && !/url\(\.\/fonts\//.test(css);
+  })());
+  check('both families the design uses are covered', (() => {
+    const css = readFileSync('public/fonts/fonts.css', 'utf8');
+    return /font-family: 'Fredoka'/.test(css) && /font-family: 'Nunito'/.test(css);
+  })());
+  check('only the subsets this game can spell are shipped', (() => {
+    // Cyrillic, greek, hebrew and vietnamese are most of the bytes and
+    // none of the glyphs for an English game with system emoji.
+    const css = readFileSync('public/fonts/fonts.css', 'utf8');
+    return /\/\* latin \*\//.test(css) && !/\/\* cyrillic \*\//.test(css)
+      && !/\/\* hebrew \*\//.test(css);
+  })());
+  check('the standalone file embeds its fonts instead of linking them', (() => {
+    const src = readFileSync('scripts/build-standalone.mjs', 'utf8');
+    return /data:font\/woff2;base64/.test(src);
+  })());
+  check('a missing font set warns but never fails the build', (() => {
+    const src = readFileSync('scripts/build-standalone.mjs', 'utf8');
+    return /console\.warn\(.*fonts/.test(src);
+  })());
+  check('the font stacks still name a rounded fallback', (() => {
+    // Fonts load lazily per weight and per subset, so there is always a
+    // first paint before they arrive.
+    const css = readFileSync('src/styles/tokens.css', 'utf8');
+    return /--font-display:[^;]*ui-rounded/.test(css)
+      && /--font-body:[^;]*ui-rounded/.test(css);
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

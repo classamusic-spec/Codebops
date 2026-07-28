@@ -9,6 +9,7 @@ import {
   createGroundTile, createBush, createSparkles, createSpores,
   createGrassTuft, createGroundDetail, createButterfly, updateButterfly, WindField,
 } from './worldFactories';
+import { jitter } from '../engine/testMode';
 
 export const TILE = 1.68;
 export const STEP = 1.78;
@@ -275,9 +276,9 @@ export class PatternForest {
     this.fireflyBase = new Float32Array(count * 3);
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      this.fireflyBase[i * 3] = (Math.random() - 0.5) * 15;
-      this.fireflyBase[i * 3 + 1] = 0.6 + Math.random() * 2.6;
-      this.fireflyBase[i * 3 + 2] = (Math.random() - 0.5) * 10;
+      this.fireflyBase[i * 3] = (jitter() - 0.5) * 15;
+      this.fireflyBase[i * 3 + 1] = 0.6 + jitter() * 2.6;
+      this.fireflyBase[i * 3 + 2] = (jitter() - 0.5) * 10;
     }
     pos.set(this.fireflyBase);
     const geo = new THREE.BufferGeometry();
@@ -293,7 +294,7 @@ export class PatternForest {
     // Glowing spores drifting up from the grove floor
     this.spores = createSpores(26, 14);
     this.sporeSpeeds = new Float32Array(26);
-    for (let i = 0; i < 26; i++) this.sporeSpeeds[i] = 0.12 + Math.random() * 0.22;
+    for (let i = 0; i < 26; i++) this.sporeSpeeds[i] = 0.12 + jitter() * 0.22;
     this.group.add(this.spores);
   }
 

@@ -9,6 +9,7 @@ import {
   createDrone, TILE_THICK,
   createGrassTuft, createGroundDetail, createButterfly, updateButterfly, WindField,
 } from './worldFactories';
+import { jitter } from '../engine/testMode';
 
 export const TILE = 1.68;
 export const STEP = 1.78;
@@ -186,7 +187,7 @@ export class RobotTown {
           new THREE.MeshToonMaterial({ color: '#dfe9ff', transparent: true, opacity: 0 }),
         );
         puff.castShadow = puff.receiveShadow = false;
-        puff.userData = { ox: p.x, oy: TILE_TOP + 0.95, oz: p.z, t: k * 0.5, speed: 0.32 + Math.random() * 0.14 };
+        puff.userData = { ox: p.x, oy: TILE_TOP + 0.95, oz: p.z, t: k * 0.5, speed: 0.32 + jitter() * 0.14 };
         this.puffs.push(puff);
         this.group.add(puff);
       }

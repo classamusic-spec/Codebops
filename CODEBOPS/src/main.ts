@@ -1,5 +1,6 @@
 import './styles/main.css';
 import { App } from './app/app';
+import { registerServiceWorker } from './pwa';
 
 function bootstrap(): void {
   const host = document.getElementById('app');
@@ -10,6 +11,9 @@ function bootstrap(): void {
 
   // Swap the instant boot loader for the app
   document.getElementById('boot-loader')?.remove();
+
+  // Offline shell. Registered last so it never competes with first paint.
+  registerServiceWorker();
 }
 
 bootstrap();
