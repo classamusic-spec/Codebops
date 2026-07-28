@@ -176,16 +176,19 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   width: clamp(170px, 17vw, 240px);
   background: var(--cream); color: var(--ink-800);
   border-radius: var(--r-lg); padding: 14px 14px 16px;
-  box-shadow: 0 6px 0 var(--cream-deep), var(--shadow-card);
+  /* Flat. The 6px cream ledge under it made a label look like a physical
+     object a child might try to pick up — and it is the one thing on the
+     screen that is NOT a control. Nothing is depressed here, so nothing
+     needs a face to press. A soft cast shadow keeps it off the grass. */
+  box-shadow: 0 2px 10px rgba(13, 20, 55, .18);
   display: flex; flex-direction: column; align-items: center; gap: 10px;
-  border: 4px solid #fff;
+  border: 3px solid #fff;
 }
 .goal-card .goal-flag {
   position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
   background: linear-gradient(180deg, var(--purple-light), var(--purple-deep)); color: #fff;
   font-family: var(--font-display); font-weight: 600; letter-spacing: 1px;
   padding: 5px 20px; border-radius: var(--r-pill); font-size: 15px;
-  box-shadow: 0 4px 0 var(--purple-shade);
 }
 .goal-visual { display: flex; align-items: center; gap: 10px; font-size: 44px; line-height: 1; }
 .goal-visual .arrow { font-size: 26px; color: var(--orange-deep); font-weight: 900; }
@@ -222,14 +225,14 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   /* Tight on purpose. The slot row and tile row bring their own padding,
      so anything generous here is doubled — and every pixel spent on the
      navy card is a pixel the 3D stage does not get. */
-  padding: 4px 10px 6px;
-  box-shadow: 0 6px 0 var(--ink-line), var(--shadow-card);
+  padding: 6px 14px 10px;
+  box-shadow: 0 3px 0 var(--ink-line), 0 6px 16px rgba(13, 20, 55, .3);
   min-height: 0;
   min-width: 0;
 }
 .deck-tray {
-  order: 2; display: flex; gap: 8px; flex-wrap: wrap;
-  justify-content: center; padding-top: 0;
+  order: 2; display: flex; gap: 10px; flex-wrap: wrap;
+  justify-content: center; padding: 2px 0 2px;
 }
 .deck-divider { display: none; }
 .deck-sequence {
@@ -257,7 +260,11 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
   padding: 3px 2px 4px; overflow: hidden;
   color: var(--white); font-weight: 900;
-  box-shadow: 0 5px 0 var(--tile-deep), 0 10px 18px rgba(13,20,55,.35);
+  /* Flat-ish. A 5px ledge plus an 18px drop shadow gave every tile a
+     visible SIDE, so a row of them read as a stack of blocks jammed into
+     the bar rather than as a set of buttons sitting on it. A 2px ledge
+     still says "pressable" — it just stops the deck looking crowded. */
+  box-shadow: 0 2px 0 var(--tile-deep), 0 4px 8px rgba(13, 20, 55, .22);
   transition: transform var(--dur-fast) var(--ease-bounce), box-shadow var(--dur-fast), filter var(--dur-fast);
   touch-action: none;
 }
@@ -267,8 +274,14 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
 .tile .lbl {
   font-size: clamp(7.5px, .82vw, 10.5px); line-height: 1.03; letter-spacing: .2px;
   text-transform: uppercase; opacity: .95; max-width: 100%; text-align: center;
+  /* "DROP" was rendering as "DR OP". The label is narrower than the word
+     at this size, and a tile is 54px on a phone, so the browser split it
+     wherever it could. Words break between words or not at all — a
+     four-year-old sounding out "DR OP" is worse than a slightly smaller
+     label. */
+  word-break: keep-all; overflow-wrap: normal; hyphens: none;
 }
-.tile:active { transform: translateY(4px) scale(.97); box-shadow: 0 1px 0 var(--tile-deep); }
+.tile:active { transform: translateY(2px) scale(.97); box-shadow: 0 0 0 var(--tile-deep); }
 .tile[data-cmd="move"],
 .tile[data-cmd="moveUp"],
 .tile[data-cmd="moveDown"] { --tile-deep: var(--blue-shade); background: linear-gradient(180deg, var(--blue-bright), var(--blue-deep)); }
@@ -1441,7 +1454,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   .slot { border-radius: 14px; }
   .tile .ico { font-size: 21px; }
   .tile .cmd-ico { width: 26px; height: 26px; }
-  .tile .lbl { font-size: 8px; }
+  .tile .lbl { font-size: 7.5px; letter-spacing: 0; }
   .slot .num { width: 19px; height: 19px; font-size: 10.5px; top: -8px; left: -5px; box-shadow: 0 2px 0 var(--blue-shade); }
   .slot .count-badge { width: 24px; height: 24px; font-size: 11px; top: -9px; right: -7px; }
   .bop-wrap { gap: 6px; justify-content: flex-end; }
@@ -2230,12 +2243,12 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   box-shadow: 0 6px 0 var(--blue-shade), 0 12px 22px rgba(13,20,55,.35), inset 0 3px 0 rgba(255,255,255,.55);
 }
 
-/* Tiles get a jelly-gloss cap */
-.tile { border: 3px solid rgba(255,255,255,.6); overflow: visible; }
+/* Tiles get a light sheen — a sheen, not a dome. */
+.tile { border: 2px solid rgba(255, 255, 255, .5); overflow: visible; }
 .tile::before {
-  content: ''; position: absolute; left: 10%; right: 10%; top: 6%; height: 34%;
+  content: ''; position: absolute; left: 12%; right: 12%; top: 7%; height: 26%;
   border-radius: var(--r-pill);
-  background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,.04));
+  background: linear-gradient(180deg, rgba(255, 255, 255, .38), rgba(255, 255, 255, .02));
   pointer-events: none;
 }
 .bop-btn {

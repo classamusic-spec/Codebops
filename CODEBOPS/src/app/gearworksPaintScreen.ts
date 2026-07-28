@@ -201,6 +201,12 @@ export class GearworksPaintScreen {
   private async onBop(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    // Lean in on the machine while it works — a child pressed BOP to
+    // watch the gears, not to watch the room. A fifth closer is enough to
+    // feel like leaning forward; a half again cropped both bops off the
+    // ends of the bench and read as claustrophobic. Eased, and only for
+    // the length of the run.
+    this.stage.zoomTo(1.46, 0.55);
     this.deck.setRunning(true);
     this.rig.reset();
     this.resetBoardCells();
@@ -226,6 +232,7 @@ export class GearworksPaintScreen {
     this.deck.highlightSlot(-1);
     this.deck.setRunning(false);
     this.running = false;
+    this.stage.zoomTo(1.22, 0.5);
 
     if (result.success) {
       this.celebrate(program);

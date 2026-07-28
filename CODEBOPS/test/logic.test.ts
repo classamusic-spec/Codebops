@@ -6057,5 +6057,90 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   })());
 }
 
+
+// ============================================================
+// Second device pass — flat cards, centred board, bench, run zoom
+// ============================================================
+{
+  check('the goal card is flat, not a 3D block', (() => {
+    // It is the one thing on the play screen that is NOT a control, and a
+    // 6px ledge made it look like an object to pick up.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.goal-card {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return !/box-shadow:\s*0 \d+px 0 /.test(block);
+  })());
+  check('the GOAL flag on the card is flat too', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.goal-card .goal-flag {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return !/box-shadow/.test(block);
+  })());
+
+  check('a panel above the board does not push it sideways', (() => {
+    // The goal card tucks under the top bar in portrait, entirely above
+    // the band the board sits in, yet it still claimed left width — so
+    // the puzzle was panned right with an empty margin down the left.
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /const overlap = Math\.max\(0, Math\.min\(r\.bottom, bandBottom\)/.test(src)
+      && /overlap \/ band/.test(src);
+  })());
+
+  check('command tiles are flat enough to sit flush in the bar', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.tile {');
+    const block = css.slice(at, css.indexOf('}', at));
+    const m = /box-shadow:\s*0 (\d+)px 0/.exec(block);
+    return !!m && Number(m[1]) <= 2;
+  })());
+  check('a tile label never breaks in the middle of a word', (() => {
+    // "DROP" was rendering as "DR OP".
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.tile .lbl {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /word-break:\s*keep-all/.test(block);
+  })());
+
+  check('the bops stand on the bench, not on the floor behind it', (() => {
+    // At floor level the bench edge sliced across them and only their
+    // heads showed — they read as peering over it, not working at it.
+    const src = readFileSync('src/rendering/gearworks/garageScene.ts', 'utf8');
+    return /BENCH_TOP_Y/.test(src) && /zipSpot\(\): THREE\.Vector3 \{/.test(src);
+  })());
+  check('the lift bay, which has no bench, keeps them on the floor', (() => {
+    const src = readFileSync('src/rendering/gearworks/garageScene.ts', 'utf8');
+    const at = src.indexOf('zipSpot(): THREE.Vector3 {');
+    return src.slice(at, at + 260).includes("liftBay");
+  })());
+
+  check('pressing BOP leans the camera in on the machine', (() => {
+    const src = readFileSync('src/app/gearworksScreen.ts', 'utf8');
+    return /this\.stage\.zoomTo\([0-9.]+, 0\.55\);/.test(src);
+  })());
+  check('the camera pulls back out when the run finishes', (() => {
+    const src = readFileSync('src/app/gearworksScreen.ts', 'utf8');
+    const at = src.indexOf('this.running = false;');
+    return /zoomTo/.test(src.slice(at, at + 120));
+  })());
+  check('every Gearworks screen leans in and back out', (() => {
+    const dir = readdirSync('src/app').filter((f) => /^gearworks.*\.ts$/.test(f));
+    const withRun = dir.filter((f) => readFileSync(`src/app/${f}`, 'utf8').includes('this.running = true;'));
+    return withRun.length > 0 && withRun.every((f) => {
+      const src = readFileSync(`src/app/${f}`, 'utf8');
+      return (src.match(/zoomTo\(/g) ?? []).length >= 2;
+    });
+  })());
+  check('the lean is eased, never a snap', (() => {
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    return /zoomTween/.test(src) && /stepZoom/.test(src);
+  })());
+  check('the zoom tween keeps the same subject in the middle', (() => {
+    // Magnify about the subject rather than drifting toward a new one.
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    const at = src.indexOf('zoomTo(target: number');
+    return src.slice(at - 700, at).includes('without moving what it is framed on');
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

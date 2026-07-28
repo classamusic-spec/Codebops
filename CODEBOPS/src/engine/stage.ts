@@ -159,6 +159,7 @@ export class Stage {
       // screenshot taken at frame N shows the same instant every run.
       const det = deterministic();
       const dt = det ? FIXED_DT : wall;
+      this.stepZoom(dt);
       this.handlers.forEach((h) => h(dt, det ? tickFrame() : this.clock.elapsedTime));
       this.renderer.render(this.scene, this.camera);
       // A test asked for exactly N frames of this screen. Stopping from
@@ -266,8 +267,23 @@ export class Stage {
           const across = edge === 'top' || edge === 'bottom';
           const mid = box.left + box.width / 2;
           const underBoard = edge === 'bottom' && r.left <= mid && r.right >= mid;
+          // A side panel only takes width where it actually sits next to
+          // the board.
+          //
+          // Weighting by fraction-of-screen-height was wrong in portrait:
+          // the goal card tucks under the top bar there, entirely ABOVE
+          // the band the board occupies, yet it still claimed left width —
+          // so the free area's middle shifted right and the whole puzzle
+          // was panned off-centre with a wide empty margin down the left.
+          // Measuring the overlap with the band that is actually left over
+          // makes a panel above the board cost nothing sideways, which is
+          // the truth.
+          const bandTop = box.top + next.top;
+          const bandBottom = box.bottom - next.bottom;
+          const overlap = Math.max(0, Math.min(r.bottom, bandBottom) - Math.max(r.top, bandTop));
+          const band = Math.max(1, bandBottom - bandTop);
           const cover = underBoard ? 1
-            : across ? r.width / box.width : r.height / box.height;
+            : across ? r.width / box.width : overlap / band;
           next[edge] = Math.max(next[edge], d * Math.min(1, cover));
         }
       }
@@ -354,6 +370,34 @@ export class Stage {
       : 38 - Math.min(1, (a - 1.4) / (2.1 - 1.4)) * 7;
     const rad = (deg * Math.PI) / 180;
     this.viewDir.set(0, Math.sin(rad), Math.cos(rad)).normalize();
+  }
+
+  /**
+   * Ease the framing in or out, without moving what it is framed on.
+   *
+   * Re-running the fit each tick is cheap — eight projection passes over a
+   * handful of points, and only while a tween is live. Keeping the same
+   * centre and the same points means the picture magnifies about the
+   * subject rather than drifting toward a new one, which is what "lean in
+   * and look" should feel like.
+   */
+  zoomTo(target: number, seconds = 0.5): void {
+    this.zoomTween = { from: this.zoom, to: target, t: 0, dur: Math.max(0.01, seconds) };
+  }
+
+  private zoomTween: { from: number; to: number; t: number; dur: number } | null = null;
+
+  /** Advance a live zoom tween. Called from the loop; a no-op when idle. */
+  private stepZoom(dt: number): void {
+    const z = this.zoomTween;
+    if (!z) return;
+    z.t = Math.min(z.dur, z.t + dt);
+    const k = z.t / z.dur;
+    // Ease in-out: no snap at either end.
+    const e = k < 0.5 ? 2 * k * k : 1 - ((-2 * k + 2) ** 2) / 2;
+    this.zoom = z.from + (z.to - z.from) * e;
+    this.applyFrame();
+    if (z.t >= z.dur) this.zoomTween = null;
   }
 
   private applyFrame(): void {

@@ -317,8 +317,32 @@ export class GarageScene {
    * from the walls and forward of the bench, so the closer framing keeps
    * both of them clear of the panels.
    */
-  zipSpot(): THREE.Vector3 { return new THREE.Vector3(-3.5, 0.05, 4.3); }
-  mixySpot(): THREE.Vector3 { return new THREE.Vector3(3.9, 0.05, 4.3); }
+  /**
+   * Where the bops stand.
+   *
+   * ON the bench, not on the floor in front of it. Standing at floor
+   * level they were behind the bench from the camera's angle, so the
+   * front edge sliced across their bodies and only their heads showed —
+   * they read as peering over it rather than working at it. The bench top
+   * is 13.5 wide and 5.2 deep centred at z = -1.5, so its front edge is
+   * z = 1.1; standing them just inside that, out at the ends, keeps them
+   * clear of the machine in the middle.
+   *
+   * The lift bay has no bench, so there they stay on the floor.
+   */
+  private static readonly BENCH_TOP_Y = 1.9;
+
+  zipSpot(): THREE.Vector3 {
+    return this.layout === 'liftBay'
+      ? new THREE.Vector3(-3.5, 0.05, 4.3)
+      : new THREE.Vector3(-4.9, GarageScene.BENCH_TOP_Y, 0.2);
+  }
+
+  mixySpot(): THREE.Vector3 {
+    return this.layout === 'liftBay'
+      ? new THREE.Vector3(3.9, 0.05, 4.3)
+      : new THREE.Vector3(4.9, GarageScene.BENCH_TOP_Y, 0.2);
+  }
 
   update(dt: number, elapsed: number): void {
     for (const s of this.spinners) s.node.rotation.z += dt * s.speed;
