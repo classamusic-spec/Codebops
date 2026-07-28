@@ -106,7 +106,3 @@ export function trailWorlds(): readonly WorldDefinition[] {
   return WORLDS.filter((w) => w.onMainTrail);
 }
 
-/** Every world in a given learning layer. */
-export function worldsInLayer(layer: LearningLayerId): readonly WorldDefinition[] {
-  return WORLDS.filter((w) => w.layer === layer);
-}

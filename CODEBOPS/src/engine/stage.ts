@@ -88,6 +88,33 @@ export class Stage {
     else this.startLoop();
   };
 
+  /** Set while the GPU has taken the context away; cleared on restore. */
+  private glStallTimer = 0;
+  private onContextLost = (): void => {
+    // Three's renderer already preventDefault()s the event (which is what
+    // keeps a restore possible) and repaints by itself when the browser
+    // hands the GPU back — both verified by test. What it cannot handle
+    // is a restore that never comes: an OS that reclaimed the GPU for
+    // good leaves a dead black canvas under a working UI, forever. So:
+    // if the page is VISIBLE and the context is still gone a few seconds
+    // later, tell the app so it can rebuild this screen on a fresh one.
+    this.armGlStallCheck();
+  };
+  private onContextRestored = (): void => {
+    window.clearTimeout(this.glStallTimer);
+    this.glStallTimer = 0;
+  };
+  private armGlStallCheck(): void {
+    window.clearTimeout(this.glStallTimer);
+    this.glStallTimer = window.setTimeout(() => {
+      if (!this.renderer.getContext().isContextLost()) return;
+      // Hidden pages lose the context routinely and get it back on
+      // return — that is not a stall, so keep waiting.
+      if (document.hidden) { this.armGlStallCheck(); return; }
+      window.dispatchEvent(new CustomEvent('codebops:gpu-stall'));
+    }, 4000);
+  }
+
   constructor(wrap: HTMLElement, view: StageViewConfig = {}) {
     this.wrap = wrap;
     this.canvas = document.createElement('canvas');
@@ -140,6 +167,8 @@ export class Stage {
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.wrap);
     document.addEventListener('visibilitychange', this.onVisibility);
+    this.canvas.addEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
     this.resize();
   }
 
@@ -508,6 +537,9 @@ export class Stage {
     this.stopLoop();
     this.resizeObserver.disconnect();
     document.removeEventListener('visibilitychange', this.onVisibility);
+    this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
+    window.clearTimeout(this.glStallTimer);
     // Anything that owns GPU memory, not just meshes. The worlds are full
     // of THREE.Points — sparkles, petals, bubbles, fireflies, spores — and
     // a Points is not a Mesh, so every one of them used to survive the

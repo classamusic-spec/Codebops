@@ -285,14 +285,6 @@ export function isStageId(id: string): id is CurriculumStageId {
   return BY_ID.has(id as CurriculumStageId);
 }
 
-/** Every stage a world touches, in curriculum order. */
-export function stagesForWorld(world: WorldId): CurriculumStageDefinition[] {
-  return CURRICULUM_STAGES.filter((s) =>
-    s.introductoryWorlds.includes(world)
-    || s.practiceWorlds.includes(world)
-    || s.transferWorlds.includes(world));
-}
-
 /** Worlds where a stage shows up at all (for the journey map). */
 export function worldsForStage(id: CurriculumStageId): WorldId[] {
   const s = stage(id);

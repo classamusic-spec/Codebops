@@ -9,6 +9,7 @@
  * Run after `vite build`, as part of `npm run build`.
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -89,10 +90,29 @@ if (stale) console.log(`[sw] skipped ${stale} stale asset(s) left in dist/ by ea
 // different cache key from the file it serves.
 const precache = ['./', ...files.map((f) => `./${f}`)];
 
+/**
+ * Version the caches by the CONTENT of what they hold. The worker's
+ * activate handler deletes every cache whose name is not the current
+ * one — but the source hardcodes a placeholder, so without this stamp
+ * that cleanup never fires and each deploy's bundles pile up on the
+ * device forever until the browser evicts the whole origin, offline
+ * shell included. Hashing the precached bytes (not a timestamp) keeps
+ * the worker byte-identical across rebuilds of identical source, so an
+ * unchanged deploy causes no cache churn at all.
+ */
+const digest = createHash('sha256');
+for (const f of files) digest.update(f).update(readFileSync(join(dist, f)));
+const version = `codebops-${digest.digest('hex').slice(0, 12)}`;
+
 const swPath = join(dist, 'sw.js');
 const src = readFileSync(swPath, 'utf8');
+if (!src.includes("const VERSION = 'codebops-v1'")) {
+  throw new Error('[sw] VERSION placeholder not found in sw.js — cache cleanup would silently die.');
+}
+const stamped = src.replace("const VERSION = 'codebops-v1'", `const VERSION = '${version}'`);
 const banner = `self.__CB_PRECACHE__ = ${JSON.stringify(precache, null, 0)};\n`;
-writeFileSync(swPath, banner + src);
+writeFileSync(swPath, banner + stamped);
+console.log(`[sw] cache version ${version}`);
 
 const bytes = files.reduce((n, f) => n + statSync(join(dist, f)).size, 0);
 console.log(`[sw] precaching ${precache.length} files (${(bytes / 1024 / 1024).toFixed(1)} MB)`);

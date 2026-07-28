@@ -25,10 +25,6 @@ function clone(v: AgentValue): AgentValue {
   return Array.isArray(v) ? [...v] : v;
 }
 
-export function readMemory(state: AgentMemoryState, id: string): AgentValue | undefined {
-  return state[id];
-}
-
 /**
  * Remember one more thing.
  *

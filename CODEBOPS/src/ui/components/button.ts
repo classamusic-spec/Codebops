@@ -107,29 +107,13 @@ export const ICON_HELP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 export const ICON_PLAY = `<svg viewBox="0 0 24 24" fill="currentColor">
   <path d="M7 4.6 20 12 7 19.4Z"/></svg>`;
 
-/** Counter-clockwise arrow — rewind, replay, try again. */
-export const ICON_REWIND = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M4.5 11a7.6 7.6 0 1 1 2.2 5.4"/><path d="M4.2 5.4v5.8h5.8"/></svg>`;
-
 /** Cross — clear, close, dismiss. */
 export const ICON_CLEAR = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
   stroke-width="3.4" stroke-linecap="round"><path d="M6 6 18 18M18 6 6 18"/></svg>`;
 
-/** Padlock, for content that is not open yet. */
-export const ICON_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="4.6" y="10.4" width="14.8" height="10.4" rx="2.6" fill="currentColor" stroke="none"/>
-  <path d="M8 10.4V7.6a4 4 0 0 1 8 0v2.8"/></svg>`;
-
 /** Five-pointed star, for progress. */
 export const ICON_STAR = `<svg viewBox="0 0 24 24" fill="currentColor">
   <path d="M12 2.6 15 9.2l7.2.7-5.4 4.8 1.6 7-6.4-3.7-6.4 3.7 1.6-7L1.8 9.9 9 9.2Z"/></svg>`;
-
-/** Magnifier — Think Trail, Code Peek, "look closer". */
-export const ICON_LOOK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="2.8" stroke-linecap="round"><circle cx="10.6" cy="10.6" r="6.4"/>
-  <path d="M15.4 15.4 21 21"/></svg>`;
 
 /** Footprints climbing — the Think Trail's own mark. */
 export const ICON_TRAIL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"

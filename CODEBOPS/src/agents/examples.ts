@@ -160,10 +160,6 @@ export function correctExample(
   };
 }
 
-export function removeExample(set: ExampleSet, exampleId: string): ExampleSet {
-  return { ...set, examples: set.examples.filter((e) => e.id !== exampleId) };
-}
-
 /** What a child is told about a problem (§8: no technical vocabulary). */
 export function describeProblem(problem: ExampleProblem): string {
   switch (problem.kind) {

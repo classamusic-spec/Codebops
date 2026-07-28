@@ -81,6 +81,16 @@ function yesterdayStamp(): string {
 
 export class SaveStore {
   private data: SaveData;
+  private persistFailed = false;
+  /**
+   * The save on disk was written by a NEWER CodeBops than this one — a
+   * stale cached bundle after a deploy, most likely. Writing through it
+   * would silently strip every field the newer schema added, so this
+   * session plays from a best-effort copy and never writes back. The
+   * service worker updates on the next launch and the real save is
+   * still there, untouched.
+   */
+  private newerSaveOnDisk = false;
 
   constructor() {
     this.data = this.load();
@@ -91,6 +101,10 @@ export class SaveStore {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return structuredClone(DEFAULT_SAVE);
       const parsed = JSON.parse(raw) as Partial<SaveData>;
+      if (typeof parsed.schemaVersion === 'number' && parsed.schemaVersion > SAVE_SCHEMA_VERSION) {
+        this.newerSaveOnDisk = true;
+        console.warn('[CodeBops] Save was written by a newer version; playing read-only to protect it.');
+      }
       // Migration foundation: fill forward from older schema versions.
       return {
         schemaVersion: SAVE_SCHEMA_VERSION,
@@ -106,11 +120,24 @@ export class SaveStore {
     }
   }
 
+  /**
+   * False the moment a write fails (device full, storage revoked): the
+   * child keeps playing from memory, but stars earned now are gone on
+   * reload — and every other store in the app says so when it happens.
+   * This one used to swallow it; the App shows a notice when this flips.
+   */
+  get durable(): boolean {
+    return !this.persistFailed && !this.newerSaveOnDisk;
+  }
+
   private persist(): void {
+    if (this.newerSaveOnDisk) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+      this.persistFailed = false;
     } catch {
       // Storage full or unavailable — play session continues without persistence.
+      this.persistFailed = true;
     }
   }
 

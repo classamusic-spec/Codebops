@@ -12,7 +12,7 @@
 import type {
   MiniAppType, MiniAppComponentType, MiniAppCommand, MiniAppTrigger,
   MiniAppVariableType, MiniAppVariableVisual, MiniAppGoalType,
-  SerializableValue, MiniAppStateToken,
+  SerializableValue,
 } from './miniAppTypes';
 import type { CurriculumStageId, LearningPhase } from '../data/curriculum/stages';
 import { tokenWords } from '../data/app-lab/preparedTitleTokens';
@@ -163,23 +163,6 @@ export interface MiniAppProject {
 
 export function allComponents(project: MiniAppProject): MiniAppComponent[] {
   return project.scenes.flatMap((s) => s.components);
-}
-
-export function findComponent(project: MiniAppProject, id: string): MiniAppComponent | null {
-  return allComponents(project).find((c) => c.id === id) ?? null;
-}
-
-export function scriptsFor(project: MiniAppProject, componentId: string): MiniAppScript[] {
-  return project.scripts.filter((s) => s.ownerId === componentId);
-}
-
-/** Every component state a project's commands and tests can ask about. */
-export function statesUsed(project: MiniAppProject): MiniAppStateToken[] {
-  const out = new Set<MiniAppStateToken>();
-  for (const c of allComponents(project)) {
-    if (typeof c.initialState === 'string') out.add(c.initialState);
-  }
-  return [...out];
 }
 
 /**

@@ -129,11 +129,3 @@ export function actionsFor(state: ConfidenceState): readonly UncertaintyAction[]
   }
 }
 
-export const UNCERTAINTY_LABEL: Readonly<Record<UncertaintyAction, string>> = {
-  try: 'Try it',
-  lookAgain: 'Look again',
-  checkAnotherExample: 'Show me another one',
-  askTheChild: 'Ask me',
-  askAGrownUp: 'Ask a grown-up',
-  stopSafely: 'Stop and wait',
-};

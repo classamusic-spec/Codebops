@@ -80,13 +80,6 @@ export function describeRequest(
   return `Shall I use the ${toolTitle} on the ${thing}?`;
 }
 
-/** What each answer does to the run. */
-export const APPROVAL_EFFECT: Readonly<Record<ApprovalAnswer, string>> = {
-  approved: 'Carry on.',
-  changed: 'Skip this one and keep going.',
-  cancelled: 'Stop here.',
-};
-
 /**
  * §25: asking must never score below acting.
  *

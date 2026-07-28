@@ -197,10 +197,6 @@ export function earnedRewards(record: MakerRecord): CreatorReward[] {
   return CREATOR_REWARDS.filter((r) => r.earned(record));
 }
 
-export function rewardsOfKind(record: MakerRecord, kind: CreatorRewardKind): CreatorReward[] {
-  return earnedRewards(record).filter((r) => r.kind === kind);
-}
-
 /**
  * What is new between two records — the thing to celebrate. Rewards are
  * never lost, so this only ever grows; a shrinking record (after a reset)

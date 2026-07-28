@@ -87,7 +87,3 @@ export function watchOrientation(parent: HTMLElement): RotateHintHandle {
   };
 }
 
-/** Test seam: forget the "play like this" choice. */
-export function resetRotateHint(): void {
-  dismissed = false;
-}

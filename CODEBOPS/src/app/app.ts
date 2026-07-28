@@ -72,6 +72,10 @@ export class App {
   private store = new SaveStore();
   private mascotStops: Array<() => void> = [];
   private rotate: RotateHintHandle | null = null;
+  /** Re-runs the current screen's build — set by guard() on every transition. */
+  private reenter: (() => void) | null = null;
+  /** Recent recovery timestamps, to spot a crash loop. */
+  private failures: number[] = [];
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -83,7 +87,101 @@ export class App {
     // anywhere, which on the splash is the child reaching for Play.
     sharedMusic.enabled = this.store.settings.music !== false;
     attachFirstGesture();
+    // A child cannot open devtools, reload, or explain what happened. If
+    // an error escapes everything else and the page is left with no
+    // screen mounted, put the title screen back rather than a blank page.
+    window.addEventListener('error', () => this.rescueIfBlank());
+    window.addEventListener('unhandledrejection', () => this.rescueIfBlank());
+    // Three repaints by itself when a lost WebGL context comes back; the
+    // Stage raises this only when the restore never arrives. Rebuilding
+    // the screen asks the browser for a fresh context, which is the only
+    // remaining way to get the world back on the canvas.
+    window.addEventListener('codebops:gpu-stall', () => {
+      const again = this.reenter;
+      if (again) this.guard('current', again);
+    });
     this.showTitle();
+  }
+
+  /**
+   * Every screen transition runs through here: if building a screen
+   * throws (bad save data, a lost GPU, a level that fails validation),
+   * the child would otherwise be stranded on a blank page — clearHost()
+   * has already emptied it. Catch, and fall back to the title screen.
+   */
+  private guard(where: string, build: () => void): void {
+    this.reenter = build;
+    try {
+      build();
+      this.warnIfNotSaving();
+    } catch (err) {
+      console.error(`[CodeBops] The ${where} screen failed to open.`, err);
+      this.recover();
+    }
+  }
+
+  /** Once per session: the device stopped keeping the save. */
+  private warnedNotSaving = false;
+
+  /**
+   * A full device fails silently inside persist(); without this, a child
+   * earns stars all afternoon and loses every one on reload with nothing
+   * anywhere saying so. Checked here because every screen change passes
+   * through guard(), which is the first quiet moment after a write.
+   */
+  private warnIfNotSaving(): void {
+    if (this.store.durable || this.warnedNotSaving) return;
+    this.warnedNotSaving = true;
+    document.querySelector('.app-toast')?.remove();
+    const t = el('div', 'toast app-toast', this.host,
+      '⚠️ This tablet is out of space, so new stars can’t be remembered. You can still play!');
+    window.setTimeout(() => t.remove(), 6000);
+  }
+
+  private recover(): void {
+    const now = Date.now();
+    this.failures = this.failures.filter((t) => now - t < 10_000);
+    this.failures.push(now);
+    // Three failures in ten seconds means the title screen itself is
+    // broken — stop retrying and offer the one thing that always works.
+    if (this.failures.length >= 3) {
+      this.lastResort();
+      return;
+    }
+    try {
+      this.buildTitle();
+    } catch (err) {
+      console.error('[CodeBops] The title screen failed too.', err);
+      this.lastResort();
+    }
+  }
+
+  /** No helpers, no styles from anywhere else: nothing left to break. */
+  private lastResort(): void {
+    this.host.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'crash-card';
+    const face = document.createElement('div');
+    face.className = 'crash-face';
+    face.textContent = '🤖';
+    const msg = document.createElement('p');
+    msg.textContent = 'Oops! CodeBops got tangled up.';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Start again';
+    btn.addEventListener('click', () => window.location.reload());
+    card.append(face, msg, btn);
+    this.host.appendChild(card);
+  }
+
+  /**
+   * Global backstop: an async error (a rejected import, a bad timer)
+   * can escape guard() entirely. Only act when the page is actually
+   * blank — a healthy screen with a logged error should be left alone.
+   */
+  private rescueIfBlank(): void {
+    if (this.host.querySelector('.screen, .crash-card')) return;
+    this.recover();
   }
 
   /**
@@ -147,6 +245,10 @@ export class App {
   // ---------- title ----------
 
   private showTitle(): void {
+    this.guard('title', () => this.buildTitle());
+  }
+
+  private buildTitle(): void {
     this.clearHost();
     const screen = el('section', 'screen title-screen', this.host);
     screen.id = 'screen-title';
@@ -243,6 +345,10 @@ export class App {
   // ---------- level select ----------
 
   private showSelect(): void {
+    this.guard('level select', () => this.buildSelect());
+  }
+
+  private buildSelect(): void {
     this.clearHost();
     this.store = new SaveStore(); // re-read stars earned in the last session
     const screen = el('section', 'screen', this.host);
@@ -284,6 +390,10 @@ export class App {
   // ---------- game ----------
 
   private showGame(index: number, opts: { onSuccess?: () => void } = {}): void {
+    this.guard('level', () => this.buildGame(index, opts));
+  }
+
+  private buildGame(index: number, opts: { onSuccess?: () => void } = {}): void {
     this.clearHost();
     this.setNeedsLandscape(true);
     const screen = el('section', 'screen', this.host);
@@ -300,6 +410,10 @@ export class App {
   }
 
   private showCustomGame(level: LevelDef): void {
+    this.guard('custom level', () => this.buildCustomGame(level));
+  }
+
+  private buildCustomGame(level: LevelDef): void {
     this.clearHost();
     this.setNeedsLandscape(true);
     const screen = el('section', 'screen', this.host);
@@ -316,6 +430,10 @@ export class App {
   // ---------- gearworks ----------
 
   private showGearworks(index: number): void {
+    this.guard('Gearworks', () => this.buildGearworks(index));
+  }
+
+  private buildGearworks(index: number): void {
     this.clearHost();
     this.setNeedsLandscape(true);
     const screen = el('section', 'screen', this.host);
@@ -365,6 +483,10 @@ export class App {
   // ---------- gearworks trophy room ----------
 
   private showGearworksTrophy(): void {
+    this.guard('trophy room', () => this.buildGearworksTrophy());
+  }
+
+  private buildGearworksTrophy(): void {
     this.clearHost();
     this.store = new SaveStore(); // read the latest stars
     const screen = el('section', 'screen', this.host);
@@ -378,6 +500,10 @@ export class App {
   // ---------- Zip's App Lab ----------
 
   private showAppLab(): void {
+    this.guard('App Lab', () => this.buildAppLab());
+  }
+
+  private buildAppLab(): void {
     this.clearHost();
     this.store = new SaveStore(); // read the evidence that unlocks kits
     const screen = el('section', 'screen', this.host);
@@ -392,6 +518,10 @@ export class App {
   }
 
   private showAppLibrary(): void {
+    this.guard('app library', () => this.buildAppLibrary());
+  }
+
+  private buildAppLibrary(): void {
     this.clearHost();
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-app-library';
@@ -404,6 +534,12 @@ export class App {
   }
 
   private showCreator(
+    kit: AppKitDefinition | null, project?: MiniAppProject, open?: 'play' | 'edit',
+  ): void {
+    this.guard('creator', () => this.buildCreator(kit, project, open));
+  }
+
+  private buildCreator(
     kit: AppKitDefinition | null, project?: MiniAppProject, open?: 'play' | 'edit',
   ): void {
     this.clearHost();
@@ -419,6 +555,10 @@ export class App {
   // ---------- learning garden (curriculum map) ----------
 
   private showJourney(): void {
+    this.guard('journey map', () => this.buildJourney());
+  }
+
+  private buildJourney(): void {
     this.clearHost();
     this.store = new SaveStore(); // read the evidence recorded while playing
     const screen = el('section', 'screen', this.host);
@@ -432,6 +572,10 @@ export class App {
   // ---------- garden ----------
 
   private showGarden(): void {
+    this.guard('garden', () => this.buildGarden());
+  }
+
+  private buildGarden(): void {
     this.clearHost();
     this.store = new SaveStore();
     const screen = el('section', 'screen', this.host);
@@ -445,6 +589,10 @@ export class App {
   // ---------- helpers (Agent Mission Builder) ----------
 
   private showHelpers(): void {
+    this.guard('helpers', () => this.buildHelpers());
+  }
+
+  private buildHelpers(): void {
     this.clearHost();
     // A fresh store, like the garden and the journey: the builder writes
     // evidence, and coming back to a stale copy would show a child their
@@ -461,6 +609,10 @@ export class App {
   // ---------- editor ----------
 
   private showEditor(): void {
+    this.guard('editor', () => this.buildEditor());
+  }
+
+  private buildEditor(): void {
     this.clearHost();
     const screen = el('section', 'screen', this.host);
     screen.id = 'screen-editor';

@@ -254,9 +254,4 @@ export function benchHints(level: {
   return hints;
 }
 
-/** True when a level can offer anything at all. Used to hide a dead button. */
-export function hasHints(hints: readonly Hint[]): boolean {
-  return hints.length > 0;
-}
-
 export { initialState };

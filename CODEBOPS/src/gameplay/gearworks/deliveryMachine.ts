@@ -138,10 +138,6 @@ export function runDelivery(program: readonly DvStep[], goal: DeliveryGoal): DvR
   };
 }
 
-export function deliveryGoalMet(r: DvResult): boolean {
-  return r.allCorrect;
-}
-
 /** Kid-facing near-miss report for a failed round. */
 export function deliveryMisses(program: readonly DvStep[], goal: DeliveryGoal): string[] {
   const r = runDelivery(program, goal);

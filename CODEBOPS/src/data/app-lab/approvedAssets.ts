@@ -102,11 +102,6 @@ export function isApprovedAsset(id: string): boolean {
   return BY_ID.has(id);
 }
 
-/** Assets that may fill a given component role. */
-export function assetsForRole(role: MiniAppComponentType): ApprovedAsset[] {
-  return APPROVED_ASSETS.filter((x) => x.roles.includes(role));
-}
-
 // ---------------------------------------------------------------------
 // Themes — the seven CodeBops worlds, reused as App Lab backdrops (§7).
 // ---------------------------------------------------------------------

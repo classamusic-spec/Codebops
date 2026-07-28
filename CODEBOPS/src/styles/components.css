@@ -153,44 +153,6 @@
 }
 
 /* ------------------------------------------------------------
-   Panels
-   ------------------------------------------------------------
-   One shell for every card: goal, tray, trail, settings, dialogue.
-   ------------------------------------------------------------ */
-.cb-panel {
-  border-radius: var(--r-xl);
-  border: 3px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(180deg, var(--ink-600) 0%, var(--ink-800) 70%);
-  box-shadow: var(--pop-6) var(--ink-line), var(--shadow-card);
-  padding: var(--sp-5);
-  color: var(--white);
-}
-/* The cream variant, for anything a child is meant to READ rather than
-   operate — goals, briefs, hints. */
-.cb-panel.p-paper {
-  background: linear-gradient(180deg, var(--white), var(--cream));
-  border-color: var(--cream-deep);
-  color: var(--ink-800);
-  box-shadow: var(--pop-5) var(--cream-deep), var(--shadow-card);
-}
-
-/* ------------------------------------------------------------
-   Badges
-   ------------------------------------------------------------ */
-.cb-badge {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-5);
-  border-radius: var(--r-pill);
-  font-family: var(--font-display); font-weight: 800;
-  font-size: var(--fs-sm);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-}
-.cb-badge svg { width: 1.1em; height: 1.1em; display: block; }
-.cb-badge.b-lock    { background: var(--ink-700); color: var(--text-on-ink); }
-.cb-badge.b-concept { background: var(--purple-deep); color: var(--white); }
-.cb-badge.b-new     { background: var(--pink); color: var(--white); }
-
-/* ------------------------------------------------------------
    Star display
    ------------------------------------------------------------
    Never colour alone: an unearned star is an outline, an earned one is
@@ -220,18 +182,11 @@ body.high-contrast .cb-btn:disabled {
   filter: none; opacity: 1;
   background: var(--ink-900); border-style: dashed;
 }
-body.high-contrast .cb-panel {
-  background: var(--ink-900); border-color: var(--white);
-  box-shadow: 0 4px 0 var(--black);
-}
-body.high-contrast .cb-panel.p-paper {
-  background: var(--white); color: var(--black); border-color: var(--black);
-}
+
 /* An unearned star is already an outline; high contrast makes the
    outline explicit rather than relying on a 26% white fill. */
 body.high-contrast .cb-stars .cb-star { color: transparent; stroke: var(--white); stroke-width: 2px; }
 body.high-contrast .cb-stars .cb-star.earned { color: var(--yellow); stroke: var(--black); filter: none; }
-body.high-contrast .cb-badge { border-color: var(--white); }
 
 /* Calm mode stills the decorative loops but keeps every state change,
    because a state change is information and a wobble is not. */

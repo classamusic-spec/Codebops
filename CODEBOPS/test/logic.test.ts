@@ -3,6 +3,7 @@
  * (bundled via esbuild, executed in node; no browser needed)
  */
 import { runProgram, previewPath, MAX_STEPS } from '../src/gameplay/commands/interpreter';
+import { SaveStore, SAVE_SCHEMA_VERSION } from '../src/storage/saveStore';
 import type { ProgramStep } from '../src/gameplay/commands/interpreter';
 import { SPARKLE_MEADOW_1, SPARKLE_MEADOW_2 } from '../src/data/levels/sparkleMeadow';
 import {
@@ -4548,7 +4549,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const files = [
       'src/rendering/worldFactories.ts', 'src/rendering/bubbleBay.ts',
       'src/rendering/patternForest.ts', 'src/rendering/robotTown.ts',
-      'src/rendering/paperCharacter.ts', 'src/rendering/spriteCharacter.ts',
+      'src/rendering/spriteCharacter.ts',
     ];
     return files.every((f) => {
       const src = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
@@ -5893,6 +5894,11 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     );
     // Properties the app sets on an element at runtime are defined too,
     // just not in a stylesheet — `--i`, `--cols`, `--deck-h` and friends.
+    // index.html counts as runtime too: the boot loader's letters carry
+    // their colours as inline `style="--c:#…"` markup.
+    for (const m of readFileSync('index.html', 'utf8').matchAll(/style="[^"]*?(--[a-z0-9-]+)\s*:/gi)) {
+      defined.add(m[1]);
+    }
     const scanned = ['src/app', 'src/ui', 'src/rendering'];
     const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
       .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`)
@@ -6211,6 +6217,95 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const block = css.slice(at, css.indexOf('}', at));
     return /z-index:\s*1/.test(block) && /text-shadow/.test(block);
   })());
+
+  // ---- robustness: a child cannot recover from a blank page ----
+
+  check('every screen transition is guarded against a throwing build', (() => {
+    // clearHost() empties the page BEFORE the next screen builds, so an
+    // exception mid-build used to strand a child on nothing at all.
+    const src = readFileSync('src/app/app.ts', 'utf8');
+    const shows = [...src.matchAll(/private (show\w+)\(/g)].map((m) => m[1]);
+    if (shows.length < 13) return false;
+    return shows.every((name) => {
+      const at = src.indexOf(`private ${name}(`);
+      const body = src.slice(at, src.indexOf('private ', at + 10));
+      return body.includes('this.guard(');
+    });
+  })());
+
+  check('a crash loop ends at a reload card built with bare DOM calls', (() => {
+    // The last resort must not depend on el() or any helper that could
+    // itself be the thing that is broken.
+    const src = readFileSync('src/app/app.ts', 'utf8');
+    const at = src.indexOf('private lastResort()');
+    const body = src.slice(at, src.indexOf('\n  }', at));
+    return body.includes("document.createElement") && !body.includes(' el(')
+      && body.includes('location.reload');
+  })());
+
+  check('the stage watches for a WebGL context that never comes back', (() => {
+    // Three repaints by itself when the browser restores the context
+    // (verified by test); the stage only needs to catch the restore that
+    // never arrives — and must unhook both listeners on dispose.
+    const src = readFileSync('src/engine/stage.ts', 'utf8');
+    const adds = (src.match(/addEventListener\('webglcontext(lost|restored)'/g) ?? []).length;
+    const removes = (src.match(/removeEventListener\('webglcontext(lost|restored)'/g) ?? []).length;
+    return adds === 2 && removes === 2 && src.includes("CustomEvent('codebops:gpu-stall')");
+  })());
+
+  check('the service worker cache version is stamped by the build', (() => {
+    // A hardcoded VERSION means activate never deletes anything and every
+    // deploy piles more bundles onto the device until the browser evicts
+    // the whole origin — working offline shell included.
+    const sw = readFileSync('public/sw.js', 'utf8');
+    const build = readFileSync('scripts/build-sw.mjs', 'utf8');
+    const placeholderOnce = (sw.match(/const VERSION = 'codebops-v1'/g) ?? []).length === 1;
+    return placeholderOnce
+      && build.includes("src.replace(\"const VERSION = 'codebops-v1'\"")
+      // and the build FAILS if the placeholder ever drifts, rather than
+      // silently shipping a worker whose cleanup is dead code again.
+      && build.includes('VERSION placeholder not found');
+  })());
+
+  // ---- robustness: the save must fail loudly and never eat newer data ----
+
+  {
+    const writes: string[] = [];
+    let full = false;
+    let raw: string | null = null;
+    const mock = {
+      getItem: () => raw,
+      setItem: (_k: string, v: string) => {
+        if (full) throw new Error('QuotaExceededError');
+        writes.push(v);
+      },
+    };
+    (globalThis as { localStorage?: unknown }).localStorage = mock;
+
+    const fresh = new SaveStore();
+    fresh.setStars('sm-1', 3);
+    check('a save that persists reports itself durable', fresh.durable && writes.length === 1);
+
+    full = true;
+    fresh.setStars('sm-2', 2);
+    check('a full device flips durable to false instead of failing silently', !fresh.durable);
+    full = false;
+    fresh.setStars('sm-3', 1);
+    check('durable recovers as soon as a write lands again', fresh.durable);
+
+    // A stale cached bundle after a deploy: the save on disk is NEWER
+    // than the code reading it. Writing through would strip every field
+    // the newer schema added — so the session must never write back.
+    writes.length = 0;
+    raw = JSON.stringify({ schemaVersion: SAVE_SCHEMA_VERSION + 1, stars: { 'sm-1': 3 } });
+    const older = new SaveStore();
+    older.setStars('sm-1', 1);
+    older.updateSettings({ calmMode: true });
+    check('an older build never writes over a newer save', writes.length === 0 && !older.durable);
+    check('the newer save still plays: stars are readable', older.stars['sm-1'] === 3);
+
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

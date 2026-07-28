@@ -17,7 +17,7 @@ import {
   DROP_TARGET_REF,
 } from './miniAppTypes';
 import type { MiniAppProject, MiniAppScript } from './miniAppProject';
-import { MINI_APP_SCHEMA_VERSION, allComponents } from './miniAppProject';
+import { MINI_APP_SCHEMA_VERSION } from './miniAppProject';
 import type { MiniAppTemplateDefinition } from './miniAppTemplateRegistry';
 import { miniAppTemplate } from './miniAppTemplateRegistry';
 import { isApprovedAsset, isApprovedTheme } from '../data/app-lab/approvedAssets';
@@ -395,7 +395,3 @@ export function looksLikeProject(value: unknown): string | null {
   return null;
 }
 
-/** How many components a project holds, for library cards and reports. */
-export function componentCount(project: MiniAppProject): number {
-  return allComponents(project).length;
-}

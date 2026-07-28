@@ -33,8 +33,6 @@ export const LL_COND_SIGNAL: Readonly<Record<string, LlSignal>> = {
 };
 
 export const isCond = (cmd: LlCommandId): boolean => cmd in LL_COND_SIGNAL;
-export const isOp = (cmd: LlCommandId): boolean => cmd === 'llAnd' || cmd === 'llOr';
-
 /** Evaluate the rule for one sky (folds left-to-right; empty rule = false). */
 export function evalRule(program: readonly LlStep[], inputs: LlInputs): boolean {
   let result: boolean | null = null;
@@ -130,10 +128,6 @@ export function runLighthouse(
     events, lamps, correct, wrongCount,
     allCorrect: wrongCount === 0 && scenarios.length > 0,
   };
-}
-
-export function lighthouseSolved(program: readonly LlStep[], scenarios: readonly LighthouseScenario[]): boolean {
-  return runLighthouse(program, scenarios).allCorrect;
 }
 
 /** Kid-facing near-miss report for a rule that fails a sky. */

@@ -121,7 +121,3 @@ export function transferFor(stageId: CurriculumStageId): TransferChallenge | nul
   return BY_STAGE.get(stageId) ?? null;
 }
 
-/** Stages that show up in more than one world — the ones that transfer. */
-export function transferableStages(): readonly CurriculumStageId[] {
-  return TRANSFER_CHALLENGES.filter((t) => t.sites.length > 1).map((t) => t.stage);
-}

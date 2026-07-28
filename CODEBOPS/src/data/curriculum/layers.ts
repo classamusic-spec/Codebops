@@ -81,6 +81,3 @@ export function layerOfStage(stageId: CurriculumStageId): LearningLayerDefinitio
   return layer(id);
 }
 
-export function isLayerId(id: string): id is LearningLayerId {
-  return BY_ID.has(id as LearningLayerId);
-}

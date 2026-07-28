@@ -116,18 +116,3 @@ export function shadowedRules(rules: readonly AgentRuleDefinition[]): readonly s
   return ordered.slice(at + 1).map(({ rule }) => rule.id);
 }
 
-/**
- * Rules that would fire together on the same subject.
- *
- * Not an error — priority resolves it — but it is what makes a helper
- * surprising, so the builder can say "these two both match; the top one
- * wins" while the child is still looking at them.
- */
-export function conflictingRules(
-  rules: readonly AgentRuleDefinition[],
-  subject: AgentObservation,
-  memory: AgentMemoryState,
-): readonly string[] {
-  const { candidates } = matchRules(rules, subject, memory);
-  return candidates.length > 1 ? candidates.map((r) => r.id) : [];
-}

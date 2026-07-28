@@ -11,7 +11,7 @@
  * vocabularies (the child sees Seed / Sprout / Bloom / Shining Bloom).
  */
 import type { CurriculumStageId, LearningPhase } from './stages';
-import { CURRICULUM_STAGES, stage } from './stages';
+import { CURRICULUM_STAGES } from './stages';
 import type { EvidenceLog, MasteryState } from './mastery';
 import { MASTERY_LABEL, stageMastery } from './mastery';
 
@@ -112,9 +112,3 @@ export function latestObservation(log: EvidenceLog): string | null {
   return last ? last.note : null;
 }
 
-/** Which stages have been observed but never assessed — useful for §12 checks. */
-export function observedStages(log: EvidenceLog): CurriculumStageId[] {
-  const seen = new Set<CurriculumStageId>();
-  for (const e of log) if (stage(e.stage)) seen.add(e.stage);
-  return [...seen];
-}

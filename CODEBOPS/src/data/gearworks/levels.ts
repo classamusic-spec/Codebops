@@ -154,13 +154,6 @@ export function canonicalSolution(level: GearworksMachineLevel): GearworksStep[]
   return p;
 }
 
-export function assertMachineLevelValid(level: GearworksMachineLevel): void {
-  const errors = validateMachineLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}
-
 // ==================================================================
 // Phase 3 — chain (builder) levels: Gear Train + Belt Builder
 // ==================================================================
@@ -244,13 +237,6 @@ export function validateChainLevel(level: GearworksChainLevel): string[] {
   if (pieces.gears + pieces.belts === 0) errors.push('Nothing for the child to place.');
   if (pieces.gears + pieces.belts > 5) errors.push('Too many pieces for one sitting (max 5).');
   return errors;
-}
-
-export function assertChainLevelValid(level: GearworksChainLevel): void {
-  const errors = validateChainLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Chain level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 /** Prediction choices, generated so the correct one always matches the spec. */
@@ -373,13 +359,6 @@ export function validateLoopLevel(level: GearworksLoopLevel): string[] {
   if (long.length > level.maxSlots) errors.push('Long solution must fit the deck (both ways must be buildable).');
   if (!runLoopMachine(long, level.goal, level.machine).success) errors.push('Long solution must win too.');
   return errors;
-}
-
-export function assertLoopLevelValid(level: GearworksLoopLevel): void {
-  const errors = validateLoopLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Loop level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -554,13 +533,6 @@ export function validateSensorLevel(level: GearworksSensorLevel): string[] {
     if (buggyWins) errors.push('A debug level\'s prefilled program must NOT already work.');
   }
   return errors;
-}
-
-export function assertSensorLevelValid(level: GearworksSensorLevel): void {
-  const errors = validateSensorLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Sensor level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -881,13 +853,6 @@ export const GEARWORKS_FACTORY_LEVELS: readonly GearworksSorterLevel[] = [
   GW_FACTORY_RUSH,
 ];
 
-export function assertSorterLevelValid(level: GearworksSorterLevel): void {
-  const errors = validateSorterLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Sorter level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}
-
 // ==================================================================
 // Phase 7 — counter levels: Berry Counter + Safe Stop
 // ==================================================================
@@ -1075,13 +1040,6 @@ export function validateCounterLevel(level: GearworksCounterLevel): string[] {
   return errors;
 }
 
-export function assertCounterLevelValid(level: GearworksCounterLevel): void {
-  const errors = validateCounterLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Counter level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}
-
 // ==================================================================
 // Phase 8 — the hero level: Strawberry Jam Machine (6 missions)
 // ==================================================================
@@ -1205,13 +1163,6 @@ export function validateJamLevel(level: GearworksJamLevel): string[] {
   // the final solution must earn all three stars
   if (jamFinalStars(level, level.missions[5].solution) !== 3) errors.push('The final solution must earn 3 stars.');
   return errors;
-}
-
-export function assertJamLevelValid(level: GearworksJamLevel): void {
-  const errors = validateJamLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Jam level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -1348,13 +1299,6 @@ export function validateJobLevel(level: GearworksJobLevel): string[] {
     }
   }
   return errors;
-}
-
-export function assertJobLevelValid(level: GearworksJobLevel): void {
-  const errors = validateJobLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Job level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -1553,13 +1497,6 @@ export function validateSignalLevel(level: GearworksSignalLevel): string[] {
   const noSend = runParallel({ packer: [gFetch, gPack], mailer: [gWait, gShip] }, goal);
   if (!noSend.deadlocked) errors.push('A missing SEND SIGNAL must deadlock the Mailer.');
   return errors;
-}
-
-export function assertSignalLevelValid(level: GearworksSignalLevel): void {
-  const errors = validateSignalLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Signal level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -1777,13 +1714,6 @@ export function validateDebugLevel(level: GearworksDebugLevel): string[] {
   return errors;
 }
 
-export function assertDebugLevelValid(level: GearworksDebugLevel): void {
-  const errors = validateDebugLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Debug level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}
-
 // ==================================================================
 // Phase 13 — Robot Orchestra: a creative beat sequencer
 //
@@ -1915,13 +1845,6 @@ export function validateOrchestraLevel(level: GearworksOrchestraLevel): string[]
   ids.forEach((id, i) => { full = toggleCell(full, id, i % level.steps); });
   if (orchestraStars(level, full, BEAT_LOOP_MAX) !== 3) errors.push('A looped full ensemble must earn all three stars.');
   return errors;
-}
-
-export function assertOrchestraLevelValid(level: GearworksOrchestraLevel): void {
-  const errors = validateOrchestraLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Orchestra level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -2063,13 +1986,6 @@ export function validateLighthouseLevel(level: GearworksLighthouseLevel): string
   return errors;
 }
 
-export function assertLighthouseLevelValid(level: GearworksLighthouseLevel): void {
-  const errors = validateLighthouseLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Lighthouse level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}
-
 // ==================================================================
 // Phase 15 — Delivery Depot: queues (first in, first out)
 //
@@ -2198,13 +2114,6 @@ export function validateDeliveryLevel(level: GearworksDeliveryLevel): string[] {
   // The queue must be a real ordered line: dests in arrival order.
   level.queue.forEach((p, i) => { if (p.dest !== i) errors.push(`Parcel ${i + 1} must be addressed to house ${i + 1} (FIFO order).`); });
   return errors;
-}
-
-export function assertDeliveryLevelValid(level: GearworksDeliveryLevel): void {
-  const errors = validateDeliveryLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Delivery level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -2336,13 +2245,6 @@ export function validatePaintLevel(level: GearworksPaintLevel): string[] {
   if (oneLoop.length > level.maxSlots) errors.push('One-loop solution must fit the deck (the 2-star path must be buildable).');
   if (nested.length >= manual.length) errors.push('The nested loop must be shorter than painting by hand.');
   return errors;
-}
-
-export function assertPaintLevelValid(level: GearworksPaintLevel): void {
-  const errors = validatePaintLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Paint level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
 }
 
 // ==================================================================
@@ -2563,13 +2465,6 @@ export function validateStoryLevel(level: GearworksStoryLevel): string[] {
   return errors;
 }
 
-export function assertStoryLevelValid(level: GearworksStoryLevel): void {
-  const errors = validateStoryLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Story level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}
-
 // ==================================================================
 // Phase 18 — Maker Workshop: functions with a parameter
 //
@@ -2745,9 +2640,3 @@ export function validateMakerLevel(level: GearworksMakerLevel): string[] {
   return errors;
 }
 
-export function assertMakerLevelValid(level: GearworksMakerLevel): void {
-  const errors = validateMakerLevel(level);
-  if (errors.length > 0) {
-    throw new Error(`[Gearworks] Maker level "${level.id}" invalid:\n- ${errors.join('\n- ')}`);
-  }
-}

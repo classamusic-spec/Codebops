@@ -50,10 +50,6 @@ export function listMissions(): readonly AgentMission[] {
   return readAll().sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export function loadMission(id: string): AgentMission | null {
-  return readAll().find((m) => m.id === id) ?? null;
-}
-
 export function saveMission(mission: AgentMission): boolean {
   const all = readAll().filter((m) => m.id !== mission.id);
   all.push(mission);

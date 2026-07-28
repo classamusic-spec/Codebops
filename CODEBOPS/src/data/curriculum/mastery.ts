@@ -17,10 +17,6 @@ export type MasteryState =
   | 'not-introduced' | 'discovered' | 'guided'
   | 'practiced' | 'demonstrated' | 'applied-creatively';
 
-export const MASTERY_ORDER: readonly MasteryState[] = [
-  'not-introduced', 'discovered', 'guided', 'practiced', 'demonstrated', 'applied-creatively',
-];
-
 /** Grown-up wording for a report. */
 export const MASTERY_LABEL: Readonly<Record<MasteryState, string>> = {
   'not-introduced': 'Not introduced yet',

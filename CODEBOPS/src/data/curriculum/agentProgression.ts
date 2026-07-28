@@ -62,14 +62,6 @@ export const AGENT_CONCEPTS: readonly AgentConceptDefinition[] = [
   { id: 'explanation', formalName: 'Explainability', childFacingQuestion: 'Why did it do that?', icon: '🔍' },
 ];
 
-const CONCEPT_BY_ID = new Map(AGENT_CONCEPTS.map((c) => [c.id, c]));
-
-export function agentConcept(id: AgentConcept): AgentConceptDefinition {
-  const c = CONCEPT_BY_ID.get(id);
-  if (!c) throw new Error(`[agentProgression] Unknown agent concept "${id}"`);
-  return c;
-}
-
 export interface WorldAgentProgression {
   readonly world: WorldId;
   /** Ideas this world is the first to show. */

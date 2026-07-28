@@ -836,10 +836,6 @@ export function startersForTemplate(templateId: string): StarterDefinition[] {
   return MINI_APP_STARTERS.filter((s) => s.templateId === templateId);
 }
 
-export function starterDefinition(id: string): StarterDefinition | null {
-  return MINI_APP_STARTERS.find((s) => s.id === id) ?? null;
-}
-
 /** Duplicate a project under a new id (spec §11 App Library). */
 export function duplicateProject(
   project: MiniAppProject, seed: ProjectSeed, version: number,
