@@ -6162,5 +6162,56 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   })());
 }
 
+
+// ============================================================
+// Geometry audit fixes — dialogs scroll, cards fit their bands
+// ============================================================
+{
+  check('every dialog scrolls past its height on every screen', (() => {
+    // This only lived in the short-landscape media query, so on a
+    // 700px-tall tablet the settings dialog ran to ~830px and its close
+    // button sat 130px below the bottom edge — unreachable.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.dialog {');
+    const block = css.slice(at, css.indexOf('@keyframes dialog-pop', at));
+    return /max-height:\s*\d+dvh/.test(block) && /overflow-y:\s*auto/.test(block);
+  })());
+  check('the builder tab row contains its pills', (() => {
+    // The tabs hung 11px into the first row of cards on a portrait phone
+    // — measured as a real tap overlap, tab on card.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.mb-tabs {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /min-height:\s*calc\(var\(--tap-floor\)/.test(block);
+  })());
+  check('the short-landscape level card fits the island band', (() => {
+    // The orb stack alone was 120px in a 148px band; the card ran to
+    // 222px, poking 29px under the medallion strip and 45px off the
+    // bottom of the screen with the Play button half-gone.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.sel2-orb-stack { grid-row: 1 / 5;');
+    return at > 0;
+  })());
+  check('the short-landscape island spends its height on the cards', (() => {
+    // Title + pips left the card rail 80px for 105px cards, and the rail
+    // clipped them — the "Play next!" flag was sliced in half.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const short = css.slice(css.indexOf('/* Short landscape: the chrome gives up height'));
+    return /\.sel2-island-head \{ display: none; \}/.test(short)
+      && /\.sel2-pips \{ display: none; \}/.test(short);
+  })());
+  check('the selected world label is readable over its own halo', (() => {
+    // 26px of 55% white glow spread behind the label and washed the white
+    // text out — unreadable on the selected world, of all places.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    // lastIndexOf: an earlier rule shares this exact selector, and
+    // indexOf found that one — the same wrong-block trap as the old
+    // .sel2-strip check.
+    const at = css.lastIndexOf('.sel2-med.on .sel2-med-name {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /z-index:\s*1/.test(block) && /text-shadow/.test(block);
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

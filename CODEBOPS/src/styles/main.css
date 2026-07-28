@@ -407,6 +407,13 @@ button.stars-pill { min-height: 44px; min-width: 44px; cursor: pointer; font: in
   box-shadow: 0 10px 0 var(--ink-line), var(--shadow-card);
   padding: 26px 30px 28px;
   max-width: min(640px, 88vw);
+  /* Always scrollable past this height, on EVERY screen. This only lived
+     in the short-landscape media query, so on a 700px-tall tablet the
+     settings dialog ran to ~830px and its close button sat 130px below
+     the bottom edge — unreachable, and the audit script could not click
+     it either, which is how this was found. dvh, not vh: the visible
+     viewport is what matters under mobile browser chrome. */
+  max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; align-items: center; gap: 18px;
   animation: dialog-pop .38s var(--ease-bounce) both;
   text-align: center;
@@ -861,7 +868,11 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
 .sel2-med-glyph { font-size: 29px; line-height: 1; position: relative; }
 .sel2-med.on .sel2-med-disc {
   transform: translateY(-6px) scale(1.34); border-color: #fff;
-  box-shadow: 0 8px 0 rgba(20,32,80,.34), 0 0 26px rgba(255,255,255,.55);
+  /* The halo used to be 26px of 55% white, which spread down behind the
+     medallion's own label and washed the white text out — "Sparkle" was
+     unreadable on the selected world, of all places. Softer, and the
+     label stacks above it. */
+  box-shadow: 0 8px 0 rgba(20,32,80,.34), 0 0 14px rgba(255,255,255,.4);
 }
 /* The unselected ones step back, so the difference is a hierarchy and
    not just a size. Neighbours stay legible — they are the invitation. */
@@ -890,7 +901,10 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
   color: #eaf4ff; font-weight: 800; font-size: 11.5px; line-height: 1.25;
   text-align: center; text-shadow: 0 2px 0 rgba(20,32,80,.4);
 }
-.sel2-med.on .sel2-med-name { color: #fff; }
+.sel2-med.on .sel2-med-name {
+  color: #fff; position: relative; z-index: 1;
+  text-shadow: 0 2px 0 rgba(20, 32, 80, .55), 0 0 6px rgba(20, 32, 80, .4);
+}
 .sel2-med-stars { color: #ffdf8a; font-weight: 800; font-size: 10px; }
 
 /* Theme discs, matching each world's sky.
@@ -1236,10 +1250,13 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
   .sel2-med-glyph { font-size: 22px; }
   .sel2-med-name { font-size: 9.5px; }
   .sel2-med-stars { display: none; }
-  .sel2-island-head { margin-bottom: 6px; }
-  .sel2-island-titles p { display: none; }
-  .sel2-island-titles h2 { font-size: 17px; }
-  .sel2-island-glyph { font-size: 24px; }
+  /* The header and the pips cost the rail its height. The island band is
+     148px here; title + dots left the rail 80, and the 105px cards were
+     clipped top and bottom — the "Play next!" flag was the visible
+     casualty, sliced in half. The selected medallion above already names
+     the world, so in this one layout the header says nothing new. */
+  .sel2-island-head { display: none; }
+  .sel2-pips { display: none; }
   /* A short card lays out side by side instead of stacking. */
   .sel2-cell { width: min(70vw, 372px); }
   .sel2-card {
@@ -1249,11 +1266,24 @@ body.high-contrast .al-station.locked { opacity: 1; border-style: dashed; }
   .sel2-card-top { grid-column: 2; justify-content: flex-start; min-height: 0; }
   .sel2-cell { height: auto; align-self: center; }
   .sel2-card { height: auto; }
-  .sel2-art { grid-row: 1 / 4; grid-column: 1; width: 96px; height: 96px; flex: none; min-height: 0; margin: 0; }
-  .sel2-disc-glyph { font-size: 46px; }
-  .sel2-stone-name { grid-column: 2; font-size: 15px; }
+  /* Small enough to actually FIT. The island band on a 390px-tall phone
+     is 148px; the card measured 222px, so it poked 29px up under the
+     medallion strip and 45px off the bottom of the screen — its Play
+     button half-gone. Every number here exists to bring the card under
+     that band: 64px art, tighter paddings, a 40px Play. */
+  .sel2-card { grid-template-columns: 84px 1fr; grid-template-rows: auto auto auto; padding: 8px 12px; gap: 1px 10px; }
+  /* The artwork is the orb stack, and its 120px min-height was the whole
+     reason the card could not fit the band — it alone was 80% of the
+     available height. In the side-by-side layout it becomes the left
+     column, spanning all rows, at a size the band can hold. */
+  .sel2-orb-stack { grid-row: 1 / 5; grid-column: 1; width: 84px; min-height: 84px; flex: none; }
+  .sel2-orb { width: 74px; height: 74px; }
+  .sel2-disc-glyph { font-size: 32px; }
+  .sel2-stone-name { grid-column: 2; font-size: 14px; }
   .sel2-stone-stars, .sel2-stone-note { grid-column: 2; }
-  .sel2-go { grid-column: 2; margin-top: 4px; }
+  .sel2-stone-note { display: none; }
+  .sel2-go { grid-column: 2; margin-top: 2px; min-height: 40px; padding: 0 20px; font-size: 14px; }
+  .sel2-card-top { display: none; }
   .sel2-pips { padding: 4px 0 2px; }
 }
 
@@ -1649,7 +1679,7 @@ body.left-handed .dialog-actions { flex-direction: row-reverse; }
   z-index: 10; width: 58px; height: 58px; border-radius: var(--r-circle);
   border: 3px solid #ffe9c8;
   background: radial-gradient(120% 120% at 50% 18%, #ff9f5c 0%, #f25430 55%, #c92c1c 100%);
-  font-size: 26px; cursor: pointer;
+  font-size: 26px; line-height: 1; cursor: pointer;
   display: grid; place-items: center;
   box-shadow: 0 5px 0 #8f1d12, 0 10px 20px rgba(13,20,55,.35), inset 0 3px 0 rgba(255,255,255,.45);
   transition: transform .15s;
@@ -4638,6 +4668,11 @@ button.stars-pill:active { transform: translateY(3px); }
 .mb-tabs {
   display: flex; gap: var(--sp-2); overflow-x: auto; padding: 0 var(--sp-4) var(--sp-3);
   scrollbar-width: none;
+  /* The row must CONTAIN its pills. It sized itself to the pills' border
+     boxes minus their focus ring, so on a portrait phone the tabs hung
+     11px into the first row of cards below — measured as a real tap
+     overlap, tab on card. */
+  flex: 0 0 auto; align-items: flex-start; min-height: calc(var(--tap-floor) + var(--sp-3));
 }
 .mb-tabs::-webkit-scrollbar { display: none; }
 .mb-tab {
