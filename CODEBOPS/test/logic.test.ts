@@ -235,6 +235,23 @@ import {
 } from '../src/creator/miniAppEvidence';
 import { isStageId } from '../src/data/curriculum/stages';
 import type { TriggerCause } from '../src/creator/miniAppRuntime';
+import type { AgentMission, MissionRule } from '../src/agents/mission';
+import {
+  newMission, toAgent, limitsFor, missionGaps, GAP_PHRASE, parseMission,
+} from '../src/agents/mission';
+import {
+  MISSION_GOALS, MISSION_TOOLS, BUILDER_STEPS, STEP_TITLE, STEP_ICON,
+  missionGoal, toolsForGoal, whenCardsFor, doCardsFor, stepsFor,
+} from '../src/data/agents/missionCatalog';
+import { scenarioFor, SCENARIO_NAMES } from '../src/data/agents/scenarios';
+import { GLITCH_BOPS, detectGlitchBops, headlineGlitch } from '../src/agents/glitchBops';
+// Aliased: `evidenceForRun` is also exported by curriculum/record, and
+// the two take different arguments. tsc catches it now; before test/ was
+// typechecked, esbuild would have silently picked one.
+import {
+  evidenceForMission, evidenceForRun as evidenceForHelperRun, evidenceForEdgeCase,
+  parentSentenceForMission, offScreenIdeaForMission,
+} from '../src/agents/evidence';
 // ---- App Lab Phase 13 ----
 import {
   CREATOR_REWARDS, creatorReward, makerRecord, earnedRewards, newlyEarned,
@@ -4481,6 +4498,19 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const src = readFileSync('scripts/build-sw.mjs', 'utf8');
     return /__CB_PRECACHE__/.test(src);
   })());
+  check('a cached asset is served even when Vary would block the match', (() => {
+    // Measured: the main bundle, present in the cache and served by an
+    // activated worker, failed to load on roughly one offline start in
+    // three. caches.match honours Vary; the network retry then fails too,
+    // offline, and the whole promise rejects as ERR_FAILED with nothing
+    // in the console. 11/11 offline boots after adding the relaxed retry.
+    const sw = readFileSync('public/sw.js', 'utf8');
+    return /ignoreVary: true/.test(sw);
+  })());
+  check('the worker never rejects a request into a silent network error', (() => {
+    const sw = readFileSync('public/sw.js', 'utf8');
+    return /Response\.error\(\)/.test(sw);
+  })());
   check('the precache follows what index.html references, not what dist holds', (() => {
     // emptyOutDir is false, so dist/assets keeps every hashed bundle ever
     // emitted. Precaching the directory shipped 11.7 MB of dead copies.
@@ -5440,6 +5470,492 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     // Five stages sit here today; the number should go DOWN over time.
     const orphans = stagesWithoutTransfer();
     return Array.isArray(orphans) && orphans.length <= 6;
+  })());
+}
+
+
+// ============================================================
+// Agent Mission Builder, GlitchBops, and helper evidence
+// ============================================================
+{
+  const mk = (over: Partial<AgentMission> = {}): AgentMission => ({
+    ...newMission('m1', 'flowers-healthy', 1), ...over,
+  });
+  const rule = (id: string, whenCardId: string, doCardId: string): MissionRule =>
+    ({ id, whenCardId, doCardId, enabled: true });
+
+  // ---- Phase 8: the catalogue is closed ------------------------------
+  check('the builder offers the eight goals the spec names', (() => {
+    return MISSION_GOALS.length === 8;
+  })());
+  check('the builder offers the twelve tools the spec names', (() => {
+    return MISSION_TOOLS.length === 12;
+  })());
+  check('every goal says what it is in words a child would use', (() => {
+    return MISSION_GOALS.every((g) => g.childFacingTitle.trim().length > 0
+      && !/\d|level|advanced|beginner/i.test(g.childFacingTitle));
+  })());
+  check('every goal names the things its world contains', (() => {
+    return MISSION_GOALS.every((g) => g.subjectKinds.length > 0 && g.attributes.length > 0);
+  })());
+  check('every goal can actually be reached', (() => {
+    return MISSION_GOALS.every((g) => g.successConditions.length > 0);
+  })());
+  check('goal ids and tool ids are unique', (() => {
+    const g = MISSION_GOALS.map((x) => x.id);
+    const t = MISSION_TOOLS.map((x) => x.id);
+    return new Set(g).size === g.length && new Set(t).size === t.length;
+  })());
+  check('a tool is only offered where it makes sense', (() => {
+    // A watering can is no use to a parcel.
+    const parcels = missionGoal('deliver-packages');
+    return !toolsForGoal(parcels).some((t) => t.id === 'watering-can');
+  })());
+  check('some tools ask a person no matter what the child chose', (() => {
+    // §10: the lesson only lands if some things ask by nature.
+    return MISSION_TOOLS.some((t) => t.requiresApproval);
+  })());
+  check('rule cards only mention things the chosen world has', (() => {
+    const flowers = missionGoal('flowers-healthy');
+    const cards = whenCardsFor(flowers);
+    return cards.some((c) => c.id === 'is-droopy')
+      && !cards.some((c) => c.id === 'is-metal');
+  })());
+  check('an action card only appears once its tool is picked', (() => {
+    return doCardsFor([]).every((c) => c.needsTool === undefined)
+      && doCardsFor(['watering-can']).some((c) => c.needsTool === 'watering-can');
+  })());
+  check('asking for help and stopping are always offered as actions', (() => {
+    const ids = doCardsFor([]).map((c) => c.id);
+    return ids.includes('ask') && ids.includes('stop');
+  })());
+
+  // ---- progressive disclosure (§16, §30) -----------------------------
+  check('a first helper is goal, tools, rules and test — and nothing else', (() => {
+    const steps = stepsFor([]);
+    return steps.join(',') === 'goal,tools,rules,test';
+  })());
+  check('a first helper is still a complete working helper', (() => {
+    // The point of §16: a beginner's helper is simpler, not crippled.
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'is-droopy', 'use-watering-can')] });
+    const r = runAgent(toAgent(m), scenarioFor('flowers-healthy'));
+    return r.handled.length === 2;
+  })());
+  check('memory, limits and Ask First appear once the child has met them', (() => {
+    const steps = stepsFor(['memory', 'stopping', 'approval', 'explanation']);
+    return steps.includes('memory') && steps.includes('limits')
+      && steps.includes('approval') && steps.includes('inspect');
+  })());
+  check('every builder step has a title and an icon', (() => {
+    return BUILDER_STEPS.every((s) => STEP_TITLE[s].trim().length > 0
+      && STEP_ICON[s].trim().length > 0);
+  })());
+
+  // ---- mission → agent ------------------------------------------------
+  check('a mission becomes a runnable helper', (() => {
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'is-droopy', 'use-watering-can')] });
+    const a = toAgent(m);
+    return a.rules.length === 1 && a.tools.length === 1 && a.goal.id === 'flowers-healthy';
+  })());
+  check('rule order is the order the child arranged, and that is priority', (() => {
+    const m = mk({
+      toolIds: ['watering-can'],
+      rules: [rule('top', 'always', 'skip'), rule('bottom', 'always', 'use-watering-can')],
+    });
+    const a = toAgent(m);
+    return a.rules[0].id === 'top' && a.rules[0].priority < a.rules[1].priority;
+  })());
+  check('a rule referring to a card that no longer exists is dropped, not fatal', (() => {
+    // A catalogue entry can disappear between versions; twenty minutes of
+    // a child's work should not disappear with it.
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'ghost-card', 'use-watering-can')] });
+    return toAgent(m).rules.length === 0;
+  })());
+  check('an approval gate for a tool that was removed is ignored', (() => {
+    const m = mk({ toolIds: [], approvalToolIds: ['grabber'] });
+    return toAgent(m).requiresApprovalFor.length === 0;
+  })());
+  check('a small helper gets a gentle budget, a bigger one gets more room', (() => {
+    const small = limitsFor(mk({ rules: [rule('r1', 'always', 'skip')] }));
+    const big = limitsFor(mk({
+      rules: [rule('r1', 'always', 'skip'), rule('r2', 'always', 'skip'), rule('r3', 'always', 'skip')],
+    }));
+    return small.maximumSteps < big.maximumSteps;
+  })());
+  check('a chosen limit card overrides the default', (() => {
+    return limitsFor(mk({ limitCardIds: ['stop-3'] })).maximumActions === 3;
+  })());
+
+  // ---- gaps are reported, never enforced ------------------------------
+  check('a helper with no stopping rule still runs', (() => {
+    // It is the helper Forever Fred exists to talk about. Blocking it
+    // would delete the lesson.
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'always', 'use-watering-can')] });
+    return runAgent(toAgent(m), scenarioFor('flowers-healthy')).trace.length > 0;
+  })());
+  check('missing pieces are named as things to try', (() => {
+    const kinds = missionGaps(mk()).map((g) => g.kind);
+    return kinds.includes('noTool') && kinds.includes('noRule');
+  })());
+  check('a rule that can never get a turn is pointed out', (() => {
+    const m = mk({
+      toolIds: ['watering-can'],
+      rules: [rule('catch', 'always', 'use-watering-can'), rule('never', 'is-droopy', 'skip')],
+    });
+    return missionGaps(m).some((g) => g.kind === 'ruleNeverRuns' && g.ruleId === 'never');
+  })());
+  check('every gap is phrased as a question, never as an error', (() => {
+    return Object.values(GAP_PHRASE).every((p) => !/error|invalid|must|cannot|wrong/i.test(p));
+  })());
+
+  // ---- saving ---------------------------------------------------------
+  check('a saved helper survives a round trip', (() => {
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'is-droopy', 'use-watering-can')] });
+    const back = parseMission(JSON.parse(JSON.stringify(m)));
+    return back !== null && back.rules.length === 1 && back.toolIds[0] === 'watering-can';
+  })());
+  check('a corrupted helper is refused rather than half-read', (() => {
+    return parseMission({ id: 'x' }) === null
+      && parseMission(null) === null
+      && parseMission({ id: 'x', goalId: 'not-a-goal' }) === null;
+  })());
+  check('a helper from a newer version is refused, not partly loaded', (() => {
+    // A half-read helper would run with rules the child cannot see.
+    return parseMission({ id: 'x', goalId: 'flowers-healthy', schemaVersion: 99 }) === null;
+  })());
+  check('junk inside a saved helper is dropped, not crashed on', (() => {
+    const back = parseMission({
+      id: 'x', goalId: 'flowers-healthy',
+      toolIds: ['watering-can', 42, null], rules: [{ nonsense: true }, 7],
+    });
+    return back !== null && back.toolIds.length === 1 && back.rules.length === 0;
+  })());
+  check('a new helper starts empty but valid', (() => {
+    const m = newMission('n1', 'sort-recycling', 1);
+    return m.rules.length === 0 && m.toolIds.length === 0 && toAgent(m).goal.id === 'sort-recycling';
+  })());
+
+  // ---- scenarios -------------------------------------------------------
+  check('every goal has a world to be tried in', (() => {
+    return MISSION_GOALS.every((g) => {
+      try { return scenarioFor(g.id).subjects.length > 0; } catch { return false; }
+    });
+  })());
+  check('a test world mixes things that need doing with things that do not', (() => {
+    // A world where everything matches would let "every time, use the
+    // tool" look correct, and teach nothing about checking.
+    const w = scenarioFor('flowers-healthy');
+    return w.subjects.some((s) => s.attributes.includes('droopy'))
+      && w.subjects.some((s) => !s.attributes.includes('droopy'));
+  })());
+  check('running a test never marks the shared scenario', (() => {
+    const before = JSON.stringify(scenarioFor('flowers-healthy'));
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'always', 'use-watering-can')] });
+    runAgent(toAgent(m), scenarioFor('flowers-healthy'));
+    return JSON.stringify(scenarioFor('flowers-healthy')) === before;
+  })());
+  check('every token a scenario uses has a word a child would say', (() => {
+    for (const g of MISSION_GOALS) {
+      for (const s of scenarioFor(g.id).subjects) {
+        if (!SCENARIO_NAMES[s.kind]) return false;
+        for (const a of s.attributes) if (!SCENARIO_NAMES[a]) return false;
+      }
+    }
+    return true;
+  })());
+
+  // ---- Phase 10: GlitchBops ------------------------------------------
+  check('all ten GlitchBops exist', (() => {
+    return GLITCH_BOPS.length === 10;
+  })());
+  check('the four new ones are here', (() => {
+    const ids = GLITCH_BOPS.map((g) => g.id);
+    return ['echo', 'shortcut', 'guessy', 'example-mixer'].every((x) => ids.includes(x as never));
+  })());
+  check('every GlitchBop says what went wrong AND what to try', (() => {
+    return GLITCH_BOPS.every((g) => g.childFacingPhrase.trim().length > 0
+      && g.childFacingFix.trim().length > 0 && g.formalProblem.trim().length > 0);
+  })());
+  check('a GlitchBop describes the plan, never the child', (() => {
+    // §17: friendly explanations of understandable mistakes. Never "you".
+    return GLITCH_BOPS.every((g) => !/\byou\b|\byour\b/i.test(g.childFacingPhrase));
+  })());
+  check('every fix is a direction to look, never the answer', (() => {
+    return GLITCH_BOPS.every((g) => g.childFacingFix.trim().endsWith('?'));
+  })());
+  check('a GlitchBop is detected from a real run, never authored', (() => {
+    // Authored, it would be a cutscene and the child would learn that
+    // Forever Fred is a character rather than a shape their plan can have.
+    const src = readFileSync('src/agents/glitchBops.ts', 'utf8');
+    return /detectGlitchBops/.test(src) && !/levelId|declaredGlitch/.test(src);
+  })());
+  check('running out of budget summons Forever Fred', (() => {
+    const found = detectGlitchBops({ trace: [], stoppedBecause: 'stepLimit' });
+    return found.some((s) => s.bop.id === 'forever-fred');
+  })());
+  check('a rule that never gets a turn summons Shortcut', (() => {
+    const m = mk({
+      toolIds: ['watering-can'],
+      rules: [rule('catch', 'always', 'use-watering-can'), rule('never', 'is-droopy', 'skip')],
+    });
+    const found = detectGlitchBops({ trace: [], mission: m });
+    return found.some((s) => s.bop.id === 'shortcut' && s.ruleId === 'never');
+  })());
+  check('acting on something it could not see summons Guessy', (() => {
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'always', 'use-watering-can')] });
+    const foggy: AgentWorld = {
+      subjects: [{ subjectId: 'f1', kind: 'flower', attributes: ['droopy'], clear: false }],
+    };
+    const r = runAgent(toAgent(m), foggy);
+    return detectGlitchBops({ trace: r.trace }).some((s) => s.bop.id === 'guessy');
+  })());
+  check('a one-sided example set summons Example Mixer', (() => {
+    const oneSided: ExampleSet = {
+      id: 's', labels: ['berry', 'not-berry'],
+      examples: [
+        { id: 'a', inputToken: 'strawberry', labelToken: 'berry', source: 'starter' },
+        { id: 'b', inputToken: 'raspberry', labelToken: 'berry', source: 'starter' },
+      ],
+    };
+    return detectGlitchBops({ trace: [], examples: oneSided })
+      .some((s) => s.bop.id === 'example-mixer');
+  })());
+  check('a run where nothing matched summons Mixy', (() => {
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'is-metal', 'use-watering-can')] });
+    const r = runAgent(toAgent(m), scenarioFor('flowers-healthy'));
+    return detectGlitchBops({ trace: r.trace }).some((s) => s.bop.id === 'mixy');
+  })());
+  check('a clean run summons nobody', (() => {
+    const m = mk({
+      toolIds: ['watering-can'],
+      rules: [rule('r1', 'is-droopy', 'use-watering-can'), rule('r2', 'is-happy', 'skip')],
+    });
+    const r = runAgent(toAgent(m), scenarioFor('flowers-healthy'));
+    return detectGlitchBops({ trace: r.trace, mission: m, stoppedBecause: r.stoppedBecause })
+      .length === 0;
+  })());
+  check('the same GlitchBop never turns up twice in one run', (() => {
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'always', 'use-watering-can')] });
+    const foggy: AgentWorld = {
+      subjects: [
+        { subjectId: 'f1', kind: 'flower', attributes: [], clear: false },
+        { subjectId: 'f2', kind: 'flower', attributes: [], clear: false },
+      ],
+    };
+    const found = detectGlitchBops({ trace: runAgent(toAgent(m), foggy).trace });
+    return new Set(found.map((s) => s.bop.id)).size === found.length;
+  })());
+  check('only one GlitchBop is put in front of a child at a time', (() => {
+    // A run can genuinely have several problems; saying so all at once is
+    // how a child stops reading.
+    const found = detectGlitchBops({ trace: [], stoppedBecause: 'stepLimit' });
+    return headlineGlitch(found) !== null && headlineGlitch([]) === null;
+  })());
+
+  // ---- Phase 12: what a grown-up is told ------------------------------
+  check('choosing a goal is itself evidence', (() => {
+    // §22: deciding what should happen IS the skill on this curriculum.
+    return evidenceForMission(mk()).some((e) => e.requirement === 'agent-goal');
+  })());
+  check('an Ask First checkpoint is recorded', (() => {
+    const m = mk({ toolIds: ['grabber'], approvalToolIds: ['grabber'] });
+    return evidenceForMission(m).some((e) => e.requirement === 'agent-approval');
+  })());
+  check('a confident run evidences nothing about confidence', (() => {
+    // Two rules, so every flower is covered. A ONE-rule helper is
+    // genuinely unsure about the happy flowers it has no rule for, which
+    // is the engine being right — an earlier version of this check used
+    // one rule and failed for that reason.
+    const m = mk({
+      toolIds: ['watering-can'],
+      rules: [rule('r1', 'is-droopy', 'use-watering-can'), rule('r2', 'is-happy', 'skip')],
+    });
+    const r = runAgent(toAgent(m), scenarioFor('flowers-healthy'));
+    return !evidenceForHelperRun(m, r).some((e) => e.requirement === 'agent-confidence');
+  })());
+  check('adding the missing rule is what makes a helper confident', (() => {
+    const one = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'is-droopy', 'use-watering-can')] });
+    const two = mk({
+      toolIds: ['watering-can'],
+      rules: [rule('r1', 'is-droopy', 'use-watering-can'), rule('r2', 'is-happy', 'skip')],
+    });
+    const w = scenarioFor('flowers-healthy');
+    return runAgent(toAgent(one), w).overallConfidence === 'unsure'
+      && runAgent(toAgent(two), w).overallConfidence === 'confident';
+  })());
+  check('seeing a helper be unsure IS evidence', (() => {
+    const m = mk({ toolIds: ['watering-can'], rules: [rule('r1', 'always', 'use-watering-can')] });
+    const foggy: AgentWorld = {
+      subjects: [{ subjectId: 'f1', kind: 'flower', attributes: [], clear: false }],
+    };
+    const r = runAgent(toAgent(m), foggy);
+    return evidenceForHelperRun(m, r).some((e) => e.requirement === 'agent-confidence');
+  })());
+  check('a failed surprise records nothing, and never a deficit', (() => {
+    // §23: never diagnose ability.
+    return evidenceForEdgeCase('a lesson', false).length === 0
+      && evidenceForEdgeCase('A good plan checks first.', true).length === 1;
+  })());
+  check('every helper evidence id is one the curriculum declares', (() => {
+    const declared = new Set(stage('agents').evidenceRequirements.map((r) => r.id));
+    const m = mk({
+      toolIds: ['grabber'], approvalToolIds: ['grabber'], memoryIds: ['done'],
+      rules: [rule('r1', 'always', 'skip')],
+    });
+    return evidenceForMission(m).every((e) => declared.has(e.requirement));
+  })());
+  check('a parent sentence describes what happened, never a score', (() => {
+    const m = mk({
+      toolIds: ['watering-can'], rules: [rule('r1', 'is-droopy', 'use-watering-can')],
+      limitCardIds: ['stop-3'],
+    });
+    const s = parentSentenceForMission(m, runAgent(toAgent(m), scenarioFor('flowers-healthy')));
+    return s.includes('keep the flowers healthy') && !/\d+%|score|rank|better than/i.test(s);
+  })());
+  check('a parent sentence never invents progress', (() => {
+    const s = parentSentenceForMission(mk(), null);
+    return !/reached its goal|still worked/.test(s);
+  })());
+  check('every parent sentence offers something to talk about away from the screen', (() => {
+    const m = mk({ toolIds: ['grabber'], approvalToolIds: ['grabber'] });
+    return offScreenIdeaForMission(m).trim().length > 0;
+  })());
+  check('helper evidence is recorded per helper, so editing does not inflate it', (() => {
+    // The store merges on (levelId, requirement); a helper's id is its
+    // levelId, so saving twice updates rather than stacks.
+    const src = readFileSync('src/app/missionScreen.ts', 'utf8');
+    return /levelId: m\.id/.test(src);
+  })());
+
+  // ---- the builder itself ----------------------------------------------
+  check('there is no free text anywhere in the builder', (() => {
+    // §29's "approved goal, approved tools, approved actions" is true by
+    // construction only if a child cannot type.
+    const src = readFileSync('src/ui/agents/missionBuilder.ts', 'utf8');
+    return !/<input|createElement\('input'|contentEditable|el\('input'/.test(src);
+  })());
+  check('Ask First offers three answers, not two', (() => {
+    // §10: continue, change the plan, cancel. A native confirm gives two.
+    const src = readFileSync('src/ui/dialogs.ts', 'utf8');
+    const at = src.indexOf('export function askFirst');
+    const block = src.slice(at, at + 2200);
+    return /'approved'/.test(block) && /'changed'/.test(block) && /'cancelled'/.test(block);
+  })());
+  check('the builder never blocks the tab with a native prompt', (() => {
+    const src = readFileSync('src/ui/agents/missionBuilder.ts', 'utf8');
+    return !/window\.confirm|window\.prompt|window\.alert/.test(src);
+  })());
+  check('a run cannot ask a child an unbounded number of questions', (() => {
+    const src = readFileSync('src/ui/agents/missionBuilder.ts', 'utf8');
+    return /MAX_APPROVAL_ASKS/.test(src);
+  })());
+  check('BopLens keeps every line as text, not as animation', (() => {
+    // §4: essential reasoning must not hide inside an animation.
+    const src = readFileSync('src/ui/agents/bopLensPanel.ts', 'utf8');
+    return /iSaw/.test(src) && /iRemembered/.test(src)
+      && /iChose/.test(src) && /thisHappened/.test(src);
+  })());
+  check('the confidence face is hidden from screen readers, the word is not', (() => {
+    const src = readFileSync('src/ui/agents/bopLensPanel.ts', 'utf8');
+    return /face\.setAttribute\('aria-hidden', 'true'\)/.test(src);
+  })());
+  check('selected cards are marked by more than colour', (() => {
+    // §30 and the app's own a11y rule: never colour alone.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return css.includes(".mb-card.on::after") && /aria-pressed/.test(
+      readFileSync('src/ui/agents/missionBuilder.ts', 'utf8'));
+  })());
+  check('every builder control clears the tap floor', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    // Brace-anchored: plain '.mb-rule' also matches '.mb-rules {', which
+    // is a flex column with no min-height, and the check failed on the
+    // wrong block. Same trap as an earlier '.sel2-strip' check.
+    for (const sel of ['.helpers-goal, .mb-card {', '.mb-tab {', '.helper-open {', '.mb-rule {']) {
+      const at = css.indexOf(sel);
+      if (at < 0) return false;
+      const block = css.slice(at, css.indexOf('}', at));
+      if (!/min-height:\s*var\(--tap-(min|floor)\)/.test(block)) return false;
+    }
+    return true;
+  })());
+  check('high contrast and reduced motion reach the builder', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    return css.includes('body.high-contrast .mb-card')
+      && /@media \(prefers-reduced-motion: reduce\) \{\s*\.mb-card/.test(css);
+  })());
+  check('every CSS variable the styles use is actually defined', (() => {
+    // I invented --panel and --panel-hi while building the Mission
+    // Builder. Neither existed, so every surface in it rendered
+    // transparent and the page showed through the BopLens panel.
+    const tokens = readFileSync('src/styles/tokens.css', 'utf8');
+    const defined = new Set(
+      [...tokens.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]),
+    );
+    // Properties the app sets on an element at runtime are defined too,
+    // just not in a stylesheet — `--i`, `--cols`, `--deck-h` and friends.
+    const scanned = ['src/app', 'src/ui', 'src/rendering'];
+    const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`)
+        : e.name.endsWith('.ts') ? [`${dir}/${e.name}`] : []));
+    for (const f of scanned.flatMap(walk)) {
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/(?:setProperty\(|style=")\s*['"`]?\s*(--[a-z0-9-]+)/gi)) {
+        defined.add(m[1]);
+      }
+    }
+
+    const files = ['src/styles/main.css', 'src/styles/components.css'];
+    const missing = new Set<string>();
+    for (const f of files) {
+      const css = readFileSync(f, 'utf8');
+      // Locally-defined variables count too — a file may declare its own.
+      // Any position, not just line start: `.th-meadow { --isle: … }`
+      // declares a token on the same line as its selector.
+      for (const m of css.matchAll(/(--[a-z0-9-]+)\s*:/gi)) defined.add(m[1]);
+      // Only references with NO fallback. `var(--deck-h, 190px)` is safe
+      // by construction; `var(--panel)` renders as nothing at all, which
+      // is the bug this check exists for.
+      for (const m of css.matchAll(/var\((--[a-z0-9-]+)\s*([,)])/g)) {
+        if (m[2] === ')' && !defined.has(m[1])) missing.add(m[1]);
+      }
+    }
+    // Re-scan once, since a later file may define what an earlier one used.
+    for (const f of files) {
+      const css = readFileSync(f, 'utf8');
+      for (const m of css.matchAll(/var\((--[a-z0-9-]+)/g)) {
+        if (defined.has(m[1])) missing.delete(m[1]);
+      }
+    }
+    if (missing.size > 0) console.log('    undefined tokens:', [...missing].join(', '));
+    return missing.size === 0;
+  })());
+  check('the BopLens panel is sized against the visible viewport', (() => {
+    // A percentage max-height inside the scrolling builder resolved
+    // against the scroll height, so the panel ran off the screen.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const at = css.indexOf('.lens-panel {');
+    const block = css.slice(at, css.indexOf('}', at));
+    return /max-height:\s*[0-9]+dvh/.test(block) && /position:\s*fixed/.test(block);
+  })());
+  check('helpers are reachable from the level picker', (() => {
+    const src = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+    return /onHelpers/.test(src) && /'My Helpers'/.test(src);
+  })());
+  check('the helper library is local, with no upload path', (() => {
+    // Comments stripped first: the file's own header says "there is no
+    // upload path in this file", which an earlier version of this check
+    // read as an upload path.
+    const src = readFileSync('src/storage/missionStore.ts', 'utf8')
+      .replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    return !/fetch\(|XMLHttpRequest|upload/i.test(src);
+  })());
+  check('a full storage quota does not lose the helper on screen', (() => {
+    const src = readFileSync('src/storage/missionStore.ts', 'utf8');
+    return /return false;/.test(src) && /catch/.test(src);
+  })());
+  check('the library is capped, and drops the oldest not the newest', (() => {
+    const src = readFileSync('src/storage/missionStore.ts', 'utf8');
+    return /MAX_HELPERS/.test(src) && /sort\(\(a, b\) => b\.updatedAt - a\.updatedAt\)/.test(src);
   })());
 }
 

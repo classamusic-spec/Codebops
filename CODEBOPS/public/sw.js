@@ -83,23 +83,36 @@ self.addEventListener('fetch', (event) => {
           void caches.open(SHELL).then((c) => c.put('./index.html', copy));
           return res;
         })
-        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./'))),
+        .catch(() => caches.match('./index.html', { ignoreVary: true })
+          .then((r) => r || caches.match('./', { ignoreVary: true }))),
     );
     return;
   }
 
-  // Everything else: cache first, then network, then remember it.
+  // Everything else: cache first, then network, then the cache again on
+  // relaxed terms.
+  //
+  // That last step is not belt-and-braces, it is a real fix. `caches.match`
+  // honours `Vary`, so a response stored when the server said
+  // `Vary: Accept-Encoding` can fail to match a later request whose
+  // encoding differs — and then the network attempt fails too, offline,
+  // and the whole promise rejects as ERR_FAILED with nothing in the
+  // console. Measured: the main bundle, present in the cache and served by
+  // an activated worker, failed to load on roughly one offline start in
+  // three. Retrying with ignoreVary turns that into a hit.
   event.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      // Only store real, complete responses. An opaque or partial
-      // response cached here would be served forever and could not be
-      // told apart from a good one.
-      if (res.ok && res.type === 'basic') {
-        const copy = res.clone();
-        void caches.open(RUNTIME).then((c) => c.put(req, copy));
-      }
-      return res;
-    })),
+    caches.match(req)
+      .then((hit) => hit || fetch(req).then((res) => {
+        // Only store real, complete responses. An opaque or partial
+        // response cached here would be served forever and could not be
+        // told apart from a good one.
+        if (res.ok && res.type === 'basic') {
+          const copy = res.clone();
+          void caches.open(RUNTIME).then((c) => c.put(req, copy));
+        }
+        return res;
+      }).catch(() => caches.match(req, { ignoreVary: true, ignoreSearch: true })))
+      .then((res) => res || Response.error()),
   );
 });
 

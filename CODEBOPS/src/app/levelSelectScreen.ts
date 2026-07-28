@@ -97,6 +97,7 @@ export interface LevelSelectEvents {
   readonly onGearworksTrophy: () => void;
   readonly onAppLab: () => void;
   readonly onGarden: () => void;
+  readonly onHelpers: () => void;
   readonly onEditor: () => void;
   readonly onCustom: (level: LevelDef) => void;
   readonly onDeleteCustom: (id: string) => void;
@@ -661,6 +662,34 @@ export class LevelSelectScreen {
         note: 'Six workbenches',
         state: 'open',
         onPlay: () => this.events.onAppLab(),
+      }],
+    });
+
+    // ---- My Helpers (Agent Mission Builder) ----
+    //
+    // Its own island rather than a stone inside Agent Academy: §20 lists
+    // the Mission Builder alongside the App Lab and Gearworks as a place
+    // where a child MAKES something, and a made thing that lives inside
+    // the level that taught it reads as an exercise.
+    worlds.push({
+      id: 'helpers',
+      name: 'My Helpers',
+      emoji: '🤖',
+      theme: 'academy',
+      unlocked: true,
+      starsEarned: 0,
+      tagline: 'Teach a Bop to help.',
+      isNew: true,
+      stones: [{
+        key: 'helpers',
+        label: 'Teach a Helper',
+        emoji: '🎓',
+        badge: '★',
+        stars: 0,
+        showStars: false,
+        note: 'Goal, tools, rules',
+        state: 'open',
+        onPlay: () => this.events.onHelpers(),
       }],
     });
 

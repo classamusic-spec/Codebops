@@ -21,6 +21,58 @@ function closeDialog(node: HTMLElement, previousFocus: Element | null): void {
   if (previousFocus instanceof HTMLElement) previousFocus.focus();
 }
 
+/* ---------------- Ask First (§10) ---------------- */
+
+/**
+ * The approval card.
+ *
+ * Three answers, not two, because §10 says so and because the third one
+ * is the interesting one: a child who can say "do it differently" is
+ * directing, while a child who can only say yes or no is being consulted.
+ *
+ * Deliberately NOT `window.confirm`. That gives two buttons, unstyled
+ * text at the top of the screen, and a wall of native chrome a
+ * four-year-old cannot read — and it blocks the whole tab while it is up.
+ */
+export function askFirst(
+  parent: HTMLElement,
+  prompt: string,
+  sfx: Sfx,
+): Promise<'approved' | 'changed' | 'cancelled'> {
+  return new Promise((resolve) => {
+    const previousFocus = document.activeElement;
+    const s = scrim(parent);
+    const d = el('div', 'dialog ask-first', s);
+    d.setAttribute('role', 'dialog');
+    d.setAttribute('aria-modal', 'true');
+    d.setAttribute('aria-label', prompt);
+    const face = el('div', 'intro-emoji', d, '\u{1F64B}');
+    face.setAttribute('aria-hidden', 'true');
+    el('h2', undefined, d, 'Shall I?');
+    el('p', undefined, d, prompt);
+
+    const row = el('div', 'dialog-actions', d);
+    const answer = (
+      label: string, value: 'approved' | 'changed' | 'cancelled', className: string,
+    ): HTMLButtonElement => {
+      const b = el('button', `mini-btn ${className}`, row, label) as HTMLButtonElement;
+      b.type = 'button';
+      b.addEventListener('click', () => {
+        sfx.play('tap');
+        closeDialog(s, previousFocus);
+        resolve(value);
+      });
+      return b;
+    };
+    // "Yes" first and focused: it is the common answer, and a child
+    // reaching for the biggest button should not be cancelling by default.
+    const yes = answer('\u2705 Yes please', 'approved', 'green');
+    answer('\u23ED\uFE0F Skip this one', 'changed', 'purple');
+    answer('\u270B Stop', 'cancelled', 'orange');
+    yes.focus();
+  });
+}
+
 /* ---------------- Level brief ---------------- */
 
 export function showBrief(

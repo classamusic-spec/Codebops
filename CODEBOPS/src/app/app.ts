@@ -12,6 +12,7 @@ import { sharedMusic, attachFirstGesture } from '../audio/music';
 import { sharedHaptics } from '../audio/haptics';
 import { resetFrames, resetJitter } from '../engine/testMode';
 import { GardenScreen } from './gardenScreen';
+import { MissionScreen } from './missionScreen';
 import { EditorScreen } from './editorScreen';
 import { GearworksScreen } from './gearworksScreen';
 import { GearworksChainScreen } from './gearworksChainScreen';
@@ -59,6 +60,7 @@ export class App {
   private readonly host: HTMLElement;
   private gameScreen: GameScreen | null = null;
   private garden: GardenScreen | null = null;
+  private helpers: MissionScreen | null = null;
   private trophy: GearworksTrophyScreen | null = null;
   private journey: JourneyScreen | null = null;
   private select: LevelSelectScreen | null = null;
@@ -121,6 +123,8 @@ export class App {
     this.gameScreen = null;
     this.garden?.dispose();
     this.garden = null;
+    this.helpers?.dispose();
+    this.helpers = null;
     this.trophy?.dispose();
     this.trophy = null;
     this.journey?.dispose();
@@ -258,6 +262,7 @@ export class App {
       onGearworksTrophy: () => { sharedSfx.play('bop'); this.showGearworksTrophy(); },
       onAppLab: () => { sharedSfx.play('bop'); this.showAppLab(); },
       onGarden: () => this.showGarden(),
+      onHelpers: () => this.showHelpers(),
       onEditor: () => this.showEditor(),
       onCustom: (custom) => this.showCustomGame(custom),
       onDeleteCustom: (id) => { deleteCustomLevel(id); this.showSelect(); },
@@ -435,6 +440,22 @@ export class App {
       onBack: () => this.showTitle(),
     });
     this.garden.enter();
+  }
+
+  // ---------- helpers (Agent Mission Builder) ----------
+
+  private showHelpers(): void {
+    this.clearHost();
+    // A fresh store, like the garden and the journey: the builder writes
+    // evidence, and coming back to a stale copy would show a child their
+    // own helper missing from the map.
+    this.store = new SaveStore();
+    const screen = el('section', 'screen', this.host);
+    screen.id = 'screen-helpers';
+    this.helpers = new MissionScreen(screen, this.store, {
+      onBack: () => this.showSelect(),
+    });
+    this.helpers.enter();
   }
 
   // ---------- editor ----------

@@ -4541,3 +4541,169 @@ button.stars-pill:active { transform: translateY(3px); }
   font-size: var(--fs-fluid-sm);
 }
 @media (prefers-reduced-motion: reduce) { .replay-chip.suspect { animation: none; } }
+
+/* ==========================================================
+   Agent Mission Builder + BopLens  (Intelligent Systems §15, §19)
+   ========================================================== */
+
+.helpers-screen { overflow-y: auto; padding-bottom: var(--sp-8); }
+.helpers-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4); }
+.helpers-title { font-family: var(--font-display); font-size: var(--fs-fluid-xl); color: #fff; margin: 0; }
+.helpers-lead { text-align: center; color: var(--cream); font-size: var(--fs-fluid-md); margin: 0 0 var(--sp-4); }
+.helpers-sub { color: #fff; font-size: var(--fs-fluid-lg); text-align: center; margin: var(--sp-6) 0 var(--sp-3); }
+.helpers-empty { color: var(--cream); text-align: center; opacity: .85; padding: var(--sp-5); }
+
+.helpers-list { display: flex; flex-direction: column; gap: var(--sp-3); padding: 0 var(--sp-4); }
+.helper-card { display: flex; align-items: center; gap: var(--sp-2); }
+.helper-open {
+  flex: 1; display: flex; align-items: center; gap: var(--sp-4);
+  min-height: var(--tap-min); padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg); border: 3px solid rgba(255,255,255,.35);
+  background: var(--ink-700); color: #fff; text-align: left; cursor: pointer;
+}
+.helper-ico { font-size: var(--fs-2xl); }
+.helper-text { display: flex; flex-direction: column; gap: 2px; }
+.helper-sub { font-size: var(--fs-xs); opacity: .8; }
+.helper-badge { font-size: var(--fs-3xs); color: var(--green); }
+
+.helpers-goals, .mb-grid {
+  display: grid; gap: var(--sp-3); padding: 0 var(--sp-4);
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.mb-grid.small { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+.helpers-goal, .mb-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--sp-2); min-height: var(--tap-min); padding: var(--sp-4) var(--sp-3);
+  border-radius: var(--r-lg); border: 3px solid rgba(255,255,255,.3);
+  background: var(--ink-700); color: #fff; cursor: pointer; text-align: center;
+  font-size: var(--fs-sm); line-height: 1.25;
+}
+.helpers-goal-ico, .mb-card-ico { font-size: var(--fs-2xl); }
+/* Selected state carries a border, a tint AND a tick — never colour alone. */
+.mb-card.on, .helpers-goal:focus-visible { border-color: var(--green); background: var(--ink-500); }
+.mb-card.on::after { content: '✓'; position: absolute; }
+.mb-card { position: relative; }
+.mb-card.on .mb-card-text { font-weight: 800; }
+.mb-card.locked { opacity: .75; cursor: default; border-color: var(--yellow); }
+.mb-ask-flag { font-size: var(--fs-3xs); color: var(--yellow); }
+
+.mb-root { display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+.mb-head { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4); }
+.mb-title { font-family: var(--font-display); font-size: var(--fs-fluid-lg); color: #fff; margin: 0; }
+.mb-tabs {
+  display: flex; gap: var(--sp-2); overflow-x: auto; padding: 0 var(--sp-4) var(--sp-3);
+  scrollbar-width: none;
+}
+.mb-tabs::-webkit-scrollbar { display: none; }
+.mb-tab {
+  display: flex; align-items: center; gap: var(--sp-2); flex: 0 0 auto;
+  min-height: var(--tap-floor); padding: var(--sp-2) var(--sp-4);
+  border-radius: 999px; border: 3px solid rgba(255,255,255,.28);
+  background: var(--ink-700); color: #fff; cursor: pointer; font-size: var(--fs-sm);
+}
+.mb-tab.on { border-color: var(--yellow); background: var(--ink-500); font-weight: 800; }
+.mb-tab.done .mb-tab-text::after { content: ' ✓'; color: var(--green); }
+.mb-body { flex: 1; padding-bottom: var(--sp-6); }
+.mb-lead { text-align: center; color: var(--cream); font-size: var(--fs-fluid-md); margin: 0 0 var(--sp-4); }
+.mb-sub { color: #fff; text-align: center; margin: var(--sp-5) 0 var(--sp-2); }
+.mb-note { text-align: center; color: var(--cream); opacity: .85; padding: var(--sp-4); }
+
+.mb-rules { display: flex; flex-direction: column; gap: var(--sp-2); padding: 0 var(--sp-4); }
+.mb-rule {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  min-height: var(--tap-floor); padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md); background: var(--ink-700); color: #fff;
+  border: 3px solid rgba(255,255,255,.25);
+}
+.mb-rule.off { opacity: .5; }
+.mb-rule-n { font-weight: 800; color: var(--yellow); min-width: 1.5em; }
+.mb-rule-arrow { color: var(--yellow); }
+.mb-maker { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@media (min-width: 820px) { .mb-maker { grid-template-columns: 1fr 1fr; } }
+.mb-half h4 { color: #fff; text-align: center; margin: 0 0 var(--sp-2); }
+
+.mb-gaps {
+  margin: var(--sp-5) var(--sp-4) 0; padding: var(--sp-4);
+  border-radius: var(--r-lg); background: rgba(255,255,255,.08);
+  border: 3px dashed rgba(255,255,255,.3);
+}
+.mb-gaps-title { color: var(--yellow); margin: 0 0 var(--sp-2); font-size: var(--fs-md); }
+.mb-gap { color: var(--cream); margin: 0 0 var(--sp-1); font-size: var(--fs-sm); }
+
+.mb-test-buttons { display: flex; gap: var(--sp-3); justify-content: center; flex-wrap: wrap; padding: 0 var(--sp-4); }
+.mb-result { padding: var(--sp-4); display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); }
+.mb-summary { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; justify-content: center; }
+.mb-face { font-size: var(--fs-3xl); }
+.mb-conf { color: #fff; font-weight: 800; font-size: var(--fs-lg); }
+.mb-stop, .mb-count { color: var(--cream); margin: 0; text-align: center; }
+.mb-glitch {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-4); border-radius: var(--r-lg);
+  background: var(--ink-700); border: 3px solid var(--yellow); color: #fff; text-align: center;
+}
+.mb-glitch-ico { font-size: var(--fs-3xl); }
+.mb-glitch-say { margin: 0; }
+.mb-glitch-fix { margin: 0; color: var(--yellow); font-weight: 700; }
+
+/* ---- BopLens ---- */
+/* Fixed, not absolute: a percentage max-height inside the scrolling
+   builder resolved against the SCROLL height, so the panel grew past the
+   bottom of the screen and the page showed through it. dvh is the
+   visible viewport, which is what "most of the screen" has to mean. */
+.lens-panel {
+  position: fixed; left: var(--sp-4); right: var(--sp-4);
+  bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
+  max-height: 70dvh; overflow-y: auto; z-index: var(--z-modal);
+  padding: var(--sp-4); border-radius: var(--r-xl);
+  background: var(--ink-800); border: 4px solid var(--yellow); color: #fff;
+  box-shadow: var(--pop-6) rgba(0,0,0,.45);
+}
+.lens-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.lens-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-fluid-lg); }
+.lens-list { display: flex; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-3); }
+.lens-card { padding: var(--sp-3); border-radius: var(--r-lg); background: rgba(255,255,255,.08); }
+.lens-card-top { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.lens-step {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.9em; min-height: 1.9em; border-radius: 999px;
+  background: var(--yellow); color: var(--ink-900); font-weight: 800;
+}
+.lens-face { font-size: var(--fs-xl); }
+.lens-conf { font-weight: 800; }
+.conf-confident { color: var(--green); }
+.conf-maybe { color: var(--yellow); }
+.conf-unsure { color: var(--orange); }
+.lens-row { display: grid; grid-template-columns: 1.6em 8.5em 1fr; gap: var(--sp-2); align-items: baseline; padding: 2px 0; }
+.lens-label { color: var(--yellow); font-size: var(--fs-xs); font-weight: 700; }
+.lens-text { font-size: var(--fs-sm); }
+.lens-more { margin-top: var(--sp-2); }
+.lens-more summary { cursor: pointer; color: var(--cream); min-height: var(--tap-floor); display: flex; align-items: center; }
+.lens-detail { display: grid; grid-template-columns: 10em 1fr; gap: var(--sp-2); font-size: var(--fs-xs); padding: 2px 0; }
+.lens-detail-label { color: var(--cream); opacity: .85; }
+.lens-empty { color: var(--cream); text-align: center; }
+
+@media (max-width: 620px) {
+  .lens-row { grid-template-columns: 1.6em 1fr; }
+  .lens-label { grid-column: 2; }
+  .lens-text { grid-column: 2; }
+  .lens-detail { grid-template-columns: 1fr; }
+}
+
+/* Ask First — three answers, big enough to hit in a hurry. */
+.dialog.ask-first .dialog-actions { flex-wrap: wrap; gap: var(--sp-3); }
+.dialog.ask-first .mini-btn { min-height: var(--tap-min); }
+
+/* Accessibility modes (§13). Contrast and calm reach the builder too. */
+body.high-contrast .mb-card,
+body.high-contrast .mb-tab,
+body.high-contrast .helper-open,
+body.high-contrast .helpers-goal,
+body.high-contrast .lens-panel { border-color: #fff; }
+body.high-contrast .mb-gap,
+body.high-contrast .lens-detail-label,
+body.high-contrast .helpers-lead { color: #fff; opacity: 1; }
+body.calm-mode .mb-glitch { border-style: solid; }
+@media (prefers-reduced-motion: reduce) {
+  .mb-card, .mb-tab, .helper-open { transition: none; }
+}
