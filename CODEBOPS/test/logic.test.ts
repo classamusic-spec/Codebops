@@ -5996,12 +5996,14 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     return /stroke="currentColor"/.test(block) && /<circle/.test(block);
   })());
 
-  check('the board frame does not have to contain the whole off-board perch', (() => {
-    // Framing both of her outer edges made her the binding constraint, so
-    // the board came back small with a lap of empty meadow around it.
+  check('the friend beside the board is framed whole, not cut in half', (() => {
+    // This went back and forth twice. Framing only her inner edge made the
+    // board big and cut her in half at the right edge of a phone — and the
+    // goal card says "bring the fruit to our friend", so a puzzle with the
+    // friend off screen is missing its point. Both edges again; the
+    // portrait tilt is what pays for it.
     const src = readFileSync('src/app/gameScreen.ts', 'utf8');
-    return /const inner = perch\.x > center\.x/.test(src)
-      && !/for \(const dx of \[-HALF_W, HALF_W\]\)/.test(src);
+    return /for \(const dx of \[-HALF_W, HALF_W\]\)/.test(src);
   })());
   check('the camera tilts to suit the shape of the screen', (() => {
     // A grid is wider than it is deep, so on a tall phone the fit is
@@ -6086,12 +6088,30 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
       && /overlap \/ band/.test(src);
   })());
 
-  check('command tiles are flat enough to sit flush in the bar', (() => {
+  check('command tiles are flat — no ledge, no gloss, no sheen', (() => {
+    // Five depth effects at once (gradient face, gloss cap, sweeping
+    // sheen, inset highlight and shade, coloured ledge) gave every tile a
+    // visible top, side and bottom, so a row read as blocks wedged into
+    // the bar rather than buttons sitting on it.
     const css = readFileSync('src/styles/main.css', 'utf8');
-    const at = css.indexOf('.tile {');
-    const block = css.slice(at, css.indexOf('}', at));
-    const m = /box-shadow:\s*0 (\d+)px 0/.exec(block);
-    return !!m && Number(m[1]) <= 2;
+    const flat = css.slice(css.indexOf('Flat command tiles'));
+    return /box-shadow:\s*none/.test(flat)
+      && /background-image:\s*none/.test(flat)
+      && /\.tile::before, \.tile \.sheen \{ display: none; \}/.test(flat);
+  })());
+  check('a flat tile still answers a press', (() => {
+    // Flat must not mean dead. It dips and dims instead of un-embossing.
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const flat = css.slice(css.indexOf('Flat command tiles'));
+    const at = flat.indexOf('.tile:active {');
+    const block = flat.slice(at, flat.indexOf('}', at));
+    return /translateY/.test(block) && /brightness/.test(block);
+  })());
+  check('every command family has a flat colour, so none renders grey', (() => {
+    const css = readFileSync('src/styles/main.css', 'utf8');
+    const flat = css.slice(css.indexOf('Flat command tiles'));
+    return ['moveUp', 'moveLeft', 'grab', 'drop', 'repeat', 'ifFlower']
+      .every((c) => new RegExp(`data-cmd="${c}"[^{]*\\{[^}]*background-color`).test(flat));
   })());
   check('a tile label never breaks in the middle of a word', (() => {
     // "DROP" was rendering as "DR OP".

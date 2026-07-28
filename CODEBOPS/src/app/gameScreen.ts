@@ -195,10 +195,20 @@ export class GameScreen {
       // inner edge went too far the other way and pushed her off the
       // canvas entirely. Her middle is the honest promise: she is on
       // screen and recognisable, and at most an outer shoulder is clipped.
-      const inner = perch.x > center.x ? -HALF_W : HALF_W;
-      framePts.push(perch.clone());
-      framePts.push(perch.clone().setY(SHOULDER_Y));
-      framePts.push(perch.clone().setX(perch.x + inner).setY(SHOULDER_Y));
+      // Both edges, so she is WHOLE.
+      //
+      // This went back and forth: framing both edges made her the binding
+      // constraint and left the board small; framing only her centre and
+      // inner shoulder made the board big but cut her in half at the right
+      // edge on a phone, and she is the friend the goal card is about —
+      // "bring the fruit to our friend" with the friend off screen is a
+      // puzzle missing its point. Her whole silhouette is back in the
+      // frame; the steeper portrait tilt is what pays for it now, so the
+      // board keeps most of the size it gained.
+      for (const dx of [-HALF_W, HALF_W]) {
+        framePts.push(perch.clone().setX(perch.x + dx));
+        framePts.push(perch.clone().setX(perch.x + dx).setY(SHOULDER_Y));
+      }
       // Head room for a bop standing on the back row is NOT declared here.
       // A point two units above the furthest row projects near the top of
       // the screen, so asking the fit to contain it dollies the camera

@@ -4751,3 +4751,49 @@ body.calm-mode .mb-glitch { border-style: solid; }
 @media (prefers-reduced-motion: reduce) {
   .mb-card, .mb-tab, .helper-open { transition: none; }
 }
+
+/* ==========================================================
+   Flat command tiles
+   ==========================================================
+   The tiles carried five separate depth effects at once: a radial
+   gradient face, a gloss cap, a sweeping sheen, inset highlight and
+   shade, and a coloured ledge underneath. Individually each is subtle;
+   together they gave every tile a visible top, side and bottom, so a
+   row of them read as a stack of blocks wedged into the bar rather
+   than as a set of buttons sitting on it.
+
+   Flat now: one solid colour per family, no gloss, no sheen, no inset,
+   no ledge. Pressing still gives feedback — the tile dips and dims —
+   but at rest they sit clean and flush. The colours are the MID stop of
+   each old gradient, so nothing changes hue, it just stops shading. */
+.tile {
+  border: 0;
+  box-shadow: none;
+  background-image: none;
+}
+.tile::before, .tile .sheen { display: none; }
+.tile .ico { filter: none; }
+.cmd-ico { filter: none; }
+
+.tile[data-cmd="moveUp"], .tile[data-cmd="moveDown"], .tile[data-cmd="move"] { background-color: #37a2f2; }
+.tile[data-cmd="moveLeft"], .tile[data-cmd="moveRight"] { background-color: #2fd2ab; }
+.tile[data-cmd="grab"] { background-color: #ffa42f; }
+.tile[data-cmd="drop"] { background-color: #a877f5; }
+.tile[data-cmd="repeat"], .tile[data-cmd="repeatUntil"] { background-color: #a06bf5; }
+.tile[data-cmd="turnLeft"], .tile[data-cmd="turnRight"] { background-color: #ffa42f; }
+.tile[data-cmd="swap"] { background-color: #ffbf3f; }
+.tile[data-cmd="ifFlower"] { background-color: #ff7fb8; }
+.tile[data-cmd="ifMushroom"] { background-color: #b075f2; }
+/* Gearworks and the other benches name their own commands; anything not
+   listed above keeps whatever colour its own rule set, flattened. */
+
+/* Feedback without depth: dip and dim. */
+.tile:active {
+  transform: translateY(2px) scale(.96);
+  box-shadow: none;
+  filter: brightness(.9);
+}
+.slot .tile { box-shadow: none; }
+
+/* The label sat on a shaded face; on a flat one it needs its own weight. */
+.tile .lbl { opacity: 1; text-shadow: 0 1px 1px rgba(13, 20, 55, .28); }

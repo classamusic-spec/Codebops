@@ -359,6 +359,11 @@ export class Stage {
     //  0.55 (tall phone)    58 deg — steep. A grid is wider than it is
     //                       deep, so a shallow view fills the width and
     //                       leaves half the screen as empty meadow.
+    //                       Tried 66 to claw back the size the friend
+    //                       costs the frame; measured, the board came out
+    //                       20px SHORTER — past about 60 the scene goes
+    //                       flat-on and the depth stops projecting as
+    //                       height at all. 58 is the useful maximum.
     //  1.40 (tablet)        38 deg — the storybook three-quarter view.
     //  2.10 (phone on its   31 deg — shallow. A 390px-tall landscape
     //       side)           screen is height-limited, so flattening the
