@@ -76,6 +76,8 @@ export class Stage {
    * doing nothing but the lean.
    */
   private static readonly VIEW_DIR = new THREE.Vector3(0, 0.62, 0.782).normalize();
+  /** How far left the whole scene sits, as a fraction of half the view. */
+  private static readonly SCENE_NUDGE_X = 0.05;
   /** Active view direction (defaults to VIEW_DIR; presets may override). */
   private viewDir: THREE.Vector3;
   /** True when a preset pinned the view — then aspect must not move it. */
@@ -479,7 +481,19 @@ export class Stage {
     this.fitY = Math.max(0.25, (h - top - bottom) / h);
     // NDC is +x right and +y UP, so a tall deck at the bottom pushes the
     // free area's middle upward.
-    this.centerX = (left - right) / w;
+    // Plus a small nudge LEFT.
+    //
+    // Nothing clever: the composition just sits better a touch off the
+    // middle. `centerX` is where the picture is aimed AND what the fit
+    // measures against, so moving it moves the whole scene together —
+    // the board, the friend and the scenery — without re-framing or
+    // resizing anything.
+    //
+    // NDC is +x right, so a negative delta slides the scene left. 0.05 is
+    // 5% of a half-width, which is about 10px on a phone and 25 on a
+    // tablet: visible, and nowhere near enough to push anything off the
+    // edge that the fit has already promised to keep on it.
+    this.centerX = (left - right) / w - Stage.SCENE_NUDGE_X;
     this.centerY = (bottom - top) / h;
     const offX = Math.round((right - left) / 2);
     const offY = Math.round((bottom - top) / 2);
