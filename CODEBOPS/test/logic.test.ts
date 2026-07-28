@@ -17,6 +17,42 @@ import {
 import {
   AGENT_ACADEMY_1, AGENT_ACADEMY_2, AGENT_ACADEMY_3, AGENT_ACADEMY_DEBUG, AGENT_ACADEMY_CREATIVE,
 } from '../src/data/levels/agentAcademy';
+import type {
+  AgentDefinition, AgentToolDefinition, AgentMemoryDefinition, AgentObservation,
+  AgentRuleDefinition, AgentCondition,
+} from '../src/agents/types';
+import { runAgent } from '../src/agents/engine';
+import type { AgentWorld } from '../src/agents/engine';
+// Aliased: `evaluateCondition` is also exported by the App Lab runtime,
+// and esbuild silently let the second import win — which is how this
+// file's checks quietly started calling the wrong function.
+import { evaluateCondition as evalAgentCondition, shadowedRules } from '../src/agents/rules';
+import {
+  initialMemory, remember, forget, count, carryOver,
+} from '../src/agents/memory';
+import {
+  DEFAULT_LIMITS, BEGINNER_LIMITS, withDefaults, SAFE_STOP_PHRASE, isSuccessfulStop,
+} from '../src/agents/limits';
+import {
+  assessConfidence, weakest, actionsFor, CONFIDENCE_PHRASE, CONFIDENCE_LABEL,
+} from '../src/agents/confidence';
+import {
+  classify, inspectExamples, addExample, correctExample, describeProblem,
+} from '../src/agents/examples';
+import type { ExampleSet } from '../src/agents/examples';
+import { isSuccessfulOutcome } from '../src/agents/approval';
+import { EDGE_CASES, edgeCase, applyPatches, pickEdgeCase, appliesTo } from '../src/agents/edgeCases';
+import {
+  evaluateSolution, compareSolutions, TRAIT_PHRASE, TRAIT_STRENGTH, TRADEOFF_CARDS,
+} from '../src/agents/evaluate';
+import { toLensCard, toTrailRows } from '../src/agents/trace';
+import { WORLDS, trailWorlds } from '../src/data/worlds';
+import { LEARNING_LAYERS, layerOfStage } from '../src/data/curriculum/layers';
+import {
+  AGENT_CONCEPTS, AGENT_PROGRESSION, agentProgressionFor, agentConceptsAvailableBy,
+} from '../src/data/curriculum/agentProgression';
+import { TRANSFER_CHALLENGES, transferFor } from '../src/data/curriculum/transfer';
+import { validateAlignment, stagesWithoutTransfer } from '../src/data/curriculum/validate';
 import { assertLevelValid } from '../src/data/schemas/level';
 import { levelHints, benchHints } from '../src/gameplay/hints';
 import { ALL_LEVELS } from '../src/data/levels/index';
@@ -94,7 +130,7 @@ import {
   GW_TWO_MACHINE, GW_FIRST_SIGNAL, GW_RELAY_RACE, GEARWORKS_SIGNAL_LEVELS, validateSignalLevel, signalStars,
   signalFullSolution, signalLoopSolution, signalOneSolution, signalEncoreSolution,
 } from '../src/data/gearworks/levels';
-import { runJam, jamGoalMet, jamBugIndex } from '../src/gameplay/gearworks/jamMachine';
+import { jamBugIndex } from '../src/gameplay/gearworks/jamMachine';
 import {
   GW_BROKEN_MACHINE, GEARWORKS_DEBUG_LEVELS, validateDebugLevel, debugBugIndex,
 } from '../src/data/gearworks/levels';
@@ -197,7 +233,8 @@ import { thumbnailFor, thumbnailSummary } from '../src/creator/miniAppThumbnail'
 import {
   factsFor, evidenceForCreation, parentSentenceFor, offScreenIdeaFor,
 } from '../src/creator/miniAppEvidence';
-import { stage, isStageId, CURRICULUM_STAGES } from '../src/data/curriculum/stages';
+import { isStageId } from '../src/data/curriculum/stages';
+import type { TriggerCause } from '../src/creator/miniAppRuntime';
 // ---- App Lab Phase 13 ----
 import {
   CREATOR_REWARDS, creatorReward, makerRecord, earnedRewards, newlyEarned,
@@ -1260,7 +1297,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
   check('a row loop of 2 on a 3-wide banner leaves the last column blank', !under.success && under.painted.size === 4);
 
   // an empty loop is flagged
-  check('a REPEAT with nothing before it is an empty loop', expandPaint(P('ppRepeatRow', 2)).emptyLoop);
+  check('a REPEAT with nothing before it is an empty loop', expandPaint(P(['ppRepeatRow', 2])).emptyLoop);
 
   // determinism
   check('runPaint is deterministic', JSON.stringify(runPaint(nested, goal)) === JSON.stringify(rn));
@@ -2759,7 +2796,7 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
         id: 'x', ownerId: 'item-1', trigger: { kind: 'onTap' as const, targetId: 'item-1' },
         commands: [{
           kind: 'repeatUntil' as const,
-          test: { kind: 'stateIs' as const, targetId: 'item-1', state: 'collected' },
+          test: { kind: 'stateIs' as const, targetId: 'item-1', state: 'collected' as const },
           body: [{ kind: 'playSound' as const, sound: 'tap' as const }],
         }],
       }],
@@ -4569,6 +4606,840 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const css = readFileSync('src/styles/tokens.css', 'utf8');
     return /--font-display:[^;]*ui-rounded/.test(css)
       && /--font-body:[^;]*ui-rounded/.test(css);
+  })());
+}
+
+
+// ============================================================
+// Intelligent Systems — the shared helper engine
+// ============================================================
+{
+  // ---- fixtures ------------------------------------------------------
+  const wateringCan: AgentToolDefinition = {
+    id: 'can', titleToken: 'watering can', icon: '🚿',
+    capabilities: ['water'], allowedTargets: ['flower'], requiresApproval: false,
+  };
+  const spade: AgentToolDefinition = {
+    id: 'spade', titleToken: 'spade', icon: '🪏',
+    capabilities: ['grab'], allowedTargets: ['flower'], requiresApproval: true,
+  };
+  const wateredMemory: AgentMemoryDefinition = {
+    id: 'watered', titleToken: 'watered', valueType: 'token-set',
+    initialValue: [], maximumEntries: 10, resetPolicy: 'level',
+  };
+  const countMemory: AgentMemoryDefinition = {
+    id: 'howMany', titleToken: 'how many', valueType: 'number',
+    initialValue: 0, resetPolicy: 'level',
+  };
+
+  const flower = (id: string, attrs: string[] = ['droopy'], clear = true): AgentObservation =>
+    ({ subjectId: id, kind: 'flower', attributes: attrs, clear });
+
+  const gardener = (over: Partial<AgentDefinition> = {}): AgentDefinition => ({
+    id: 'gardener',
+    goal: {
+      id: 'keep-healthy', titleToken: 'keep flowers healthy', priority: 1,
+      successConditions: [{ kind: 'allHandled', subjectKind: 'flower' }],
+    },
+    tools: [wateringCan, spade],
+    rules: [{
+      id: 'water-droopy', priority: 1, enabled: true,
+      condition: { kind: 'hasAttribute', value: 'droopy' },
+      action: { kind: 'useTool', toolId: 'can' },
+    }],
+    memory: [wateredMemory, countMemory],
+    examples: [],
+    requiresApprovalFor: [],
+    limits: DEFAULT_LIMITS,
+    ...over,
+  });
+
+  const garden = (n: number, attrs: string[] = ['droopy']): AgentWorld =>
+    ({ subjects: Array.from({ length: n }, (_, i) => flower(`flower-${i + 1}`, attrs)) });
+
+  // ---- Phase 2: goals, tools, rules, memory ---------------------------
+  check('a helper with a matching rule acts on every subject', (() => {
+    const r = runAgent(gardener(), garden(3));
+    return r.handled.length === 3 && r.goalReached;
+  })());
+  check('a goal is judged against the world, never against the plan', (() => {
+    // The SAME goal, reached by a helper with a completely different rule
+    // set. This is what makes more than one right answer possible (§13).
+    const viaSkipThenWater = gardener({
+      rules: [
+        { id: 'ignore-happy', priority: 1, enabled: true,
+          condition: { kind: 'notAttribute', value: 'droopy' }, action: { kind: 'skip' } },
+        { id: 'water', priority: 2, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } },
+      ],
+    });
+    return runAgent(viaSkipThenWater, garden(3)).goalReached;
+  })());
+  check('a rule that does not match leaves the subject alone', (() => {
+    const r = runAgent(gardener(), garden(2, ['happy']));
+    return r.handled.length === 0
+      && r.trace.every((t) => t.outcome.kind === 'noRuleMatched');
+  })());
+  check('walking past something is still recorded', (() => {
+    // The row a child needs when asking "why did it ignore that one?"
+    const r = runAgent(gardener(), garden(2, ['happy']));
+    return r.trace.length === 2;
+  })());
+  check('rules run in priority order, lowest first', (() => {
+    const a = gardener({
+      rules: [
+        { id: 'second', priority: 9, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'skip' } },
+        { id: 'first', priority: 1, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } },
+      ],
+    });
+    return runAgent(a, garden(1)).trace[0].selectedRuleId === 'first';
+  })());
+  check('equal priorities break on the order the child arranged them', (() => {
+    const a = gardener({
+      rules: [
+        { id: 'top', priority: 1, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'skip' } },
+        { id: 'bottom', priority: 1, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } },
+      ],
+    });
+    return runAgent(a, garden(1)).trace[0].selectedRuleId === 'top';
+  })());
+  check('a disabled rule never fires', (() => {
+    const a = gardener({
+      rules: [{ id: 'off', priority: 1, enabled: false,
+        condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } }],
+    });
+    return runAgent(a, garden(2)).handled.length === 0;
+  })());
+  check('the trace lists every rule that could have fired, not just the winner', (() => {
+    const a = gardener({
+      rules: [
+        { id: 'a', priority: 1, enabled: true, condition: { kind: 'always' }, action: { kind: 'skip' } },
+        { id: 'b', priority: 2, enabled: true, condition: { kind: 'always' }, action: { kind: 'skip' } },
+      ],
+    });
+    return runAgent(a, garden(1)).trace[0].candidateRules.join(',') === 'a,b';
+  })());
+  check('the same helper and world always produce the same trace', (() => {
+    const a = gardener();
+    const one = JSON.stringify(runAgent(a, garden(4)).trace);
+    const two = JSON.stringify(runAgent(a, garden(4)).trace);
+    return one === two;
+  })());
+  check('running a helper never mutates the world it was given', (() => {
+    const w = garden(2);
+    const before = JSON.stringify(w);
+    runAgent(gardener(), w);
+    return JSON.stringify(w) === before;
+  })());
+  check('AND with no clauses is true, so a half-built rule never blocks', (() => {
+    return evalAgentCondition({ kind: 'and', all: [] }, flower('f'), {});
+  })());
+  check('OR with no clauses is false', (() => {
+    return !evalAgentCondition({ kind: 'or', any: [] }, flower('f'), {});
+  })());
+  check('NOT flips its test', (() => {
+    const c: AgentCondition = { kind: 'not', test: { kind: 'hasAttribute', value: 'droopy' } };
+    return !evalAgentCondition(c, flower('f', ['droopy']), {})
+      && evalAgentCondition(c, flower('f', ['happy']), {});
+  })());
+  check('a rule shadowed by an earlier always-rule is reported', (() => {
+    const rules: AgentRuleDefinition[] = [
+      { id: 'catch-all', priority: 1, enabled: true, condition: { kind: 'always' }, action: { kind: 'skip' } },
+      { id: 'never-runs', priority: 2, enabled: true,
+        condition: { kind: 'hasAttribute', value: 'droopy' }, action: { kind: 'skip' } },
+    ];
+    return shadowedRules(rules).join(',') === 'never-runs';
+  })());
+  check('nothing is called shadowed when there is no catch-all', (() => {
+    const rules: AgentRuleDefinition[] = [
+      { id: 'a', priority: 1, enabled: true,
+        condition: { kind: 'hasAttribute', value: 'droopy' }, action: { kind: 'skip' } },
+      { id: 'b', priority: 2, enabled: true,
+        condition: { kind: 'hasAttribute', value: 'happy' }, action: { kind: 'skip' } },
+    ];
+    return shadowedRules(rules).length === 0;
+  })());
+
+  // ---- memory --------------------------------------------------------
+  check('memory starts from its declared initial value', (() => {
+    const m = initialMemory([wateredMemory, countMemory]);
+    return Array.isArray(m.watered) && m.watered.length === 0 && m.howMany === 0;
+  })());
+  check('remembering the same thing twice changes nothing', (() => {
+    let m = initialMemory([wateredMemory]);
+    m = remember(m, wateredMemory, 'flower-1', DEFAULT_LIMITS).state;
+    const once = JSON.stringify(m);
+    m = remember(m, wateredMemory, 'flower-1', DEFAULT_LIMITS).state;
+    return JSON.stringify(m) === once;
+  })());
+  check('a memory that is full says so instead of growing forever', (() => {
+    const small: AgentMemoryDefinition = { ...wateredMemory, maximumEntries: 2 };
+    let m = initialMemory([small]);
+    m = remember(m, small, 'a', DEFAULT_LIMITS).state;
+    m = remember(m, small, 'b', DEFAULT_LIMITS).state;
+    const third = remember(m, small, 'c', DEFAULT_LIMITS);
+    return third.full && (third.state.watered as string[]).length === 2;
+  })());
+  check("the helper's own budget caps memory even when the memory asks for more", (() => {
+    const greedy: AgentMemoryDefinition = { ...wateredMemory, maximumEntries: 999 };
+    const tight = { ...DEFAULT_LIMITS, maximumMemoryEntries: 1 };
+    let m = initialMemory([greedy]);
+    m = remember(m, greedy, 'a', tight).state;
+    return remember(m, greedy, 'b', tight).full;
+  })());
+  check('forgetting puts a memory back to how it started', (() => {
+    let m = initialMemory([wateredMemory]);
+    m = remember(m, wateredMemory, 'x', DEFAULT_LIMITS).state;
+    m = forget(m, wateredMemory);
+    return (m.watered as string[]).length === 0;
+  })());
+  check('counting only works on a number memory', (() => {
+    const m = count(initialMemory([wateredMemory]), wateredMemory, 1);
+    return Array.isArray(m.watered);
+  })());
+  check('level memory is cleared at a level boundary', (() => {
+    let m = initialMemory([wateredMemory]);
+    m = remember(m, wateredMemory, 'x', DEFAULT_LIMITS).state;
+    const after = carryOver(m, [wateredMemory], 'level');
+    return (after.watered as string[]).length === 0;
+  })());
+  check('project memory survives a level boundary', (() => {
+    const projectMem: AgentMemoryDefinition = { ...wateredMemory, resetPolicy: 'project' };
+    let m = initialMemory([projectMem]);
+    m = remember(m, projectMem, 'x', DEFAULT_LIMITS).state;
+    const after = carryOver(m, [projectMem], 'level');
+    return (after.watered as string[]).length === 1;
+  })());
+  check('memory a helper reads is captured in the trace, not looked up later', (() => {
+    // The whole point of §18: a trace has to hold the memory the decision
+    // was made against, or a wrong answer is only re-runnable, never
+    // explainable.
+    const a = gardener({
+      rules: [
+        { id: 'remember-it', priority: 1, enabled: true,
+          condition: { kind: 'memoryLacks', memoryId: 'watered' },
+          action: { kind: 'remember', memoryId: 'watered' } },
+      ],
+    });
+    const r = runAgent(a, garden(2));
+    const first = r.trace[0].memoryRead.find((x) => x.memoryId === 'watered');
+    const second = r.trace[1].memoryRead.find((x) => x.memoryId === 'watered');
+    return (first!.value as string[]).length === 0 && (second!.value as string[]).length === 1;
+  })());
+  check('a helper can be told not to do the same job twice', (() => {
+    const a = gardener({
+      goal: { id: 'g', titleToken: 'g', priority: 1,
+        successConditions: [{ kind: 'countAtLeast', memoryId: 'howMany', value: 99 }] },
+      rules: [
+        { id: 'skip-known', priority: 1, enabled: true,
+          condition: { kind: 'memoryContains', memoryId: 'watered' }, action: { kind: 'skip' } },
+        { id: 'water-new', priority: 2, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'remember', memoryId: 'watered' } },
+      ],
+    });
+    const r = runAgent(a, { subjects: [flower('f1'), flower('f1'), flower('f2')] });
+    return (r.memory.watered as string[]).length === 2;
+  })());
+
+  // ---- Phase 3: confidence ------------------------------------------
+  check('a helper that cannot see clearly is never confident', (() => {
+    const a = assessConfidence({
+      subject: flower('f', ['droopy'], false), rules: gardener().rules, memory: {},
+    });
+    return a.state === 'unsure';
+  })());
+  check('no matching rule reads as unsure', (() => {
+    const a = assessConfidence({ subject: flower('f', ['happy']), rules: gardener().rules, memory: {} });
+    return a.state === 'unsure';
+  })());
+  check('exactly one matching rule and a clear view reads as confident', (() => {
+    const a = assessConfidence({ subject: flower('f'), rules: gardener().rules, memory: {} });
+    return a.state === 'confident';
+  })());
+  check('two rules matching the same thing reads as maybe', (() => {
+    const rules: AgentRuleDefinition[] = [
+      { id: 'a', priority: 1, enabled: true, condition: { kind: 'always' }, action: { kind: 'skip' } },
+      { id: 'b', priority: 2, enabled: true, condition: { kind: 'always' }, action: { kind: 'skip' } },
+    ];
+    return assessConfidence({ subject: flower('f'), rules, memory: {} }).state === 'maybe';
+  })());
+  check('confidence always says WHY, never just how much', (() => {
+    const a = assessConfidence({ subject: flower('f', ['droopy'], false), rules: [], memory: {} });
+    return a.reasons.length > 0 && a.reasons.every((r) => r.trim().length > 0);
+  })());
+  check('the weakest input decides — a helper is only as sure as its worst part', (() => {
+    return weakest(['confident', 'unsure', 'maybe']) === 'unsure'
+      && weakest(['confident', 'maybe']) === 'maybe'
+      && weakest([]) === 'confident';
+  })());
+  check('confidence is never a percentage for a child', (() => {
+    // §9: no percentages by default. Shape, face and words instead.
+    const values = Object.values(CONFIDENCE_PHRASE).concat(Object.values(CONFIDENCE_LABEL));
+    return values.every((v) => !/\d/.test(v));
+  })());
+  check('an unsure helper is not offered "just try it"', (() => {
+    // §9: the child has to give it something, not tell it to guess.
+    return !actionsFor('unsure').includes('try') && actionsFor('confident').includes('try');
+  })());
+  check('stopping safely is offered at every confidence level', (() => {
+    return (['confident', 'maybe', 'unsure'] as const)
+      .every((s) => actionsFor(s).includes('stopSafely'));
+  })());
+  check('asking a grown-up is offered exactly when the helper is unsure', (() => {
+    return actionsFor('unsure').includes('askAGrownUp')
+      && !actionsFor('confident').includes('askAGrownUp');
+  })());
+  check('confidence is never authored by a level — only derived', (() => {
+    // Guards the design decision. If a ConfidenceState ever becomes a
+    // field on a level or a rule, this fails and someone has to argue for it.
+    const src = readFileSync('src/agents/types.ts', 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    const ruleBlock = src.slice(src.indexOf('interface AgentRuleDefinition'));
+    return !ruleBlock.slice(0, 400).includes('ConfidenceState');
+  })());
+
+  // ---- Phase 4: human approval ---------------------------------------
+  check('a tool marked as needing approval stops the run to ask', (() => {
+    const a = gardener({
+      rules: [{ id: 'dig', priority: 1, enabled: true,
+        condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'spade' } }],
+    });
+    const r = runAgent(a, garden(2));
+    return r.pendingApproval !== null && r.handled.length === 0;
+  })());
+  check('the child can gate a tool the helper does not think is dangerous', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    return runAgent(a, garden(1)).pendingApproval !== null;
+  })());
+  check('an approval question names the actual thing, not "an action"', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const p = runAgent(a, garden(1)).pendingApproval!;
+    return p.childFacingPrompt.includes('watering can') && p.childFacingPrompt.includes('flower');
+  })());
+  check('answering yes lets the run carry on', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const r = runAgent(a, garden(2), { approvals: ['approved', 'approved'] });
+    return r.handled.length === 2 && r.pendingApproval === null;
+  })());
+  check('answering "change the plan" skips that one and keeps going', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const r = runAgent(a, garden(2), { approvals: ['changed', 'approved'] });
+    return r.handled.length === 1;
+  })());
+  check('cancelling stops the helper there', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const r = runAgent(a, garden(3), { approvals: ['cancelled'] });
+    return r.stoppedBecause === 'approvalDeclined' && r.handled.length === 0;
+  })());
+  check('a run waiting for approval is replayable from its answers alone', (() => {
+    // No callbacks, no clock: (helper, world, answers) fully describes it.
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const one = JSON.stringify(runAgent(a, garden(3), { approvals: ['approved', 'changed'] }).trace);
+    const two = JSON.stringify(runAgent(a, garden(3), { approvals: ['approved', 'changed'] }).trace);
+    return one === two;
+  })());
+  check('every approval answer counts as a successful outcome', (() => {
+    // §25: asking must never score below acting, including when the
+    // answer is no.
+    return (['approved', 'changed', 'cancelled'] as const).every(isSuccessfulOutcome);
+  })());
+  check('the helper waiting for a person is visible in the trace', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const r = runAgent(a, garden(1));
+    return r.trace.some((t) => t.approvalRequested && t.outcome.kind === 'waitingForApproval');
+  })());
+
+  // ---- Phase 5: teach by example -------------------------------------
+  const berrySet: ExampleSet = {
+    id: 'berries', labels: ['berry', 'not-berry'],
+    examples: [
+      { id: 'e1', inputToken: 'strawberry', labelToken: 'berry', source: 'starter' },
+      { id: 'e2', inputToken: 'blueberry', labelToken: 'berry', source: 'starter' },
+      { id: 'e3', inputToken: 'bolt', labelToken: 'not-berry', source: 'starter' },
+    ],
+  };
+  check('a helper can label something it has been shown', (() => {
+    return classify(berrySet, 'strawberry').label === 'berry';
+  })());
+  check('a helper says it does not know rather than guessing', (() => {
+    const g = classify(berrySet, 'mango');
+    return g.label === null && g.confidence === 'unsure';
+  })());
+  check('one example is a fact about one thing, not a pattern', (() => {
+    const thin: ExampleSet = { ...berrySet, examples: [berrySet.examples[0], berrySet.examples[2]] };
+    return classify(thin, 'strawberry').confidence === 'maybe';
+  })());
+  check('two examples pointing the same way earn confidence', (() => {
+    const twice: ExampleSet = {
+      ...berrySet,
+      examples: [...berrySet.examples,
+        { id: 'e4', inputToken: 'strawberry', labelToken: 'berry', source: 'child-corrected' }],
+    };
+    return classify(twice, 'strawberry').confidence === 'confident';
+  })());
+  check('a helper shown only one kind of answer is flagged as one-sided', (() => {
+    const oneSided: ExampleSet = {
+      id: 's', labels: ['berry', 'not-berry'],
+      examples: [
+        { id: 'a', inputToken: 'strawberry', labelToken: 'berry', source: 'starter' },
+        { id: 'b', inputToken: 'raspberry', labelToken: 'berry', source: 'starter' },
+      ],
+    };
+    return inspectExamples(oneSided).some((p) => p.kind === 'oneSided');
+  })());
+  check('too few examples is reported before anything else', (() => {
+    const thin: ExampleSet = { id: 's', labels: ['berry'], examples: [] };
+    return inspectExamples(thin)[0].kind === 'tooFew';
+  })());
+  check('two examples disagreeing about the same thing is a conflict', (() => {
+    const conflicted: ExampleSet = {
+      ...berrySet,
+      examples: [...berrySet.examples,
+        { id: 'x', inputToken: 'strawberry', labelToken: 'not-berry', source: 'starter' }],
+    };
+    const problems = inspectExamples(conflicted);
+    return problems[0].kind === 'conflict';
+  })());
+  check('a conflicted example makes the helper unsure, not wrong', (() => {
+    const conflicted: ExampleSet = {
+      ...berrySet,
+      examples: [...berrySet.examples,
+        { id: 'x', inputToken: 'strawberry', labelToken: 'not-berry', source: 'starter' }],
+    };
+    const g = classify(conflicted, 'strawberry');
+    return g.label === null && g.confidence === 'unsure';
+  })());
+  check('correcting an example replaces it rather than arguing with it', (() => {
+    const fixed = correctExample(berrySet, 'strawberry', 'not-berry', 'fix1');
+    const problems = inspectExamples(fixed);
+    return classify(fixed, 'strawberry').label === 'not-berry'
+      && !problems.some((p) => p.kind === 'conflict');
+  })());
+  check('an example outside the approved labels is refused', (() => {
+    // No free text can become a label.
+    const same = addExample(berrySet, {
+      id: 'bad', inputToken: 'rock', labelToken: 'sandwich', source: 'child-corrected',
+    });
+    return same.examples.length === berrySet.examples.length;
+  })());
+  check('classification shows which examples decided it', (() => {
+    const g = classify(berrySet, 'bolt');
+    return g.basis.length === 1 && g.basis[0].id === 'e3';
+  })());
+  check('example problems are explained without technical words', (() => {
+    // §8 bans "training distribution", "bias", "model weights" and friends.
+    const banned = /bias|distribution|weights|probabilit|statistic|model|calibrat/i;
+    return inspectExamples({ id: 'x', labels: ['a', 'b'], examples: [] })
+      .every((p) => !banned.test(describeProblem(p)));
+  })());
+  check('an example set is a plain value the caller owns', (() => {
+    // §7: every learned classification stays scoped. Nothing here is
+    // global and nothing persists on its own.
+    const src = readFileSync('src/agents/examples.ts', 'utf8');
+    return !/localStorage|indexedDB|window\./.test(src);
+  })());
+
+  // ---- Phase 6: edge cases -------------------------------------------
+  check('an edge case changes the world without touching the original', (() => {
+    const w = garden(3);
+    const before = JSON.stringify(w);
+    applyPatches(w, {}, edgeCase('cannot-see').changedInitialState);
+    return JSON.stringify(w) === before;
+  })());
+  check('the fog scenario really does stop the helper seeing', (() => {
+    const { world: w } = applyPatches(garden(3), {}, edgeCase('cannot-see').changedInitialState);
+    return w.subjects.some((s) => !s.clear);
+  })());
+  check('a helper that cannot see is unsure in the edge case, not wrong', (() => {
+    const { world: w } = applyPatches(garden(1), {}, edgeCase('cannot-see').changedInitialState);
+    return runAgent(gardener(), w).overallConfidence === 'unsure';
+  })());
+  check('the already-done scenario preloads memory', (() => {
+    const { memory } = applyPatches(garden(3), initialMemory([wateredMemory]),
+      edgeCase('already-done').changedInitialState);
+    return (memory.watered as string[]).length === 2;
+  })());
+  check('the nothing-to-do scenario empties the world', (() => {
+    const { world: w } = applyPatches(garden(3), {}, edgeCase('nothing-to-do').changedInitialState);
+    return w.subjects.length === 0;
+  })());
+  check('a plan still ends tidily when there is nothing to do', (() => {
+    const { world: w } = applyPatches(garden(3), {}, edgeCase('nothing-to-do').changedInitialState);
+    const r = runAgent(gardener(), w);
+    return r.trace.length === 0 && r.stoppedBecause === 'noRuleMatched';
+  })());
+  check('the same edge case is offered again on a replay, never a random one', (() => {
+    // A random surprise would make "try again" a lottery; the child has
+    // to be able to fix their plan and watch it hold.
+    const w = garden(3);
+    return pickEdgeCase(w, [])?.id === pickEdgeCase(w, [])?.id;
+  })());
+  check('an edge case that would change nothing here is not offered', (() => {
+    const empty: AgentWorld = { subjects: [] };
+    return !appliesTo(edgeCase('cannot-see'), empty);
+  })());
+  check('seen edge cases are not repeated', (() => {
+    const w = garden(3);
+    const first = pickEdgeCase(w, [])!;
+    return pickEdgeCase(w, [first.id])?.id !== first.id;
+  })());
+  check('every edge case is phrased as an invitation, never a warning', (() => {
+    // §12: no trick questions, no harsh failure, no shame, no timers.
+    // Word-bounded on purpose — an earlier version of this check matched
+    // "time" inside "This time," and reported a perfectly kind sentence.
+    const harsh = /\b(fail(ed|s)?|wrong|lose|lost|mistake|hurry|quickly|timer|score)\b/i;
+    return EDGE_CASES.every((e) => !harsh.test(e.childFacingPrompt));
+  })());
+  check('every edge case names what it teaches', (() => {
+    return EDGE_CASES.every((e) => e.childFacingLesson.trim().length > 0
+      && e.expectedConcepts.length > 0);
+  })());
+
+  // ---- Phase 7: more than one right answer ---------------------------
+  const direct = evaluateSolution({
+    worksAgainstGoal: true, commandCount: 3, usesLoop: false, usesFunction: false,
+    usesCondition: false, hasStoppingRule: false, usesApproval: false,
+    usesMemory: false, handlesEdgeCases: [],
+  });
+  const looped = evaluateSolution({
+    worksAgainstGoal: true, commandCount: 2, usesLoop: true, usesFunction: false,
+    usesCondition: false, hasStoppingRule: false, usesApproval: false,
+    usesMemory: false, handlesEdgeCases: [],
+  });
+  const adaptive = evaluateSolution({
+    worksAgainstGoal: true, commandCount: 2, usesLoop: true, usesFunction: false,
+    usesCondition: false, hasStoppingRule: true, usesApproval: false,
+    usesMemory: false, handlesEdgeCases: ['all-the-same'],
+  });
+  check('all three of the addendum’s example solutions work', (() => {
+    return direct.works && looped.works && adaptive.works;
+  })());
+  check('the direct plan is described as direct, not as worse', (() => {
+    return direct.explanationTokens.includes('direct')
+      && TRAIT_PHRASE.direct === 'You gave every step.';
+  })());
+  check('a loop is called clever and a stopping rule adaptable', (() => {
+    return looped.explanationTokens.includes('clever')
+      && adaptive.explanationTokens.includes('adaptable');
+  })());
+  check('comparing two working plans never picks a winner', (() => {
+    const c = compareSolutions(direct, adaptive);
+    return c.bothWork && !('better' in c) && !('winner' in c) && !('score' in c);
+  })());
+  check('no trait is phrased as a deficiency', (() => {
+    // Ranking words, not the word "not": "Does not do the same job twice"
+    // is a strength stated plainly, and an earlier version of this check
+    // failed it for containing "not ".
+    const negative = /\b(worse|worst|best|better|bad|poor|inefficient|suboptimal|fail(ed|s)?|wrong)\b/i;
+    return Object.values(TRAIT_PHRASE).every((p) => !negative.test(p))
+      && Object.values(TRAIT_STRENGTH).every((p) => !negative.test(p));
+  })());
+  check('a shorter plan is noted as shorter, and nothing more', (() => {
+    const c = compareSolutions(looped, direct);
+    return c.childFacingSummary.includes('fewer tiles')
+      && c.childFacingSummary.includes('good at different things');
+  })());
+  check('surviving an edge case earns "tested"', (() => {
+    return adaptive.explanationTokens.includes('tested')
+      && !direct.explanationTokens.includes('tested');
+  })());
+  check('asking first is a trait a plan HAS, not a cost it pays', (() => {
+    const careful = evaluateSolution({
+      worksAgainstGoal: true, commandCount: 4, usesLoop: false, usesFunction: false,
+      usesCondition: false, hasStoppingRule: false, usesApproval: true,
+      usesMemory: false, handlesEdgeCases: [],
+    });
+    return careful.explanationTokens.includes('careful')
+      && careful.conceptsShown.includes('agents');
+  })());
+  check('every tradeoff card leaves both answers open', (() => {
+    // §14: never declare one approach universally best.
+    return TRADEOFF_CARDS.every((c) =>
+      c.optionA.whenBetter.trim().length > 0 && c.optionB.whenBetter.trim().length > 0)
+      && TRADEOFF_CARDS.every((c) => !('correct' in c.optionA) && !('correct' in c.optionB));
+  })());
+  check('a plan that does not reach the goal is compared gently', (() => {
+    const broken = evaluateSolution({
+      worksAgainstGoal: false, commandCount: 1, usesLoop: false, usesFunction: false,
+      usesCondition: false, hasStoppingRule: false, usesApproval: false,
+      usesMemory: false, handlesEdgeCases: [],
+    });
+    const c = compareSolutions(direct, broken);
+    return !c.bothWork && !/wrong|fail/i.test(c.childFacingSummary);
+  })());
+
+  // ---- safe stopping (§11, §29) --------------------------------------
+  check('a helper always stops, whatever the child builds', (() => {
+    const forever = gardener({
+      goal: { id: 'never', titleToken: 'never', priority: 1,
+        successConditions: [{ kind: 'countAtLeast', memoryId: 'howMany', value: 999999 }] },
+      rules: [{ id: 'loop', priority: 1, enabled: true,
+        condition: { kind: 'always' }, action: { kind: 'skip' } }],
+    });
+    const r = runAgent(forever, garden(50));
+    return r.trace.length <= DEFAULT_LIMITS.maximumSteps;
+  })());
+  check('the step limit is reported as a reason, never as an error', (() => {
+    const forever = gardener({
+      goal: { id: 'never', titleToken: 'never', priority: 1,
+        successConditions: [{ kind: 'countAtLeast', memoryId: 'howMany', value: 999999 }] },
+      rules: [{ id: 'act', priority: 1, enabled: true,
+        condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } }],
+    });
+    const r = runAgent(forever, garden(200));
+    return r.stoppedBecause === 'stepLimit' || r.stoppedBecause === 'actionLimit';
+  })());
+  check('a helper keeps everything it built when it stops safely', (() => {
+    const forever = gardener({
+      goal: { id: 'never', titleToken: 'never', priority: 1,
+        successConditions: [{ kind: 'countAtLeast', memoryId: 'howMany', value: 999999 }] },
+      rules: [{ id: 'note', priority: 1, enabled: true,
+        condition: { kind: 'memoryLacks', memoryId: 'watered' },
+        action: { kind: 'remember', memoryId: 'watered' } }],
+    });
+    const r = runAgent(forever, garden(200));
+    return r.trace.length > 0 && Array.isArray(r.memory.watered);
+  })());
+  check('the same subject cannot be worked on forever', (() => {
+    const a = gardener({
+      goal: { id: 'never', titleToken: 'never', priority: 1,
+        successConditions: [{ kind: 'flagIs', memoryId: 'nope', value: true }] },
+      rules: [{ id: 'again', priority: 1, enabled: true,
+        condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } }],
+    });
+    const one = flower('only-one');
+    const r = runAgent(a, { subjects: [one, one, one, one, one, one, one, one] });
+    const touched = r.trace.filter((t) => t.outcome.kind === 'acted').length;
+    return touched <= DEFAULT_LIMITS.maximumRepeatsPerSubject;
+  })());
+  check('a limit of zero falls back to the default instead of freezing the level', (() => {
+    // A cap of 0 means the helper stops before its first step, and the
+    // level looks broken rather than protected.
+    return withDefaults({ maximumSteps: 0 }).maximumSteps === DEFAULT_LIMITS.maximumSteps
+      && withDefaults({ maximumActions: -3 }).maximumActions === DEFAULT_LIMITS.maximumActions;
+  })());
+  check('a corrupted save cannot remove a helper’s limits', (() => {
+    return withDefaults({ maximumSteps: NaN }).maximumSteps === DEFAULT_LIMITS.maximumSteps
+      && withDefaults(undefined).maximumSteps > 0;
+  })());
+  check('a beginner helper is gentler but no less protected', (() => {
+    return BEGINNER_LIMITS.maximumSteps < DEFAULT_LIMITS.maximumSteps
+      && BEGINNER_LIMITS.maximumSteps > 0
+      && BEGINNER_LIMITS.maximumMemoryEntries > 0;
+  })());
+  check('every safe-stop reason has words a child can hear', (() => {
+    const reasons = ['goalReached', 'stepLimit', 'actionLimit', 'memoryLimit',
+      'approvalDeclined', 'cannotSee', 'noRuleMatched'] as const;
+    return reasons.every((r) => SAFE_STOP_PHRASE[r].trim().length > 0);
+  })());
+  check('stopping because you were told no is not a failure', (() => {
+    return isSuccessfulStop('approvalDeclined') && isSuccessfulStop('cannotSee')
+      && isSuccessfulStop('goalReached');
+  })());
+  check('a full memory stops the helper rather than dropping what it knows', (() => {
+    const tiny: AgentMemoryDefinition = { ...wateredMemory, maximumEntries: 2 };
+    const a = gardener({
+      memory: [tiny],
+      goal: { id: 'never', titleToken: 'never', priority: 1,
+        successConditions: [{ kind: 'countAtLeast', memoryId: 'watered', value: 99 }] },
+      rules: [{ id: 'note', priority: 1, enabled: true,
+        condition: { kind: 'memoryLacks', memoryId: 'watered' },
+        action: { kind: 'remember', memoryId: 'watered' } }],
+    });
+    const r = runAgent(a, garden(6));
+    return r.stoppedBecause === 'memoryLimit' && (r.memory.watered as string[]).length === 2;
+  })());
+
+  // ---- traces, BopLens and Think Trail (§18, §19) ---------------------
+  check('every decision becomes a four-line explanation', (() => {
+    const r = runAgent(gardener(), garden(1));
+    const card = toLensCard(r.trace[0]);
+    return card.iSaw.length > 0 && card.iRemembered.length > 0
+      && card.iChose.length > 0 && card.thisHappened.length > 0;
+  })());
+  check('BopLens never says the helper wanted, believed or understood', (() => {
+    // §19: no language implying the Bop is conscious.
+    const banned = /\bwant|\bbelieve|\bunderstood|\bunderstand|\bfeel|\bthinks\b|\bhopes?\b/i;
+    const r = runAgent(gardener({ requiresApprovalFor: ['can'] }), garden(2));
+    const cards = r.trace.map((t) => toLensCard(t));
+    const text = cards.flatMap((c) => [c.iSaw, c.iRemembered, c.iChose, c.thisHappened,
+      ...c.details.map((d) => `${d.label} ${d.value}`)]).join(' ');
+    return !banned.test(text);
+  })());
+  check('the lens explains why a rule won when others also matched', (() => {
+    const a = gardener({
+      rules: [
+        { id: 'water', priority: 1, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'useTool', toolId: 'can' } },
+        { id: 'also-matches', priority: 2, enabled: true,
+          condition: { kind: 'always' }, action: { kind: 'skip' } },
+      ],
+    });
+    const card = toLensCard(runAgent(a, garden(1)).trace[0]);
+    return card.details.some((d) => d.label === 'Other rules that matched');
+  })());
+  check('the lens says why the helper stopped', (() => {
+    const a = gardener({ requiresApprovalFor: ['can'] });
+    const r = runAgent(a, garden(2), { approvals: ['cancelled'] });
+    const last = toLensCard(r.trace[r.trace.length - 1]);
+    return last.details.some((d) => d.label === 'Why I stopped');
+  })());
+  check('confidence rides along with every explanation', (() => {
+    const r = runAgent(gardener(), garden(1));
+    const card = toLensCard(r.trace[0]);
+    return card.confidenceFace.length > 0 && card.confidenceLabel.length > 0;
+  })());
+  check('an empty memory reads as "nothing yet", not as a blank', (() => {
+    const r = runAgent(gardener(), garden(1));
+    return toLensCard(r.trace[0]).iRemembered === 'Nothing yet.';
+  })());
+  check('trail rows plug straight into the existing Think Trail shape', (() => {
+    const rows = toTrailRows(runAgent(gardener(), garden(2)).trace);
+    return rows.length === 2 && rows.every((r) => typeof r.n === 'number'
+      && typeof r.icon === 'string' && typeof r.text === 'string');
+  })());
+  check('asking for help is not marked with a cross', (() => {
+    // §25: careful uncertainty must not look like a mistake.
+    const a = gardener({
+      rules: [{ id: 'ask', priority: 1, enabled: true,
+        condition: { kind: 'always' }, action: { kind: 'askForHelp' } }],
+    });
+    const rows = toTrailRows(runAgent(a, garden(1)).trace);
+    return rows[0].verdict !== 'no';
+  })());
+  check('walking past something IS marked, so the child has something to fix', (() => {
+    const rows = toTrailRows(runAgent(gardener(), garden(1, ['happy'])).trace);
+    return rows[0].verdict === 'no';
+  })());
+  check('tokens are resolved to names the child recognises', (() => {
+    const r = runAgent(gardener(), garden(1));
+    const card = toLensCard(r.trace[0], { can: 'watering can', flower: 'sunflower' });
+    return card.thisHappened.includes('watering can') && card.iSaw.includes('sunflower');
+  })());
+
+  // ---- the shared engine is the only engine (§27) ---------------------
+  check('nothing in the agent engine imports THREE or the DOM', (() => {
+    const files = ['types', 'engine', 'rules', 'memory', 'confidence',
+      'examples', 'approval', 'limits', 'trace', 'edgeCases', 'evaluate'];
+    return files.every((f) => {
+      const src = readFileSync(`src/agents/${f}.ts`, 'utf8');
+      return !/from 'three'|document\.|window\./.test(src);
+    });
+  })());
+  check('the engine needs no network, no model and no chat', (() => {
+    // §28: the child-facing experience stays deterministic and explainable.
+    const files = ['types', 'engine', 'rules', 'memory', 'confidence',
+      'examples', 'approval', 'limits', 'trace', 'edgeCases', 'evaluate'];
+    const banned = /fetch\(|XMLHttpRequest|openai|anthropic|WebSocket|prompt\(/i;
+    return files.every((f) => !banned.test(readFileSync(`src/agents/${f}.ts`, 'utf8')));
+  })());
+  check('the engine draws no randomness and reads no clock', (() => {
+    const files = ['engine', 'rules', 'memory', 'confidence', 'examples',
+      'approval', 'limits', 'trace', 'edgeCases', 'evaluate'];
+    return files.every((f) => {
+      const src = readFileSync(`src/agents/${f}.ts`, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+      return !/Math\.random|Date\.now|performance\.now/.test(src);
+    });
+  })());
+}
+
+// ============================================================
+// Curriculum alignment — layers, worlds, agent ladder, transfer
+// ============================================================
+{
+  check('the four-layer model and the curriculum agree completely', (() => {
+    return validateAlignment().length === 0;
+  })());
+  check('every stage sits in exactly one learning layer', (() => {
+    const counts = new Map<string, number>();
+    for (const l of LEARNING_LAYERS) for (const s of l.stages) {
+      counts.set(s, (counts.get(s) ?? 0) + 1);
+    }
+    return CURRICULUM_STAGES.every((s) => counts.get(s.id) === 1);
+  })());
+  check('every layer speaks to a child as well as to a grown-up', (() => {
+    return LEARNING_LAYERS.every((l) => l.childFacingIdea.trim().length > 0
+      && l.formalName.trim().length > 0);
+  })());
+  check('layerOfStage finds a home for all fourteen stages', (() => {
+    return CURRICULUM_STAGES.every((s) => layerOfStage(s.id).id.length > 0);
+  })());
+
+  check('the world registry holds every world the app can reach', (() => {
+    const ids = WORLDS.map((w) => w.id);
+    return ['sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town',
+      'gearworks-garage', 'agent-academy', 'app-lab', 'imagination-island']
+      .every((w) => ids.includes(w as never));
+  })());
+  check('the level picker reads worlds from the registry, not its own list', (() => {
+    // This drifted once already: the picker knew five worlds while the
+    // curriculum named eight, and nothing noticed for months.
+    const src = readFileSync('src/app/levelSelectScreen.ts', 'utf8');
+    return src.includes("from '../data/worlds'")
+      && !/WORLD_META[^=]*=\s*\{\s*'sparkle-meadow'/.test(src);
+  })());
+  check('every world says what a child walks away holding', (() => {
+    // §2: every major learning journey produces something meaningful.
+    return WORLDS.filter((w) => w.capstone !== null)
+      .every((w) => w.capstone!.trim().length > 0);
+  })());
+  check('the trail is a subset of the worlds, in journey order', (() => {
+    const trail = trailWorlds();
+    const orders = trail.map((w) => w.order);
+    return trail.length > 0 && trail.length <= WORLDS.length
+      && orders.every((o, i) => i === 0 || o > orders[i - 1]);
+  })());
+
+  check('agent ideas start in the very first world', (() => {
+    // §6: do not introduce all agent ideas only at the end.
+    const first = agentProgressionFor('sparkle-meadow');
+    return first !== null && first.introduces.length > 0;
+  })());
+  check('no world revisits an agent idea before one introduces it', (() => {
+    return validateAlignment().every((i) => !i.problem.includes('before anything introduces'));
+  })());
+  check('every agent idea is introduced exactly once', (() => {
+    const counts = new Map<string, number>();
+    for (const p of AGENT_PROGRESSION) for (const c of p.introduces) {
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return AGENT_CONCEPTS.every((c) => counts.get(c.id) === 1);
+  })());
+  check('every agent idea is phrased as a question a child would ask', (() => {
+    return AGENT_CONCEPTS.every((c) => c.childFacingQuestion.trim().endsWith('?'));
+  })());
+  check('progressive disclosure only offers ideas the child has met', (() => {
+    // §30: a beginner sees goal + one tool + one rule, not the lot.
+    const order = (id: string): number => WORLDS.find((w) => w.id === id)?.order ?? 99;
+    const early = agentConceptsAvailableBy('sparkle-meadow', order as never);
+    const late = agentConceptsAvailableBy('agent-academy', order as never);
+    return early.length < late.length
+      && !early.includes('confidence') && late.includes('confidence');
+  })());
+  check('the concept list comes back in a stable order every time', (() => {
+    const order = (id: string): number => WORLDS.find((w) => w.id === id)?.order ?? 99;
+    const a = agentConceptsAvailableBy('robot-town', order as never).join(',');
+    const b = agentConceptsAvailableBy('robot-town', order as never).join(',');
+    return a === b;
+  })());
+
+  check('ideas that travel name more than one world', (() => {
+    return TRANSFER_CHALLENGES.every((t) => t.sites.length >= 2);
+  })());
+  check('a transfer prompt asks where else, never what is the answer', (() => {
+    return TRANSFER_CHALLENGES.every((t) => /where else|other/i.test(t.childFacingPrompt));
+  })());
+  check('loops, conditions and functions all travel', (() => {
+    return ['loops', 'conditions', 'functions'].every((s) => transferFor(s as never) !== null);
+  })());
+  check('stages with only one home are reported, not hidden', (() => {
+    // An honest finding about how much content exists — not a failure.
+    // Five stages sit here today; the number should go DOWN over time.
+    const orphans = stagesWithoutTransfer();
+    return Array.isArray(orphans) && orphans.length <= 6;
   })());
 }
 

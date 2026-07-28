@@ -35,17 +35,25 @@ import { garageTotals } from '../data/gearworks/progress';
 import { APP_LAB_WORLD } from '../data/app-lab/appLabDefinition';
 import { announce } from '../ui/a11y';
 import { backButton } from '../ui/components/button';
+import { WORLDS, trailWorlds } from '../data/worlds';
 
-export const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> = {
-  'sparkle-meadow': { emoji: '🌼', name: 'Sparkle Meadow', theme: 'meadow' },
-  'bubble-bay': { emoji: '🐚', name: 'Bubble Bay', theme: 'bay' },
-  'pattern-forest': { emoji: '🌸', name: 'Pattern Forest', theme: 'forest' },
-  'robot-town': { emoji: '🤖', name: 'Robot Town', theme: 'town' },
-  'agent-academy': { emoji: '🎓', name: 'Agent Academy', theme: 'academy' },
-};
-export const WORLD_ORDER = [
-  'sparkle-meadow', 'bubble-bay', 'pattern-forest', 'robot-town', 'agent-academy',
-];
+/**
+ * Worlds come from `data/worlds.ts` now, not from this file.
+ *
+ * These two exports used to BE the definition, which meant a UI file
+ * owned a fact the curriculum also had an opinion about — and the two
+ * had already drifted apart: the picker knew five worlds while
+ * `stages.ts` named eight. Gearworks, App Lab and Imagination Island
+ * were playable but invisible to every curriculum question about worlds.
+ *
+ * They stay exported because plenty of screens import them; they are
+ * views over the registry now, and the validator checks the two agree.
+ */
+export const WORLD_META: Record<string, { emoji: string; name: string; theme: string }> =
+  Object.fromEntries(WORLDS.map((w) => [w.id, { emoji: w.emoji, name: w.name, theme: w.theme }]));
+
+/** Only the worlds that appear as stones on this trail, in journey order. */
+export const WORLD_ORDER: readonly string[] = trailWorlds().map((w) => w.id);
 
 type StoneState = 'done' | 'open' | 'next' | 'locked' | 'soon';
 

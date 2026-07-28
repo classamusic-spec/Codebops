@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.3.0",
   "type": "module",
-  "description": "CodeBops \u2014 Teach tiny helpers. Build big ideas. A playful coding adventure for ages 3\u20137.",
+  "description": "CodeBops — Teach tiny helpers. Build big ideas. A playful coding adventure for ages 3–7.",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/build-sw.mjs",
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@types/node": "^26.1.2",
     "@types/three": "^0.171.0",
     "eslint": "^9.39.5",
     "typescript": "^5.7.2",

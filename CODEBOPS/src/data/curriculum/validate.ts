@@ -10,6 +10,10 @@ import type { CurriculumStageId } from './stages';
 import { CURRICULUM_STAGES, isStageId, stage, allPrerequisites } from './stages';
 import type { LevelCurriculumMetadata } from './levelMeta';
 import { LEVEL_CURRICULUM, levelsForStage, phasesForStage } from './levelMeta';
+import { LEARNING_LAYERS, layerOfStage } from './layers';
+import { AGENT_PROGRESSION, AGENT_CONCEPTS } from './agentProgression';
+import { TRANSFER_CHALLENGES } from './transfer';
+import { WORLDS, isWorldId } from '../worlds';
 
 export interface CurriculumIssue {
   readonly where: string;
@@ -118,12 +122,128 @@ export function validateCoverage(): CurriculumIssue[] {
   return issues;
 }
 
+/**
+ * The four-layer model (§3), the world registry, the agent ladder and
+ * the transfer registry — all checked against the same fourteen stages.
+ *
+ * These four files are each a second opinion about the curriculum, and a
+ * second opinion is only useful while it is forced to agree with the
+ * first. The inspection found exactly what happens otherwise: the level
+ * picker knew five worlds and the curriculum named eight, for months,
+ * with nothing to notice.
+ */
+export function validateAlignment(): CurriculumIssue[] {
+  const issues: CurriculumIssue[] = [];
+
+  // --- layers: every stage in exactly one, no strays ---
+  const placed = new Map<CurriculumStageId, string>();
+  for (const l of LEARNING_LAYERS) {
+    if (l.stages.length === 0) issues.push(err(l.id, 'layer teaches no stages'));
+    if (!l.childFacingIdea.trim()) issues.push(err(l.id, 'layer has no child-facing idea'));
+    for (const st of l.stages) {
+      if (!isStageId(st)) { issues.push(err(l.id, `unknown stage "${st}"`)); continue; }
+      const already = placed.get(st);
+      if (already) issues.push(err(st, `is in two layers: "${already}" and "${l.id}"`));
+      placed.set(st, l.id);
+    }
+  }
+  for (const s of CURRICULUM_STAGES) {
+    if (!placed.has(s.id)) issues.push(err(s.id, 'is in no learning layer'));
+  }
+  LEARNING_LAYERS.forEach((l, i) => {
+    if (l.order !== i + 1) issues.push(err(l.id, `layer order ${l.order} does not match position ${i + 1}`));
+  });
+
+  // --- worlds: the registry and the curriculum name the same places ---
+  const registryIds = new Set(WORLDS.map((w) => w.id));
+  const curriculumWorlds = new Set<string>();
+  for (const s of CURRICULUM_STAGES) {
+    for (const w of [...s.introductoryWorlds, ...s.practiceWorlds, ...s.transferWorlds]) {
+      curriculumWorlds.add(w);
+    }
+  }
+  for (const w of curriculumWorlds) {
+    if (!registryIds.has(w as never)) issues.push(err('worlds', `curriculum names world "${w}" that the registry does not`));
+  }
+  for (const l of LEVEL_CURRICULUM) {
+    if (!isWorldId(l.world)) issues.push(err(l.levelId, `unknown world "${l.world}"`));
+  }
+  const orders = WORLDS.map((w) => w.order);
+  if (new Set(orders).size !== orders.length) issues.push(err('worlds', 'two worlds share a journey order'));
+  for (const w of WORLDS) {
+    if (!w.name.trim() || !w.emoji.trim()) issues.push(err(w.id, 'world is missing a name or emoji'));
+  }
+
+  // --- agent ladder: every world placed, ideas introduced before reuse ---
+  const conceptIds = new Set(AGENT_CONCEPTS.map((c) => c.id));
+  const covered = new Set(AGENT_PROGRESSION.map((p) => p.world));
+  for (const w of WORLDS) {
+    if (!covered.has(w.id)) issues.push(err(w.id, 'world has no agent-concept progression'));
+  }
+  const introducedSoFar = new Set<string>();
+  const byOrder = [...AGENT_PROGRESSION].sort((a, b) => worldOrder(a.world) - worldOrder(b.world));
+  for (const p of byOrder) {
+    for (const c of p.introduces) {
+      if (!conceptIds.has(c)) issues.push(err(p.world, `unknown agent concept "${c}"`));
+      if (introducedSoFar.has(c)) issues.push(err(p.world, `agent concept "${c}" was already introduced earlier`));
+      introducedSoFar.add(c);
+    }
+    for (const c of p.revisits) {
+      if (!introducedSoFar.has(c)) {
+        issues.push(err(p.world, `revisits agent concept "${c}" before anything introduces it`));
+      }
+    }
+    if (!p.childFacingExample.trim()) issues.push(err(p.world, 'agent progression has no child-facing example'));
+  }
+  for (const c of AGENT_CONCEPTS) {
+    if (!introducedSoFar.has(c.id)) issues.push(err('agents', `concept "${c.id}" is never introduced by any world`));
+  }
+
+  // --- transfer: real stages, real worlds, and genuinely more than one ---
+  for (const t of TRANSFER_CHALLENGES) {
+    if (!isStageId(t.stage)) { issues.push(err('transfer', `unknown stage "${t.stage}"`)); continue; }
+    if (t.sites.length < 2) issues.push(err(t.stage, 'transfer challenge names fewer than two worlds'));
+    if (!t.childFacingPrompt.trim()) issues.push(err(t.stage, 'transfer challenge has no prompt'));
+    for (const site of t.sites) {
+      if (!isWorldId(site.world)) issues.push(err(t.stage, `transfer names unknown world "${site.world}"`));
+      if (!site.childFacingForm.trim()) issues.push(err(t.stage, `transfer site "${site.world}" has no description`));
+    }
+    const worldsNamed = t.sites.map((s) => s.world);
+    if (new Set(worldsNamed).size !== worldsNamed.length) {
+      issues.push(err(t.stage, 'transfer names the same world twice'));
+    }
+  }
+
+  return issues;
+}
+
+function worldOrder(id: string): number {
+  return WORLDS.find((w) => w.id === id)?.order ?? Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * Stages taught in only one place.
+ *
+ * Reported rather than failed: §21 wants ideas to travel, but a stage
+ * with one home is a fact about how much content exists, not a mistake
+ * in this file. Failing here would just pressure someone into writing a
+ * transfer entry that names a world where the idea does not really live.
+ */
+export function stagesWithoutTransfer(): readonly CurriculumStageId[] {
+  const covered = new Set(TRANSFER_CHALLENGES.filter((t) => t.sites.length > 1).map((t) => t.stage));
+  return CURRICULUM_STAGES.filter((s) => !covered.has(s.id)).map((s) => s.id);
+}
+
+/** Which layer a stage belongs to — re-exported so callers need one import. */
+export { layerOfStage };
+
 /** Everything, for the test suite. */
 export function validateCurriculum(): CurriculumIssue[] {
   return [
     ...validateStages(),
     ...LEVEL_CURRICULUM.flatMap(validateLevelMeta),
     ...validateCoverage(),
+    ...validateAlignment(),
   ];
 }
 
