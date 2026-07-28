@@ -4450,6 +4450,25 @@ const SGP = (...cmds: Array<SignalStep['cmd'] | [SignalStep['cmd'], number]>): S
     const src = readFileSync('scripts/build-sw.mjs', 'utf8');
     return /reachable/.test(src) && /queue/.test(src);
   })());
+  check('the crawl resolves a reference against the file that makes it', (() => {
+    // index.html says `assets/index-x.js`, but inside that bundle a lazy
+    // chunk is `import("./zip-y.js")` with no `assets/` in it at all.
+    // Matching only the `assets/` form dropped every character and rig
+    // chunk, and the offline SPLASH still worked — so the omission looked
+    // like a pass right up until a child opened a level.
+    const src = readFileSync('scripts/build-sw.mjs', 'utf8');
+    return /lastIndexOf\('\/'\)/.test(src) && /candidates/.test(src);
+  })());
+  check('Zip, Mixy and the rig are lazily imported, so the crawl must find them', (() => {
+    // These dynamic imports are what Rollup turns into separate chunks,
+    // and separate chunks are what the crawl above has to reach. If they
+    // ever became static imports the bug would stop mattering — and so
+    // would this test, which is exactly why it is pinned here.
+    const src = readFileSync('src/rendering/mascotRig.ts', 'utf8');
+    return /import\('\.\.\/vendor\/codebops-rig\/characters\/zip\.js'\)/.test(src)
+      && /import\('\.\.\/vendor\/codebops-rig\/characters\/mixy\.js'\)/.test(src)
+      && /import\('\.\.\/vendor\/codebops-rig\/codebops-rig\.js'\)/.test(src);
+  })());
 
   // --- Phase 14: the screenshot suite means something ---------------
   check('deterministic mode is opt-in through the URL only', (() => {

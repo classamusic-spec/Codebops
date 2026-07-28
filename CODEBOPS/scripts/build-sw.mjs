@@ -48,7 +48,17 @@ const all = walk(dist)
  * So assets are taken by reachability from index.html rather than by
  * existence. Everything outside assets/ was copied verbatim from public/
  * and is current by definition, so it is kept as-is.
+ *
+ * References are resolved relative to the file that makes them, which is
+ * the whole trick. index.html says `assets/index-x.js`, but inside that
+ * bundle a lazy chunk is `import("./zip-y.js")` — no `assets/` anywhere,
+ * because the bundle already lives there. Matching only on the `assets/`
+ * form silently dropped all four character and rig chunks: the offline
+ * splash still worked, so the omission looked like success, and the app
+ * would only have failed once a child opened an actual level.
  */
+const REF = /["'(](\.{0,2}\/)?((?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+\.(?:js|css|woff2?|svg|png|mp3))["')]/g;
+
 const reachable = new Set();
 const queue = ['index.html'];
 while (queue.length) {
@@ -56,9 +66,15 @@ while (queue.length) {
   if (reachable.has(f) || !existsSync(join(dist, f))) continue;
   reachable.add(f);
   if (!/\.(html|js|css)$/i.test(f)) continue;
+  const here = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '';
   const text = readFileSync(join(dist, f), 'utf8');
-  for (const m of text.matchAll(/assets\/[A-Za-z0-9._-]+\.(?:js|css|woff2?|svg|png|mp3)/g)) {
-    if (!reachable.has(m[0])) queue.push(m[0]);
+  for (const m of text.matchAll(REF)) {
+    const raw = m[2];
+    // Root-relative wins; otherwise resolve against the referring file.
+    const candidates = m[1] === '/' ? [raw] : [here ? `${here}/${raw}` : raw, raw];
+    for (const c of candidates) {
+      if (!reachable.has(c) && existsSync(join(dist, c))) { queue.push(c); break; }
+    }
   }
 }
 

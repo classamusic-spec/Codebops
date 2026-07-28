@@ -4,3 +4,8 @@ dist-standalone/
 # Vercel — deploy-time state, never in git.
 .vercel/
 .vercel
+
+# Build output. Vercel rebuilds it from source (vercel.json buildCommand),
+# and committing it means every build leaves dead hashed bundles behind —
+# emptyOutDir is false, so nothing ever cleans them up.
+dist/
